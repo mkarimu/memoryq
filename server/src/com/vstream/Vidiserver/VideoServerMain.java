@@ -289,6 +289,14 @@ public class VideoServerMain {
         siteContent.init();
         api.setSiteContent(siteContent);
         api.addModule(siteContent::register);
+        // World Radio (memoryq.com/world): stations from all over the world on a spinning globe; members add their own
+        WorldRadio world = new WorldRadio(Paths.get(System.getProperty("vstream.worldFile", "world-radio.txt")), users, sessions,
+                System::currentTimeMillis);
+        world.init();
+        world.setAi(RadioWriter.OpenAi.fromEnvironment());
+        Runtime.getRuntime().addShutdownHook(new Thread(world::flushIfDirty));
+        api.addModule(world::register);
+        world.start();
         ScheduledExecutorService marketTimer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "market-save");
             t.setDaemon(true);

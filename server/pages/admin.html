@@ -180,6 +180,7 @@
       <div class="panel" id="panel-market-pending" hidden><div id="mkPending"></div></div>
       <div class="panel" id="panel-market-reports" hidden><div id="mkReports"></div></div>
       <div class="panel" id="panel-market-all" hidden><div id="mkAll"></div></div>
+      <div class="panel" id="panel-world-stations" hidden><div id="wrList"></div></div>
 
       <div class="panel" id="panel-videos-streamers" hidden>
         <div id="streamersBox"></div>
@@ -1518,6 +1519,8 @@ const NAV = [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
     { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
+  { id: 'world', label: 'World Radio', icon: '\uD83C\uDF0D', tabs: [
+    { id: 'stations', label: 'Stations on the globe', load: loadWorld } ] },
   { id: 'radio', label: 'Radio', icon: '\uD83D\uDCFB', tabs: [
     { id: 'onair', label: 'On air', load: loadRadioLive },
     { id: 'stations', label: 'Stations', load: loadRadioStations, noAuto: true },
@@ -2654,6 +2657,27 @@ async function loadMarket(status) {
   const list = r.data.listings || [];
   if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, status === 'pending' ? 'Nothing is waiting.' : 'No listings yet.')); return; }
   list.forEach(l => root.appendChild(mkRow(l, () => loadMarket(status))));
+}
+// ---- World Radio (memoryq.com/world): the open station list + stations members added ----
+async function loadWorld() {
+  const root = $('wrList'); root.textContent = '';
+  const r = await api('/api/admin/world/status');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data;
+  const imp = h('button', { on: { click: async () => { imp.disabled = true; imp.textContent = 'Fetching (up to a minute)...'; const q = await api('/api/admin/world/import', {}); flash(q.ok ? q.data.imported + ' stations from Radio Browser' : (q.data.error || 'Could not reach Radio Browser'), q.ok); loadWorld(); } } }, 'Refresh the list now');
+  root.appendChild(h('div', { class: 'box muted' }, 'memoryq.com/world shows ' + d.total + ' stations on the globe (' + d.members + ' added by members). The open list comes from Radio Browser (radio-browser.info) and refreshes every day - last: '
+    + (d.lastImport ? when(d.lastImport) : 'not yet') + ' (' + d.importNote + '). Listening through Memoryq right now: ' + d.relaysNow + '. ', h('a', { href: '/world', target: '_blank' }, 'Open World Radio'), h('div', { style: 'margin-top:8px' }, imp)));
+  const list = d.stations || [];
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No member stations or reports yet.')); return; }
+  list.forEach(s => {
+    const act = async op => { const q = await api('/api/admin/world/' + op, { id: s.id }); flash(q.ok ? (op === 'remove' ? 'Taken off the globe' : 'Back on the globe') : (q.data.error || 'Could not'), q.ok); if (q.ok) { loadWorld(); } };
+    root.appendChild(h('div', { class: 'box' },
+      h('div', {}, h('b', {}, s.name), ' ', h('span', { class: 'pill' }, s.status === 'active' ? 'on the globe' : s.status), s.reports ? h('span', { class: 'pill', style: 'background:#fde8e8;color:#c62828' }, s.reports + ' report(s)') : null),
+      h('div', { class: 'muted small' }, [s.city, s.country].filter(Boolean).join(', ') + ' \u00b7 ' + (s.tags || 'no genre') + ' \u00b7 ' + s.plays + ' plays \u00b7 ' + (s.source === 'member' ? 'added by ' : 'Radio Browser') , s.source === 'member' ? userLink(s.addedBy) : null, ' \u00b7 ' + when(s.created)),
+      h('div', { class: 'small', style: 'word-break:break-all' }, s.play.startsWith('/') ? 'http stream (plays through Memoryq)' : s.play),
+      h('div', { style: 'margin-top:6px' }, h('audio', { controls: '', preload: 'none', src: s.play, style: 'height:32px;vertical-align:middle' }), ' ',
+        s.status === 'active' ? h('button', { on: { click: () => act('remove') } }, 'Take off the globe') : h('button', { on: { click: () => act('restore') } }, 'Put back'))));
+  });
 }
 async function loadMarketReports() {
   const root = $('mkReports'); root.textContent = '';

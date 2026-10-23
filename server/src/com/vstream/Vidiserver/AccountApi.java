@@ -183,6 +183,13 @@ public final class AccountApi {
                 servePage(ex, "/market", sibling("market.html"));
             }
         });
+        // World Radio: the globe of radio stations
+        server.createContext("/world", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange ex) throws IOException {
+                servePage(ex, "/world", sibling("world.html"));
+            }
+        });
         server.createContext("/vstream-legal", new HttpHandler() {
             @Override
             public void handle(HttpExchange ex) throws IOException {
