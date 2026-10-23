@@ -1,0 +1,2475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memoryq</title>
+<style>
+  :root {
+    --bg: #f2f4f7; --panel: #ffffff; --ink: #1b1f23; --muted: #667585; --line: #e2e7ed; --soft: #f6f8fa;
+    --side: #1c2630; --side-ink: #c5d0da; --accent: #2f6fed; --accent-soft: #e8efff; --good: #2e7d32; --bad: #c62828;
+    --mine: #dfe9ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --panel: #182029; --ink: #e6ebf0; --muted: #8b9aa8; --line: #2a3542; --soft: #1e2833;
+            --side: #121a22; --side-ink: #b5c2ce; --accent: #5b8cff; --accent-soft: #1f2d4a; --mine: #22345a; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+  a { color: var(--accent); }
+  header { background: #16202a; color: #fff; padding: 8px 16px; display: flex; align-items: center; gap: 10px;
+           position: sticky; top: 0; z-index: 20; height: 52px; }
+  header .brand { font-weight: 800; font-size: 19px; letter-spacing: .3px; flex: 1; }
+  header .hbtn { background: none; border: 0; color: #fff; font-size: 20px; position: relative; padding: 6px 8px; cursor: pointer; margin: 0; }
+  header .hbtn .badge { position: absolute; top: 0; right: -2px; }
+  header .who { display: flex; align-items: center; gap: 8px; color: #dfe7ee; font-size: 14px; cursor: pointer; }
+  header .who img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 52px); }
+  nav#side { background: var(--side); padding: 12px 8px; position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto; }
+  nav#side button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--side-ink);
+                    padding: 10px 12px; border-radius: 8px; font-size: 15px; text-align: left; cursor: pointer; margin: 2px 0; }
+  nav#side button:hover { background: rgba(255,255,255,.07); color: #fff; }
+  nav#side button.active { background: var(--accent); color: #fff; }
+  nav#side .ico { width: 22px; text-align: center; }
+  .badge { margin-left: auto; background: var(--bad); color: #fff; border-radius: 10px; font-size: 12px; padding: 1px 7px; font-weight: 700; line-height: 1.4; }
+  .content { padding: 16px 24px 60px; min-width: 0; max-width: 1100px; }
+  .content h1 { font-size: 22px; margin: 2px 0 10px; }
+  #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  #tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 9px 14px; font-size: 14px; color: var(--muted);
+                 cursor: pointer; white-space: nowrap; margin: 0; display: flex; gap: 6px; align-items: center; border-radius: 0; }
+  #tabs button:hover { color: var(--ink); }
+  #tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .box { background: var(--panel); padding: 14px; border-radius: 10px; border: 1px solid var(--line); margin: 0 0 12px; }
+  button, .btn { cursor: pointer; padding: 6px 12px; margin: 2px 4px 2px 0; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+           border-radius: 8px; font-size: 14px; font-family: inherit; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button.link { border: 0; background: none; padding: 4px 6px; color: var(--muted); }
+  button.link:hover { color: var(--accent); }
+  button:disabled { opacity: .55; cursor: default; }
+  input, select, textarea { padding: 8px 10px; margin: 2px 6px 2px 0; border: 1px solid var(--line); border-radius: 8px; font-size: 14px;
+                            background: var(--panel); color: var(--ink); font-family: inherit; }
+  textarea { width: 100%; resize: vertical; }
+  label.field { display: block; margin: 8px 0; font-size: 13px; color: var(--muted); }
+  label.field input { display: block; width: 100%; max-width: 420px; margin-top: 4px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .grow { flex: 1; min-width: 0; }
+  .av { border-radius: 50%; object-fit: cover; background: var(--soft); flex: none; }
+  .name { font-weight: 600; cursor: pointer; }
+  .name:hover { text-decoration: underline; }
+  .empty { color: var(--muted); padding: 20px 4px; }
+  .chip { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 12px; padding: 2px 10px; font-size: 12px; margin: 2px 4px 2px 0; }
+  .feed { max-width: 680px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 0 0 12px; }
+  .card .text { white-space: pre-wrap; word-wrap: break-word; margin: 10px 0; line-height: 1.45; }
+  .card img.photo { width: 100%; max-height: 520px; object-fit: contain; background: var(--soft); border-radius: 8px; display: block; }
+  .card .acts { display: flex; gap: 4px; border-top: 1px solid var(--line); margin-top: 10px; padding-top: 6px; flex-wrap: wrap; }
+  .card .acts button.on { color: var(--accent); font-weight: 600; }
+  .news h3 { margin: 6px 0; font-size: 17px; }
+  .news h3 a { color: var(--ink); text-decoration: none; }
+  .news h3 a:hover { color: var(--accent); }
+  .comments { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 8px; }
+  .cmt { display: flex; gap: 8px; margin: 6px 0; }
+  .cmt .bubble { background: var(--soft); border-radius: 12px; padding: 6px 10px; display: inline-block; max-width: 100%; }
+  .cmt .bubble .text { margin: 2px 0 0; }
+  .cmt .kids { margin-left: 34px; border-left: 2px solid var(--line); padding-left: 8px; }
+  .reply-box { display: flex; gap: 6px; margin: 6px 0; }
+  .reply-box input { flex: 1; }
+  .slider { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; scroll-snap-type: x mandatory; }
+  .slider .pc { flex: 0 0 170px; scroll-snap-align: start; background: var(--soft); border-radius: 10px; overflow: hidden; cursor: pointer; border: 1px solid var(--line); }
+  .slider .pc img { width: 100%; height: 130px; object-fit: cover; display: block; }
+  .slider .pc div { padding: 8px; font-size: 13px; }
+  .slider .ad { flex: 0 0 260px; }
+  .vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .vcard { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+  .vthumb { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: #26313e; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .vthumb img { width: 100%; height: 100%; object-fit: cover; }
+  .vlen { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.75); color: #fff; font-size: 12px; padding: 1px 6px; border-radius: 4px; }
+  .vt { font-weight: 700; margin-top: 6px; line-height: 1.3; }
+  .people { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .pcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-align: center; }
+  .pcard img { width: 84px; height: 84px; }
+  .pcard .name { display: block; margin: 8px 0 2px; }
+  .pcard.tinted { color: #fff; border-color: transparent; }
+  .pcard.tinted .name { color: #fff; font-weight: 700; }
+  .pcard.tinted .muted { color: rgba(255,255,255,.85); }
+  .pcard.tinted img.av { border: 2px solid rgba(255,255,255,.45); background: rgba(255,255,255,.2); }
+  .pcard.tinted button { background: rgba(255,255,255,.18); color: #fff; border-color: rgba(255,255,255,.35); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid transparent; padding: 0; margin: 0; cursor: pointer;
+            box-shadow: 0 0 0 1px var(--line); }
+  .swatch.on { border-color: var(--panel); box-shadow: 0 0 0 3px var(--ink); }
+  .swatch.auto { background: conic-gradient(#c62828, #8d6e00, #2e7d32, #00838f, #1565c0, #6a1b9a, #c62828); }
+  .colorrow { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .colorrow .pcard { width: 200px; flex: none; }
+  .hero { position: relative; border-radius: 12px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); margin-bottom: 14px; }
+  .hero .bannerwrap { height: 180px; overflow: hidden; background: var(--soft); }
+  .hero .banner { width: 100%; height: 100%; object-fit: cover; display: block; filter: blur(22px) saturate(1.3); transform: scale(1.3); }
+  .hero .info { padding: 0 18px 16px; position: relative; z-index: 1; }
+  .hero .bigav { width: 116px; height: 116px; border: 4px solid var(--panel); margin-top: -58px; }
+  .hero h2 { margin: 6px 0 2px; }
+  .chat { display: grid; grid-template-columns: 260px 1fr; gap: 12px; height: calc(100vh - 200px); min-height: 420px; }
+  .rooms { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow-y: auto; }
+  .rooms .room { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .rooms .room:hover { background: var(--soft); }
+  .rooms .room.active { background: var(--accent-soft); }
+  .rooms .room .last { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .conv { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; min-width: 0; }
+  .conv .top { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .conv .msgs { flex: 1; overflow-y: auto; padding: 10px 14px; }
+  .conv .bottom { border-top: 1px solid var(--line); padding: 8px 10px; }
+  .msg { display: flex; gap: 8px; margin: 8px 0; align-items: flex-start; }
+  .msg .b { background: var(--soft); border-radius: 12px; padding: 6px 10px; max-width: 75%; }
+  .msg.mine { flex-direction: row-reverse; }
+  .msg.mine .b { background: var(--mine); }
+  .msg .t { white-space: pre-wrap; word-wrap: break-word; }
+  .msg .quote { border-left: 3px solid var(--accent); padding-left: 6px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .msg .tools { visibility: hidden; display: flex; gap: 0; align-self: center; }
+  .msg:hover .tools { visibility: visible; }
+  .msg .tools button { padding: 2px 5px; margin: 0; border: 0; background: none; font-size: 14px; }
+  .react { display: inline-block; border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; font-size: 12px; margin: 3px 3px 0 0; cursor: pointer; background: var(--panel); }
+  .react.mine { border-color: var(--accent); }
+  .composer { display: flex; gap: 6px; }
+  .composer input { flex: 1; }
+  #replyBar { font-size: 12px; color: var(--muted); padding: 0 4px 6px; }
+  .list .item { display: flex; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .list .item.unread { background: var(--accent-soft); }
+  .list .item.click { cursor: pointer; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #263238; color: #fff; padding: 10px 18px; border-radius: 8px;
+           z-index: 50; font-size: 14px; max-width: 90vw; box-shadow: 0 4px 16px rgba(0,0,0,.25); }
+  #ring, #callBox { position: fixed; right: 18px; z-index: 40; width: 320px; background: var(--panel); border: 1px solid var(--line);
+                    border-radius: 14px; box-shadow: 0 8px 30px rgba(0,0,0,.25); padding: 16px; }
+  #ring { top: 66px; border-color: var(--good); }
+  #callBox { bottom: 18px; }
+  #callBox .who { margin: 8px 0; }
+  #callBox .p { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 14px; }
+  #callBox.video { width: 480px; }
+  #cbVideos { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px; margin: 8px 0; }
+  #cbVideos .tile { position: relative; background: #000; border-radius: 8px; overflow: hidden; aspect-ratio: 4 / 3; }
+  #cbVideos video { width: 100%; height: 100%; object-fit: cover; border-radius: 0; max-height: none; }
+  #cbVideos .tag { position: absolute; left: 6px; bottom: 4px; color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000; }
+  #cbVideos .tile.me video { transform: scaleX(-1); }
+  .lvl { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--line); margin-left: 4px; }
+  .lvl.on { background: var(--good); }
+  .card.login { max-width: 360px; margin: 70px auto; padding: 26px; }
+  .card.login input { display: block; width: 100%; margin: 6px 0 12px; }
+  .error { color: var(--bad); min-height: 1.2em; }
+  .ok { color: var(--good); }
+  video { width: 100%; max-height: 70vh; background: #000; border-radius: 10px; }
+  /* The slim radio player: under the header on every page while a station is on (or paused). */
+  #radioBar { position: sticky; top: 52px; z-index: 19; height: 34px; background: #0e161e; color: #fff;
+              display: flex; align-items: center; gap: 6px; padding: 0 10px 0 12px; border-bottom: 1px solid rgba(255,255,255,.06); font-size: 13px; }
+  #radioBar .rdot { width: 7px; height: 7px; border-radius: 50%; background: #6b7a89; flex: none; }
+  #radioBar.on .rdot { background: #e5484d; animation: rpulse 1.6s infinite; }
+  @keyframes rpulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+  .vwrap { position: relative; }
+  .vctl { position: absolute; top: 10px; right: 10px; display: flex; gap: 2px; background: rgba(0,0,0,.6); border-radius: 18px; padding: 3px; z-index: 2; }
+  .vctl button { background: none; border: 0; color: #fff; font-size: 14px; padding: 6px 12px; margin: 0; border-radius: 15px; }
+  .vctl button:hover { background: rgba(255,255,255,.15); }
+  #radioBar .rline { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  #radioBar .rline b { font-weight: 650; }
+  #radioBar .rline span { color: #9fb0c0; }
+  #radioBar button { background: none; color: #dfe7ee; border: 0; padding: 3px 8px; margin: 0; font-size: 13px; line-height: 1; border-radius: 6px; white-space: nowrap; }
+  #radioBar button:hover { background: rgba(255,255,255,.1); }
+  #radioBar #rbToggle { font-size: 12px; width: 28px; padding: 3px 0; }
+  #radioBar #rbLike.on { color: #ff6b6b; }
+  @media (max-width: 820px) { #rbGet, #rbRequest { display: none !important; } }
+  @media (min-width: 821px) { body.radio-on nav#side { top: 86px; height: calc(100vh - 86px); } }
+  @media (max-width: 820px) { body.radio-on nav#side { top: 86px; } }
+  .onair { display: inline-block; background: var(--bad); color: #fff; border-radius: 4px; font-size: 11px; font-weight: 700; padding: 1px 6px; }
+  .djline { background: var(--accent-soft); border-radius: 8px; padding: 8px 10px; margin-top: 8px; font-size: 14px; }
+  @media (max-width: 820px) {
+    .shell { grid-template-columns: 1fr; }
+    nav#side { position: sticky; top: 52px; z-index: 15; height: auto; display: flex; overflow-x: auto; padding: 6px; }
+    nav#side button { width: auto; white-space: nowrap; padding: 8px 10px; }
+    nav#side .lbl { display: none; }
+    nav#side button.active .lbl { display: inline; }
+    .content { padding: 12px; }
+    .chat { grid-template-columns: 1fr; height: auto; }
+    .chat .rooms { max-height: 220px; }
+    .conv { height: 70vh; }
+    header .who span { display: none; }
+    #ring, #callBox { right: 8px; left: 8px; width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login" class="card login" hidden>
+  <h2 style="margin-top:0">Memoryq</h2>
+  <div class="row" style="margin-bottom:10px">
+    <button id="modeIn" class="primary">Sign in</button>
+    <button id="modeUp">Create account</button>
+  </div>
+  <form id="loginForm">
+    <input id="u" placeholder="username" autocomplete="username" required>
+    <input id="p" type="password" placeholder="password" autocomplete="current-password" required>
+    <input id="p2" type="password" placeholder="password again" autocomplete="new-password" hidden>
+    <input id="em" type="email" placeholder="email address" autocomplete="email" hidden>
+    <button type="submit" class="primary" id="loginBtn">Sign in</button>
+    <div class="error" id="loginError"></div>
+  </form>
+  <form id="codeForm" hidden>
+    <p id="codeNote" style="margin:0 0 10px"></p>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6-digit code" required>
+    <button type="submit" class="primary">Confirm</button>
+    <div class="row" style="margin-top:6px">
+      <button type="button" class="link" id="codeResend">Send a new code</button>
+      <button type="button" class="link" id="codeBack">Back</button>
+    </div>
+    <div class="error" id="codeError"></div>
+  </form>
+  <div class="muted small">Same account as the Memoryq app.</div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <span class="brand">Memoryq</span>
+    <button class="hbtn" id="hdrBell" title="Notifications">&#128276;<span class="badge" id="bellBadge" hidden></span></button>
+    <span class="who" id="hdrMe" title="My profile"><img id="hdrAv" alt=""><span id="hdrName"></span></span>
+    <button class="hbtn" id="adminLink" title="Admin" hidden>&#9881;</button>
+    <button id="signOut" style="margin-left:6px">Sign out</button>
+  </header>
+  <div class="shell">
+    <nav id="side"></nav>
+    <section class="content">
+      <div class="box" id="emailBanner" hidden style="border-color:var(--accent);background:var(--accent-soft)">
+        <div class="row" style="flex-wrap:wrap">
+          <div class="grow" id="ebText" style="min-width:220px"><b>Add your email address</b> - it keeps your account safe and lets us reach you.</div>
+          <button class="link" id="ebLater">Later</button>
+        </div>
+        <div class="row" id="ebAsk" style="flex-wrap:wrap;margin-top:8px">
+          <input id="ebEmail" type="email" placeholder="you@example.com" style="flex:1;min-width:200px">
+          <button class="primary" id="ebSend">Send code</button>
+        </div>
+        <div class="row" id="ebCodeRow" hidden style="flex-wrap:wrap;margin-top:8px">
+          <input id="ebCode" inputmode="numeric" maxlength="7" placeholder="6-digit code" style="width:150px">
+          <button class="primary" id="ebConfirm">Confirm</button>
+          <button class="link" id="ebOther">Use another address</button>
+        </div>
+        <div class="error small" id="ebError"></div>
+      </div>
+      <h1 id="pageTitle"></h1>
+      <div id="tabs"></div>
+
+      <div class="panel" id="panel-home-feed" hidden>
+        <div class="feed">
+          <div id="feedList"></div>
+          <div id="feedMore" class="empty"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-wall-mine" hidden>
+        <div class="feed">
+          <div class="box">
+            <textarea id="postText" rows="3" maxlength="1000" placeholder="What's on your mind?"></textarea>
+            <div id="postPreviewBox" hidden style="margin:8px 0">
+              <img id="postPreview" style="max-width:100%;max-height:260px;border-radius:8px;display:block" alt="">
+            </div>
+            <div class="row" style="flex-wrap:wrap;margin-top:6px">
+              <label class="btn" style="margin:0">&#128247; Photo<input type="file" id="postPhoto" accept="image/*" hidden></label>
+              <button id="postPhotoRemove" class="link" hidden>Remove photo</button>
+              <select id="postVis">
+                <option value="everyone">Everyone</option>
+                <option value="friends">Friends only</option>
+              </select>
+              <span class="grow"></span>
+              <button id="postSend" class="primary">Post</button>
+            </div>
+          </div>
+          <div id="myWall"></div>
+          <div id="myWallMore"></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-people-find" hidden>
+        <div class="box row">
+          <input id="peopleQ" class="grow" placeholder="Search by name, stage name or country">
+          <button id="peopleGo" class="primary">Search</button>
+        </div>
+        <div class="people" id="peopleGrid"></div>
+      </div>
+
+      <div class="panel" id="panel-people-friends" hidden>
+        <div class="people" id="friendsGrid"></div>
+      </div>
+
+      <div class="panel" id="panel-people-blocked" hidden>
+        <div class="muted" style="margin-bottom:10px">People you block cannot call you or comment on your posts.</div>
+        <div class="list" id="blockedList"></div>
+      </div>
+
+      <div class="panel" id="panel-people-person" hidden>
+        <div id="personView"></div>
+        <div class="feed" id="personWall"></div>
+        <div class="feed" id="personWallMore"></div>
+      </div>
+
+      <div class="panel" id="panel-chat-rooms" hidden>
+        <div class="chat">
+          <div class="rooms" id="roomList"></div>
+          <div class="conv">
+            <div class="top"><div class="grow"><b id="convTitle">Choose a chat</b><div class="muted small" id="convSub"></div></div>
+              <button id="convCall" class="link" title="Voice call" hidden>&#128222;</button>
+              <button id="convVideo" class="link" title="Video call" hidden>&#127909;</button></div>
+            <div class="msgs" id="msgs"><div class="empty">Pick a chat on the left.</div></div>
+            <div class="bottom" id="convBottom" hidden>
+              <div id="replyBar" hidden></div>
+              <div class="muted small" id="typingLine" style="min-height:1em;padding:0 4px 4px"></div>
+              <form class="composer" id="sendForm">
+                <input id="msgText" placeholder="Write a message" maxlength="1000" autocomplete="off">
+                <button type="submit" class="primary">Send</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-chat-invites" hidden>
+        <div class="list" id="inviteList"></div>
+        <div class="box">
+          <b>Join with an invite code</b><br>
+          <input id="joinCode" placeholder="invite code" style="margin-top:6px">
+          <button id="joinBtn">Join</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-chat-new" hidden>
+        <div class="box">
+          <label class="field">Group name<input id="groupTitle" maxlength="60" placeholder="e.g. Weekend football"></label>
+          <label><input type="checkbox" id="groupPrivate" checked> Private (people join by invitation)</label><br><br>
+          <button id="groupCreate" class="primary">Create group</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-calls-history" hidden>
+        <div class="box" id="callsOffNote" hidden>Calls are turned off on this server.</div>
+        <div class="box" id="callsPrefs">
+          <label><input type="checkbox" id="dnd"> Do not disturb (calls to you don't ring)</label>
+        </div>
+        <div class="list" id="callList"></div>
+      </div>
+
+      <div class="panel" id="panel-live-mystreams" hidden>
+        <div id="myStreams"></div>
+      </div>
+
+      <div class="panel" id="panel-live-onair" hidden>
+        <div class="people" id="liveGrid"></div>
+      </div>
+
+      <div class="panel" id="panel-live-watch" hidden>
+        <div class="row" style="margin-bottom:8px"><b id="watchTitle" class="grow"></b><span class="muted small" id="watchInfo"></span></div>
+        <div class="vwrap">
+          <video id="player" controls playsinline></video>
+          <div class="vctl" id="vCtl" hidden>
+            <button id="vMute" title="Mute" aria-label="Mute">&#128266;</button>
+            <button id="vStop" title="Stop watching" aria-label="Stop watching">&#9632; Stop</button>
+          </div>
+        </div>
+        <div class="muted small" id="watchNote" style="margin-top:6px"></div>
+      </div>
+
+      <div class="panel" id="panel-radio-stations" hidden>
+        <div class="people" id="radioGrid"></div>
+      </div>
+
+      <div class="panel" id="panel-notify-all" hidden>
+        <div class="list feed" id="notifyList"></div>
+      </div>
+
+      <div class="panel" id="panel-notify-post" hidden>
+        <div class="feed" id="onePost"></div>
+      </div>
+
+      <div class="panel" id="panel-profile-view" hidden>
+        <div id="myView"></div>
+      </div>
+
+      <div class="panel" id="panel-profile-edit" hidden>
+        <div class="box">
+          <b>Card colour</b>
+          <div class="muted small">The colour of your card when people find you or see you in their friends.</div>
+          <div class="colorrow">
+            <div id="colorPreview"></div>
+            <div style="flex:1;min-width:220px">
+              <div class="swatches" id="colorSwatches"></div>
+              <label class="small">Or your own colour: <input type="color" id="colorCustom" style="width:48px;height:32px;padding:0;vertical-align:middle"></label>
+              <span id="colorMsg" class="ok small"></span>
+            </div>
+          </div>
+          <hr style="border:0;border-top:1px solid var(--line);margin:14px 0">
+          <label class="field">First name<input id="edFirst" maxlength="40"></label>
+          <label class="field">Last name<input id="edLast" maxlength="40"></label>
+          <label class="field">Stage name<input id="edStage" maxlength="40"></label>
+          <label class="field">City<input id="edCity" maxlength="60"></label>
+          <label class="field">Country<input id="edCountry" maxlength="60"></label>
+          <label class="field">Education<input id="edEdu" maxlength="120"></label>
+          <label class="field">Hobbies (separate with commas)<input id="edHobbies" maxlength="200"></label>
+          <button id="edSave" class="primary">Save</button> <span id="edMsg" class="ok"></span>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-profile-photo" hidden>
+        <div class="box">
+          <div class="row">
+            <img id="photoNow" class="av" width="120" height="120" alt="">
+            <div>
+              <label class="btn primary" style="display:inline-block">Choose a photo<input type="file" id="photoFile" accept="image/*" hidden></label>
+              <button id="photoRemove">Use my drawn picture</button>
+              <div class="muted small" style="margin-top:6px">Your photo shows on your profile, posts, comments and chats.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-videos-watch" hidden>
+        <div class="box row">
+          <input id="vSearch" class="grow" placeholder="Search videos">
+          <button id="vSearchGo" class="primary">Search</button>
+        </div>
+        <div class="vgrid" id="videoGrid"></div>
+      </div>
+
+      <div class="panel" id="panel-videos-play" hidden>
+        <div id="videoPlay" style="max-width:900px"></div>
+      </div>
+
+      <div class="panel" id="panel-videos-mine" hidden>
+        <div class="box">
+          <b>Add a video</b>
+          <div class="row" style="flex-wrap:wrap;margin-top:8px">
+            <input id="vYtUrl" class="grow" style="min-width:240px" placeholder="Paste a YouTube link">
+            <input id="vYtTitle" style="min-width:160px" placeholder="Title (optional)">
+            <button id="vYtAdd" class="primary">Add link</button>
+          </div>
+          <div class="row" style="flex-wrap:wrap;margin-top:8px">
+            <input type="file" id="vFile" accept="video/*">
+            <input id="vUpTitle" style="min-width:160px" placeholder="Title (optional)">
+            <button id="vUpGo" class="primary">Upload</button>
+            <progress id="vBar" max="100" value="0" hidden style="width:160px"></progress>
+            <span id="vUpNote" class="muted small"></span>
+          </div>
+          <textarea id="vDesc" rows="2" maxlength="2000" placeholder="Description (optional)" style="margin-top:8px"></textarea>
+          <div class="error small" id="vAddErr"></div>
+          <div class="muted small">Only share videos you made or have the rights to. <span id="vSpace"></span></div>
+        </div>
+        <div id="myVideos"></div>
+      </div>
+
+      <div class="panel" id="panel-profile-account" hidden>
+        <div class="box">
+          <b>Change password</b>
+          <label class="field">Current password<input id="pwOld" type="password" autocomplete="current-password"></label>
+          <label class="field">New password (8+ characters)<input id="pwNew" type="password" autocomplete="new-password"></label>
+          <button id="pwSave">Change password</button> <span id="pwMsg"></span>
+        </div>
+        <div class="box">
+          <b>Delete my account</b>
+          <div class="muted small" id="delState" style="margin:6px 0"></div>
+          <div id="delAsk">
+            <input id="delReason" placeholder="reason (optional)" maxlength="200" style="width:100%;max-width:420px">
+            <button id="delSend" class="danger">Ask the admin to delete my account</button>
+          </div>
+          <button id="delCancel" hidden>Cancel my deletion request</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="ring" hidden>
+  <div class="row"><img id="ringAv" class="av" width="48" height="48" alt="">
+    <div class="grow"><b id="ringWho"></b><div class="muted small" id="ringWhat"></div></div></div>
+  <div class="row" style="margin-top:12px">
+    <button id="ringAccept" class="primary grow">Answer</button>
+    <button id="ringDecline" class="danger grow">Decline</button>
+  </div>
+</div>
+
+<div id="callBox" hidden>
+  <div class="row"><b id="cbTitle" class="grow"></b><span class="muted small" id="cbTime"></span></div>
+  <div class="muted small" id="cbState"></div>
+  <div class="who" id="cbPeople"></div>
+  <div id="cbVideos"></div>
+  <div id="cbAudio" hidden></div>
+  <div class="muted small" id="cbNote" style="margin:6px 0"></div>
+  <div class="row" style="flex-wrap:wrap">
+    <button id="cbMute">&#127908; Mute</button>
+    <button id="cbCam" hidden>&#127909; Camera off</button>
+    <button id="cbAdd">Add people</button>
+    <button id="cbLeave" class="danger">Leave</button>
+    <button id="cbEnd" class="danger" hidden>End for everyone</button>
+  </div>
+</div>
+
+<div id="radioBar" hidden>
+  <span class="rdot"></span>
+  <button id="rbToggle" title="Play / stop" aria-label="Play or stop the radio">&#9632;</button>
+  <div class="rline" id="rbLine" title="Open Radio"><b id="rbStation"></b> <span id="rbNow"></span></div>
+  <button id="rbLike" title="Like this song" hidden>&#9825;</button>
+  <button id="rbGet" title="Get this song" hidden>Get this song</button>
+  <button id="rbRequest" title="Request a song">Request</button>
+  <audio id="rbAudio" preload="none"></audio>
+  <button id="rbClose" title="Close the radio" aria-label="Close the radio">&#10005;</button>
+</div>
+
+<div id="reqBox" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:45;display:flex;align-items:center;justify-content:center">
+  <div class="card" style="width:min(460px,92vw);max-height:80vh;overflow:auto;margin:0">
+    <div class="row"><b class="grow" id="reqTitle">Request a song</b><button id="reqClose" class="link">&#10005;</button></div>
+    <div class="muted small" style="margin:4px 0 8px">The DJ plays it soon and says your name on air.</div>
+    <input id="reqFilter" placeholder="Search songs" style="width:100%;margin-bottom:8px">
+    <div id="reqList"></div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+// ---------- basics ----------
+const $ = id => document.getElementById(id);
+function el(tag, text, cls) {
+  const e = document.createElement(tag);
+  if (text !== undefined && text !== null) { e.textContent = text; }
+  if (cls) { e.className = cls; }
+  return e;
+}
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+const enc = encodeURIComponent;
+
+let token = recall('vs_token');
+let me = null;
+let myProfile = null;
+let photoVer = Date.now();
+let callsOn = false;
+
+async function api(path, form) {
+  const opts = { method: form ? 'POST' : 'GET', headers: {} };
+  if (token) { opts.headers['Authorization'] = 'Bearer ' + token; }
+  if (form) {
+    opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    opts.body = new URLSearchParams(form).toString();
+  }
+  try {
+    const r = await fetch(path, opts);
+    let data = {};
+    try { data = await r.json(); } catch (e) { }
+    if (r.status === 401 && token && path !== '/api/login') { signedOut('Please sign in again.'); }
+    return { ok: r.ok, status: r.status, data: data, error: (data && data.error) || ('error ' + r.status) };
+  } catch (e) {
+    return { ok: false, status: 0, data: {}, error: 'Cannot reach the server' };
+  }
+}
+
+let toastTimer = null;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3500);
+}
+
+function ago(ms) {
+  if (!ms) { return ''; }
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) { return 'just now'; }
+  if (s < 3600) { return Math.floor(s / 60) + ' min ago'; }
+  if (s < 86400) { return Math.floor(s / 3600) + ' h ago'; }
+  if (s < 7 * 86400) { return Math.floor(s / 86400) + ' d ago'; }
+  return new Date(ms).toLocaleDateString();
+}
+function clock(ms) { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+
+function avatar(u, size) {
+  const i = el('img', null, 'av');
+  i.width = size; i.height = size; i.alt = '';
+  i.src = '/api/profiles/avatar?u=' + enc(u) + '&v=' + photoVer;
+  i.loading = 'lazy';
+  return i;
+}
+function display(o) { return (o && (o.stageName || o.name || o.username || o.author)) || ''; }
+function nameLink(user, text) {
+  const s = el('span', text || user, 'name');
+  s.addEventListener('click', (e) => { e.stopPropagation(); openPerson(user); });
+  return s;
+}
+function safeUrl(u) { return /^https?:\/\//i.test(u || '') ? u : null; }
+function btn(text, fn, cls) {
+  const b = el('button', text, cls);
+  b.addEventListener('click', async (e) => { e.stopPropagation(); b.disabled = true; try { await fn(b); } finally { b.disabled = false; } });
+  return b;
+}
+
+// Shrinks a picked photo to a JPEG data address (keeps uploads small).
+function shrink(file, maxSide) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('That photo could not be opened')); };
+    img.src = url;
+  });
+}
+
+// ---------- sign in ----------
+let signUp = false;
+function setMode(up) {
+  signUp = up;
+  $('modeIn').className = up ? '' : 'primary';
+  $('modeUp').className = up ? 'primary' : '';
+  $('p2').hidden = !up; $('p2').required = up;
+  $('em').hidden = !up; $('em').required = up;
+  $('loginBtn').textContent = up ? 'Create account' : 'Sign in';
+  $('loginError').textContent = '';
+}
+$('modeIn').addEventListener('click', () => setMode(false));
+$('modeUp').addEventListener('click', () => setMode(true));
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('loginError').textContent = '';
+  if (signUp && $('p').value !== $('p2').value) { $('loginError').textContent = 'The two passwords are different.'; return; }
+  const r = await api(signUp ? '/api/register' : '/api/login',
+    signUp ? { username: $('u').value.trim(), password: $('p').value, type: 'chatter', email: $('em').value.trim() }
+           : { username: $('u').value.trim(), password: $('p').value });
+  if (!r.ok) { $('loginError').textContent = r.error; return; }
+  if (r.data.verify) { showCodeStep(r.data.username, r.data.email); return; }
+  token = r.data.token; store('vs_token', token);
+  $('p').value = ''; $('p2').value = '';
+  await start();
+});
+// New accounts: the account is created when the code from the email comes back.
+let codeUser = '';
+function showCodeStep(user, masked) {
+  codeUser = user;
+  $('loginForm').hidden = true; $('codeForm').hidden = false;
+  $('modeIn').parentNode.hidden = true;
+  $('codeNote').textContent = 'We sent a 6-digit code to ' + masked + '. Type it here to finish creating your account. (Check the spam folder too.)';
+  $('code').value = ''; $('codeError').textContent = ''; $('code').focus();
+}
+function hideCodeStep() {
+  $('codeForm').hidden = true; $('loginForm').hidden = false; $('modeIn').parentNode.hidden = false;
+}
+$('codeForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('codeError').textContent = '';
+  const r = await api('/api/register/verify', { username: codeUser, code: $('code').value.trim() });
+  if (!r.ok) { $('codeError').textContent = r.error; if (r.status === 404 || r.status === 429) { setTimeout(hideCodeStep, 2500); } return; }
+  token = r.data.token; store('vs_token', token);
+  $('p').value = ''; $('p2').value = ''; $('em').value = '';
+  hideCodeStep(); setMode(false);
+  await start();
+  toast('Welcome to Memoryq!');
+});
+$('codeResend').addEventListener('click', async () => {
+  const r = await api('/api/register/resend', { username: codeUser });
+  $('codeError').textContent = r.ok ? 'A new code is on its way to ' + r.data.email + '.' : r.error;
+});
+$('codeBack').addEventListener('click', hideCodeStep);
+
+// Existing accounts: a banner until an email address is confirmed.
+async function checkEmail() {
+  const r = await api('/api/email');
+  if (!r.ok || !r.data.needed || r.data.verified) { $('emailBanner').hidden = true; return; }
+  let later = 0;
+  try { later = Number(sessionStorage.getItem('vs_email_later')) || 0; } catch (e) { }
+  if (later) { return; }
+  $('emailBanner').hidden = false;
+  $('ebError').textContent = '';
+  const waiting = !!r.data.pending;
+  $('ebAsk').hidden = waiting; $('ebCodeRow').hidden = !waiting;
+  if (waiting) { ebSay('Check your email', ' - we sent a code to ' + r.data.pending + '.'); }
+}
+$('ebLater').addEventListener('click', () => { try { sessionStorage.setItem('vs_email_later', '1'); } catch (e) { } $('emailBanner').hidden = true; });
+$('ebSend').addEventListener('click', async () => {
+  $('ebError').textContent = '';
+  const r = await api('/api/email/start', { email: $('ebEmail').value.trim() });
+  if (!r.ok) { $('ebError').textContent = r.error; return; }
+  $('ebAsk').hidden = true; $('ebCodeRow').hidden = false; $('ebCode').value = ''; $('ebCode').focus();
+  ebSay('Check your email', ' - we sent a code to ' + r.data.pending + ' (look in spam too).');
+});
+$('ebConfirm').addEventListener('click', async () => {
+  $('ebError').textContent = '';
+  const r = await api('/api/email/confirm', { code: $('ebCode').value.trim() });
+  if (!r.ok) { $('ebError').textContent = r.error; return; }
+  $('emailBanner').hidden = true;
+  toast('Email confirmed: ' + r.data.email);
+});
+$('ebOther').addEventListener('click', () => {
+  $('ebAsk').hidden = false; $('ebCodeRow').hidden = true;
+  ebSay('Add your email address', ' - it keeps your account safe and lets us reach you.');
+});
+function ebSay(bold, rest) {
+  const box = $('ebText'); box.textContent = '';
+  const b = document.createElement('b'); b.textContent = bold; box.appendChild(b);
+  box.appendChild(document.createTextNode(rest));
+}
+function signedOut(msg) {
+  token = null; me = null; store('vs_token', null);
+  clearInterval(pollTimer); clearInterval(callTimer); clearInterval(badgeTimer);
+  stopWatching();
+  $('app').hidden = true; $('ring').hidden = true; $('callBox').hidden = true;
+  mediaStop();
+  radioStop(); radio.station = null; $('radioBar').hidden = true; document.body.classList.remove('radio-on');
+  $('login').hidden = false;
+  $('loginError').textContent = msg || '';
+}
+$('signOut').addEventListener('click', async () => {
+  if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  signedOut('');
+});
+$('hdrBell').addEventListener('click', () => show('notify', 'all'));
+$('hdrMe').addEventListener('click', () => show('profile', 'view'));
+$('adminLink').addEventListener('click', () => { location.href = '/admin'; });
+
+// ---------- navigation ----------
+const NAV = [
+  { id: 'home', label: 'Home', icon: '\ud83c\udfe0', tabs: [ { id: 'feed', label: 'News feed', load: () => loadFeed(true) } ] },
+  { id: 'wall', label: 'My wall', icon: '\ud83e\uddf1', tabs: [ { id: 'mine', label: 'My posts', load: () => loadMyWall(true) } ] },
+  { id: 'people', label: 'People', icon: '\ud83d\udc65', tabs: [
+    { id: 'find', label: 'Find people', load: loadPeople },
+    { id: 'friends', label: 'Friends', load: loadFriends },
+    { id: 'blocked', label: 'Blocked', load: loadBlocked },
+    { id: 'person', label: 'Profile', load: () => loadPerson(true), dynamic: true } ] },
+  { id: 'chat', label: 'Chats', icon: '\ud83d\udcac', tabs: [
+    { id: 'rooms', label: 'Chats', load: loadRooms, badge: 'chat' },
+    { id: 'invites', label: 'Invitations', load: loadInvites, badge: 'invites' },
+    { id: 'new', label: 'New group' } ] },
+  { id: 'calls', label: 'Calls', icon: '\ud83d\udcde', tabs: [ { id: 'history', label: 'Recent calls', load: loadCalls, badge: 'missed' } ] },
+  { id: 'radio', label: 'Radio', icon: '\ud83d\udcfb', tabs: [ { id: 'stations', label: 'Stations', load: loadRadio } ] },
+  { id: 'videos', label: 'Videos', icon: '\ud83c\udfac', tabs: [
+    { id: 'watch', label: 'Watch', load: loadVideos },
+    { id: 'mine', label: 'My videos', load: loadMyVideos },
+    { id: 'play', label: 'Video', load: loadPlay, dynamic: true } ] },
+  { id: 'market', label: 'Marketplace', icon: '\ud83d\uded2', tabs: [ { id: 'go', label: 'Marketplace', load: () => { location.href = '/market'; } } ] },
+  { id: 'live', label: 'On air', icon: '\ud83d\udce1', tabs: [
+    { id: 'onair', label: 'Live now', load: loadLive },
+    { id: 'mystreams', label: 'My streams', load: loadMyStreams },
+    { id: 'watch', label: 'Watching', load: startWatching, dynamic: true } ] },
+  { id: 'notify', label: 'Notifications', icon: '\ud83d\udd14', tabs: [
+    { id: 'all', label: 'Notifications', load: loadNotifications, badge: 'notify' },
+    { id: 'post', label: 'Post', load: loadOnePost, dynamic: true } ] },
+  { id: 'profile', label: 'Profile', icon: '\ud83d\udc64', tabs: [
+    { id: 'view', label: 'My profile', load: loadMyProfile },
+    { id: 'edit', label: 'Edit profile', load: loadEdit },
+    { id: 'photo', label: 'Photo', load: loadPhoto },
+    { id: 'account', label: 'Account', load: loadAccount } ] },
+];
+let current = { cat: 'home', tab: 'feed' };
+let badges = {};
+let dyn = { person: null, watch: null, post: 0 };
+
+function findTab(cat, tab) {
+  const c = NAV.find(x => x.id === cat) || NAV[0];
+  const t = c.tabs.find(x => x.id === tab) || c.tabs[0];
+  return { c: c, t: t };
+}
+function dynAllowed(cat, tab) {
+  if (cat === 'people' && tab === 'person') { return !!dyn.person; }
+  if (cat === 'live' && tab === 'watch') { return !!dyn.watch; }
+  if (cat === 'notify' && tab === 'post') { return !!dyn.post; }
+  if (cat === 'videos' && tab === 'play') { return !!dyn.video; }
+  return true;
+}
+function drawNav() {
+  const side = $('side');
+  side.textContent = '';
+  NAV.forEach(c => {
+    const b = el('button');
+    b.className = c.id === current.cat ? 'active' : '';
+    b.appendChild(el('span', c.icon, 'ico'));
+    b.appendChild(el('span', c.label, 'lbl'));
+    let n = 0;
+    c.tabs.forEach(t => { if (t.badge) { n += badges[t.badge] || 0; } });
+    if (n > 0) { b.appendChild(el('span', String(n), 'badge')); }
+    b.addEventListener('click', () => show(c.id, c.tabs[0].id));
+    side.appendChild(b);
+  });
+  const ft = findTab(current.cat, current.tab);
+  $('pageTitle').textContent = ft.c.label;
+  const tabs = $('tabs');
+  tabs.textContent = '';
+  ft.c.tabs.forEach(t => {
+    if (t.dynamic && !dynAllowed(ft.c.id, t.id)) { return; }
+    let label = t.label;
+    if (t.id === 'person' && dyn.person) { label = dyn.personName || dyn.person; }
+    if (ft.c.id === 'videos' && t.id === 'play' && dyn.videoTitle) { label = dyn.videoTitle.length > 30 ? dyn.videoTitle.slice(0, 30) + '...' : dyn.videoTitle; }
+    if (t.id === 'watch' && dyn.watch && ft.c.id === 'live') { label = 'Watching ' + (dyn.watch.title || dyn.watch.channelId); }
+    const b = el('button', label);
+    b.className = t.id === ft.t.id ? 'active' : '';
+    if (t.badge && badges[t.badge] > 0) { b.appendChild(el('span', String(badges[t.badge]), 'badge')); }
+    b.addEventListener('click', () => show(ft.c.id, t.id));
+    tabs.appendChild(b);
+  });
+  const nb = badges.notify || 0;
+  $('bellBadge').hidden = nb <= 0; $('bellBadge').textContent = String(nb);
+}
+async function show(cat, tab) {
+  let ft = findTab(cat, tab);
+  if (ft.t.dynamic && !dynAllowed(ft.c.id, ft.t.id)) { ft = findTab(ft.c.id, ft.c.tabs[0].id); }
+  const leaving = current;
+  current = { cat: ft.c.id, tab: ft.t.id };
+  if (leaving.cat === 'live' && leaving.tab === 'watch' && !(current.cat === 'live' && current.tab === 'watch')) { stopWatching(); }
+  if (!(current.cat === 'chat' && current.tab === 'rooms')) { stopRoomPoll(); }
+  let hash = '#' + current.cat + '/' + current.tab;
+  if (current.tab === 'person') { hash += '/' + enc(dyn.person); }
+  if (current.tab === 'post') { hash += '/' + dyn.post; }
+  if (current.cat === 'videos' && current.tab === 'play') { hash += '/' + dyn.video; }
+  if (!(current.cat === 'videos' && current.tab === 'play')) { const pv = $('videoPlay'); if (pv) { pv.textContent = ''; } }
+  try { history.replaceState(null, '', hash); } catch (e) { }
+  document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'panel-' + current.cat + '-' + current.tab; });
+  drawNav();
+  window.scrollTo(0, 0);
+  if (ft.t.load) { await ft.t.load(); }
+}
+
+// ---------- posts (used by feed, walls, notifications) ----------
+function postCard(p, opts) {
+  opts = opts || {};
+  const card = el('div', null, 'card');
+  const head = el('div', null, 'row');
+  head.appendChild(avatar(p.author, 42));
+  const who = el('div', null, 'grow');
+  who.appendChild(nameLink(p.author, p.stageName || p.name || p.author));
+  const sub = el('div', ago(p.created) + (p.friendsOnly ? ' \u00b7 friends only' : '') + (p.country ? ' \u00b7 ' + p.country : ''), 'muted small');
+  who.appendChild(sub);
+  head.appendChild(who);
+  card.appendChild(head);
+  if (p.text) { card.appendChild(el('div', p.text, 'text')); }
+  if (p.imageUrl) {
+    const img = el('img', null, 'photo');
+    img.src = p.imageUrl; img.alt = ''; img.loading = 'lazy';
+    card.appendChild(img);
+  }
+  const acts = el('div', null, 'acts');
+  const like = el('button', '', 'link');
+  const setLike = () => { like.textContent = (p.liked ? '\u2764\ufe0f ' : '\u2661 ') + (p.likes > 0 ? p.likes + ' ' : '') + 'Like'; like.classList.toggle('on', !!p.liked); };
+  setLike();
+  like.addEventListener('click', async () => {
+    const r = await api('/api/wall/like', { id: p.id, like: String(!p.liked) });
+    if (r.ok) { p.likes = r.data.likes; p.liked = r.data.liked; setLike(); } else { toast(r.error); }
+  });
+  acts.appendChild(like);
+  const cbtn = el('button', '', 'link');
+  const setC = () => { cbtn.textContent = '\ud83d\udcac ' + (p.comments > 0 ? p.comments + ' ' : '') + (p.comments === 1 ? 'Comment' : 'Comments'); };
+  setC();
+  acts.appendChild(cbtn);
+  if (p.mine) {
+    acts.appendChild(btn('Delete', async () => {
+      if (!confirm('Delete this post?')) { return; }
+      const r = await api('/api/wall/delete', { id: p.id });
+      if (r.ok) { card.remove(); toast('Post deleted'); } else { toast(r.error); }
+    }, 'link'));
+  } else {
+    acts.appendChild(btn('Report', async () => {
+      const reason = prompt('What is wrong with this post?', '');
+      if (reason === null) { return; }
+      const r = await api('/api/wall/report', { id: p.id, reason: reason });
+      toast(r.ok ? 'Thanks - the admin will look at it.' : r.error);
+    }, 'link'));
+  }
+  card.appendChild(acts);
+  const box = el('div', null, 'comments');
+  box.hidden = true;
+  card.appendChild(box);
+  const toggle = async () => {
+    if (!box.hidden) { box.hidden = true; return; }
+    box.hidden = false;
+    await loadComments(p, box, setC);
+  };
+  cbtn.addEventListener('click', toggle);
+  if (opts.open) { toggle(); }
+  return card;
+}
+
+async function loadComments(p, box, setCount) {
+  box.textContent = 'Loading comments...';
+  const r = await api('/api/wall/comments?post=' + p.id);
+  box.textContent = '';
+  if (!r.ok) { box.appendChild(el('div', r.error, 'muted')); return; }
+  p.comments = r.data.count; setCount();
+  const list = r.data.comments || [];
+  const kids = {};
+  list.forEach(c => { (kids[c.parent] = kids[c.parent] || []).push(c); });
+  const reload = () => loadComments(p, box, setCount);
+  const draw = (parent, into) => {
+    (kids[parent] || []).forEach(c => {
+      const wrap = el('div');
+      const row = el('div', null, 'cmt');
+      row.appendChild(avatar(c.author, 28));
+      const right = el('div', null, 'grow');
+      const bub = el('div', null, 'bubble');
+      bub.appendChild(nameLink(c.author, c.stageName || c.author));
+      bub.appendChild(el('div', c.deleted ? '(deleted)' : c.text, 'text' + (c.deleted ? ' muted' : '')));
+      right.appendChild(bub);
+      const line = el('div', null, 'small muted');
+      line.appendChild(el('span', ago(c.created) + ' '));
+      const replyHere = el('div');
+      if (r.data.canComment && !c.deleted) {
+        const rb = el('button', 'Reply', 'link small');
+        rb.addEventListener('click', () => {
+          if (replyHere.firstChild) { replyHere.textContent = ''; return; }
+          replyHere.appendChild(commentBox(p, c.id, 'Reply to ' + (c.stageName || c.author), reload));
+          replyHere.querySelector('input').focus();
+        });
+        line.appendChild(rb);
+      }
+      if (c.canDelete) {
+        line.appendChild(btn('Delete', async () => {
+          const d = await api('/api/wall/comment/delete', { id: c.id });
+          if (d.ok) { reload(); } else { toast(d.error); }
+        }, 'link small'));
+      }
+      right.appendChild(line);
+      right.appendChild(replyHere);
+      row.appendChild(right);
+      wrap.appendChild(row);
+      if (kids[c.id]) {
+        const k = el('div', null, 'kids');
+        draw(c.id, k);
+        wrap.appendChild(k);
+      }
+      into.appendChild(wrap);
+    });
+  };
+  draw(0, box);
+  if (list.length === 0) { box.appendChild(el('div', 'No comments yet.', 'muted small')); }
+  if (r.data.canComment) { box.appendChild(commentBox(p, 0, 'Write a comment', reload)); }
+  else { box.appendChild(el('div', 'Comments are closed for you on this post.', 'muted small')); }
+}
+function commentBox(p, parent, hint, done) {
+  const f = el('form', null, 'reply-box');
+  const i = el('input'); i.placeholder = hint; i.maxLength = 500;
+  const b = el('button', 'Send', 'primary'); b.type = 'submit';
+  f.appendChild(i); f.appendChild(b);
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = i.value.trim();
+    if (!text) { return; }
+    b.disabled = true;
+    const form = { post: p.id, text: text };
+    if (parent) { form.parent = parent; }
+    const r = await api('/api/wall/comment', form);
+    b.disabled = false;
+    if (r.ok) { i.value = ''; done(); } else { toast(r.error); }
+  });
+  return f;
+}
+
+// ---------- home feed: news, people slider with an ad, public posts ----------
+let feed = null;
+let feedObserver = null;
+async function loadFeed(reset) {
+  if (reset || !feed) {
+    feed = { seed: Math.floor(Math.random() * 1e9), offset: 0, total: -1, count: 0, shown: [], busy: false, done: false, sliderEvery: 20, wallEvery: 5, slider: null };
+    $('feedList').textContent = '';
+    const s = await api('/api/feed/slider');
+    if (s.ok) { feed.slider = s.data; feed.sliderEvery = s.data.every || 20; }
+  }
+  await moreFeed();
+  if (!feedObserver && 'IntersectionObserver' in window) {
+    feedObserver = new IntersectionObserver((en) => {
+      if (en[0].isIntersecting && current.cat === 'home') { moreFeed(); }
+    });
+    feedObserver.observe($('feedMore'));
+  }
+}
+async function wallPostForFeed() {
+  const r = await api('/api/wall/random?' + new URLSearchParams({ skip: feed.shown.join(',') }).toString());
+  if (!r.ok) { return null; }
+  if (r.data.every !== undefined) { feed.wallEvery = r.data.every; }
+  if (!r.data.post) { return null; }
+  feed.shown.push(r.data.post.id);
+  return r.data.post;
+}
+async function moreFeed() {
+  if (!feed || feed.busy || feed.done) { return; }
+  feed.busy = true;
+  $('feedMore').textContent = 'Loading...';
+  const r = await api('/api/news?seed=' + feed.seed + '&offset=' + feed.offset + '&limit=15');
+  const list = $('feedList');
+  const items = r.ok ? (r.data.items || []) : [];
+  feed.total = r.ok ? r.data.total : 0;
+  if (items.length === 0 && feed.offset === 0) {
+    // No news yet: show the people slider and a few public posts instead.
+    if (feed.slider) { list.appendChild(sliderCard(feed.slider)); }
+    for (let i = 0; i < 6; i++) {
+      const p = await wallPostForFeed();
+      if (!p) { break; }
+      list.appendChild(postCard(p));
+    }
+    $('feedMore').textContent = list.childElementCount === 0 ? 'Nothing here yet.' : 'No news right now - check back later.';
+    feed.done = true; feed.busy = false;
+    return;
+  }
+  for (const it of items) {
+    list.appendChild(newsCard(it));
+    feed.count++;
+    if (feed.wallEvery > 0 && feed.count % feed.wallEvery === 0) {
+      const p = await wallPostForFeed();
+      if (p) { list.appendChild(postCard(p)); }
+    }
+    if (feed.slider && feed.slider.enabled && feed.sliderEvery > 0 && feed.count % feed.sliderEvery === 0) {
+      const s = await api('/api/feed/slider');
+      if (s.ok) { list.appendChild(sliderCard(s.data)); }
+    }
+  }
+  feed.offset += items.length;
+  feed.done = items.length === 0 || feed.offset >= feed.total;
+  $('feedMore').textContent = feed.done ? 'You are all caught up.' : '';
+  if (!feed.done && !('IntersectionObserver' in window)) {
+    $('feedMore').appendChild(btn('Show more', moreFeed));
+  }
+  feed.busy = false;
+}
+function newsCard(it) {
+  const c = el('div', null, 'card news');
+  const top = el('div', null, 'small muted');
+  if (it.live) { const lv = el('span', '\u25CF LIVE', 'chip'); lv.style.background = '#e5484d'; lv.style.color = '#fff'; top.appendChild(lv); }
+  else if (it.topic) { top.appendChild(el('span', it.topic, 'chip')); }
+  top.appendChild(el('span', (it.source || '') + ' \u00b7 ' + ago(it.published || it.created)));
+  c.appendChild(top);
+  const h = el('h3');
+  const url = safeUrl(it.link);
+  if (url) { const a = el('a', it.headline); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; h.appendChild(a); }
+  else { h.textContent = it.headline; }
+  c.appendChild(h);
+  if (it.summary) { c.appendChild(el('div', it.summary, 'text')); }
+  return c;
+}
+function sliderCard(s) {
+  const c = el('div', null, 'card');
+  c.appendChild(el('div', 'People on Memoryq', 'small muted'));
+  const row = el('div', null, 'slider');
+  (s.people || []).forEach(pp => {
+    const d = el('div', null, 'pc');
+    const img = el('img'); img.src = '/api/profiles/picture?u=' + enc(pp.username) + '&v=' + photoVer; img.alt = ''; img.loading = 'lazy';
+    d.appendChild(img);
+    const t = el('div');
+    t.appendChild(el('b', display(pp)));
+    t.appendChild(el('div', pp.country || '', 'muted small'));
+    d.appendChild(t);
+    d.addEventListener('click', () => openPerson(pp.username));
+    row.appendChild(d);
+  });
+  if (s.ad && s.ad.type === 'paid') {
+    const a = s.ad;
+    const d = el('div', null, 'pc ad');
+    const img = el('img'); img.src = a.imageUrl; img.alt = '';
+    d.appendChild(img);
+    const t = el('div');
+    t.appendChild(el('div', 'Sponsored \u00b7 ' + a.advertiser, 'muted small'));
+    t.appendChild(el('b', a.headline));
+    if (a.text) { t.appendChild(el('div', a.text, 'small')); }
+    d.appendChild(t);
+    d.addEventListener('click', async () => {
+      const r = await api('/api/feed/ad/click', { id: a.id });
+      const url = r.ok ? safeUrl(r.data.link) : null;
+      if (url) { window.open(url, '_blank', 'noopener'); }
+    });
+    row.appendChild(d);
+    api('/api/feed/ad/view', { id: a.id });
+  }
+  c.appendChild(row);
+  return c;
+}
+
+// ---------- my wall ----------
+let postImage = null;
+let myWallNext = null;
+$('postPhoto').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) { return; }
+  try {
+    postImage = await shrink(f, 1280);
+    $('postPreview').src = postImage; $('postPreviewBox').hidden = false; $('postPhotoRemove').hidden = false;
+  } catch (err) { toast(err.message); }
+});
+$('postPhotoRemove').addEventListener('click', () => {
+  postImage = null; $('postPreviewBox').hidden = true; $('postPhotoRemove').hidden = true;
+});
+$('postSend').addEventListener('click', async () => {
+  const text = $('postText').value.trim();
+  if (!text && !postImage) { toast('Write something or add a photo'); return; }
+  $('postSend').disabled = true;
+  const form = { text: text, visibility: $('postVis').value };
+  if (postImage) { form.image = postImage; }
+  const r = await api('/api/wall/post', form);
+  $('postSend').disabled = false;
+  if (!r.ok) { toast(r.error); return; }
+  $('postText').value = ''; postImage = null; $('postPreviewBox').hidden = true; $('postPhotoRemove').hidden = true;
+  toast('Posted');
+  loadMyWall(true);
+});
+async function loadWallInto(user, listEl, moreEl, reset, state) {
+  if (reset) { listEl.textContent = ''; state.next = null; }
+  moreEl.textContent = '';
+  const q = '/api/wall/user?u=' + enc(user) + (state.next ? '&before=' + state.next : '');
+  const r = await api(q);
+  if (!r.ok) { listEl.appendChild(el('div', r.error, 'empty')); return; }
+  (r.data.posts || []).forEach(p => listEl.appendChild(postCard(p)));
+  if (reset && (r.data.posts || []).length === 0) { listEl.appendChild(el('div', 'No posts yet.', 'empty')); }
+  state.next = r.data.next;
+  if (r.data.more) { moreEl.appendChild(btn('Show older posts', () => loadWallInto(user, listEl, moreEl, false, state))); }
+}
+const myWallState = {};
+async function loadMyWall(reset) { await loadWallInto(me.username, $('myWall'), $('myWallMore'), reset, myWallState); }
+
+// ---------- people ----------
+function personCard(pp) {
+  const c = el('div', null, 'pcard');
+  if (/^#[0-9a-f]{6}$/i.test(pp.color || '')) { c.classList.add('tinted'); c.style.background = pp.color; }
+  const a = avatar(pp.username, 84);
+  a.style.cursor = 'pointer';
+  a.addEventListener('click', () => openPerson(pp.username));
+  c.appendChild(a);
+  c.appendChild(nameLink(pp.username, display(pp)));
+  c.appendChild(el('div', [pp.firstName, pp.lastName].filter(Boolean).join(' ') + (pp.country ? ' \u00b7 ' + pp.country : ''), 'muted small'));
+  const row = el('div'); row.style.marginTop = '8px';
+  row.appendChild(btn('Message', () => privateChat(pp.username)));
+  if (callsOn) { row.appendChild(btn('\ud83d\udcde', () => startCall(pp.username, false))); }
+  c.appendChild(row);
+  return c;
+}
+async function loadPeople() {
+  const q = $('peopleQ').value.trim();
+  const r = await api('/api/profiles/people' + (q ? '?q=' + enc(q) : ''));
+  const g = $('peopleGrid');
+  g.textContent = '';
+  if (!r.ok) { g.appendChild(el('div', r.error, 'empty')); return; }
+  const list = (r.data.people || []).filter(pp => pp.username !== me.username);
+  list.forEach(pp => g.appendChild(personCard(pp)));
+  if (list.length === 0) { g.appendChild(el('div', 'Nobody found.', 'empty')); }
+}
+$('peopleGo').addEventListener('click', loadPeople);
+$('peopleQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') { loadPeople(); } });
+async function loadFriends() {
+  const r = await api('/api/profiles/me');
+  const g = $('friendsGrid');
+  g.textContent = '';
+  if (!r.ok) { g.appendChild(el('div', r.error, 'empty')); return; }
+  myProfile = r.data;
+  (r.data.friends || []).forEach(pp => g.appendChild(personCard(pp)));
+  if ((r.data.friends || []).length === 0) { g.appendChild(el('div', 'No friends yet - open someone\u2019s profile and press Add friend.', 'empty')); }
+}
+let blockedSet = new Set();
+async function fetchBlocked() {
+  const r = await api('/api/wall/blocked');
+  blockedSet = new Set(r.ok ? (r.data.blocked || []).map(x => x.toLowerCase()) : []);
+  return r;
+}
+async function loadBlocked() {
+  const r = await fetchBlocked();
+  const l = $('blockedList');
+  l.textContent = '';
+  const names = r.ok ? (r.data.blocked || []) : [];
+  names.forEach(n => {
+    const it = el('div', null, 'item');
+    it.appendChild(avatar(n, 36));
+    const g = el('div', null, 'grow'); g.appendChild(nameLink(n)); it.appendChild(g);
+    it.appendChild(btn('Unblock', async () => {
+      const u = await api('/api/wall/unblock', { u: n });
+      if (u.ok) { loadBlocked(); } else { toast(u.error); }
+    }));
+    l.appendChild(it);
+  });
+  if (names.length === 0) { l.appendChild(el('div', 'You have not blocked anyone.', 'empty')); }
+}
+function openPerson(user) {
+  if (me && user.toLowerCase() === me.username.toLowerCase()) { show('profile', 'view'); return; }
+  dyn.person = user; dyn.personName = user;
+  show('people', 'person');
+}
+const personWallState = {};
+function profileHero(pr, own) {
+  const hero = el('div', null, 'hero');
+  const ban = el('img', null, 'banner');
+  ban.src = '/api/profiles/picture?u=' + enc(pr.username) + '&v=' + photoVer; ban.alt = '';
+  const bw = el('div', null, 'bannerwrap'); bw.appendChild(ban); hero.appendChild(bw);
+  const info = el('div', null, 'info');
+  info.appendChild(avatar(pr.username, 116)).classList.add('bigav');
+  info.appendChild(el('h2', pr.stageName || pr.username));
+  info.appendChild(el('div', [pr.firstName, pr.lastName].filter(Boolean).join(' ') + ' \u00b7 @' + pr.username, 'muted'));
+  const where = [pr.city, pr.country].filter(Boolean).join(', ');
+  if (where) { info.appendChild(el('div', '\ud83d\udccd ' + where)); }
+  if (pr.education) { info.appendChild(el('div', '\ud83c\udf93 ' + pr.education)); }
+  if (pr.hobbies && pr.hobbies.length) {
+    const h = el('div'); h.style.margin = '6px 0';
+    pr.hobbies.forEach(x => h.appendChild(el('span', x, 'chip')));
+    info.appendChild(h);
+  }
+  if (pr.since) { info.appendChild(el('div', 'On Memoryq since ' + new Date(pr.since).toLocaleDateString(), 'muted small')); }
+  hero.appendChild(info);
+  return { hero: hero, info: info };
+}
+function friendsStrip(pr) {
+  const box = el('div', null, 'box');
+  box.appendChild(el('b', 'Friends (' + (pr.friends || []).length + ')'));
+  const row = el('div', null, 'slider');
+  (pr.friends || []).forEach(f => {
+    const d = el('div', null, 'row');
+    d.style.cursor = 'pointer'; d.style.flex = '0 0 auto';
+    d.appendChild(avatar(f.username, 32));
+    d.appendChild(el('span', display(f)));
+    d.addEventListener('click', () => openPerson(f.username));
+    row.appendChild(d);
+  });
+  box.appendChild(row);
+  return box;
+}
+async function loadPerson(reset) {
+  const v = $('personView');
+  v.textContent = 'Loading...';
+  const [r] = await Promise.all([api('/api/profiles/view?u=' + enc(dyn.person)), fetchBlocked()]);
+  v.textContent = '';
+  if (!r.ok) { v.appendChild(el('div', r.error, 'empty')); $('personWall').textContent = ''; return; }
+  const pr = r.data;
+  dyn.personName = pr.stageName || pr.username;
+  drawNav();
+  const h = profileHero(pr, false);
+  const acts = el('div'); acts.style.marginTop = '10px';
+  acts.appendChild(btn(pr.isFriend ? 'Remove friend' : 'Add friend', async () => {
+    const x = await api(pr.isFriend ? '/api/profiles/friends/remove' : '/api/profiles/friends/add', { u: pr.username });
+    if (x.ok) { toast(pr.isFriend ? 'Removed from your friends' : 'Added to your friends'); loadPerson(true); } else { toast(x.error); }
+  }, pr.isFriend ? '' : 'primary'));
+  acts.appendChild(btn('\ud83d\udcac Message', () => privateChat(pr.username)));
+  if (callsOn) {
+    acts.appendChild(btn('\ud83d\udcde Voice call', () => startCall(pr.username, false)));
+    acts.appendChild(btn('\ud83c\udfa5 Video call', () => startCall(pr.username, true)));
+  }
+  const blocked = blockedSet.has(pr.username.toLowerCase());
+  acts.appendChild(btn(blocked ? 'Unblock' : 'Block', async () => {
+    if (!blocked && !confirm('Block ' + pr.username + '? They will not be able to call you or comment on your posts.')) { return; }
+    const x = await api(blocked ? '/api/wall/unblock' : '/api/wall/block', { u: pr.username });
+    if (x.ok) { toast(blocked ? 'Unblocked' : 'Blocked'); loadPerson(true); } else { toast(x.error); }
+  }, 'danger'));
+  h.info.appendChild(acts);
+  v.appendChild(h.hero);
+  if ((pr.friends || []).length) { v.appendChild(friendsStrip(pr)); }
+  const wh = el('h3', 'Posts'); v.appendChild(wh);
+  await loadWallInto(pr.username, $('personWall'), $('personWallMore'), true, personWallState);
+}
+
+// ---------- chats ----------
+let rooms = [];
+let roomId = null;
+let roomSig = '';
+let roomPoll = null;
+let replyTo = null;
+let lastTypingSent = 0;
+function seenKey(id) { return 'vs_seen_' + (me ? me.username : '') + '_' + id; }
+function roomTitle(r) {
+  if (r.private && me) {
+    const parts = r.title.split(' & ');
+    if (parts.length === 2) {
+      if (parts[0].toLowerCase() === me.username.toLowerCase()) { return parts[1]; }
+      if (parts[1].toLowerCase() === me.username.toLowerCase()) { return parts[0]; }
+    }
+  }
+  return r.title;
+}
+function roomPeer(r) {
+  const t = roomTitle(r);
+  return r.private && t !== r.title ? t : null;
+}
+async function unreadCounts() {
+  const parts = [];
+  rooms.forEach(r => {
+    let seen = Number(recall(seenKey(r.id)));
+    if (!recall(seenKey(r.id))) { seen = r.lastId; store(seenKey(r.id), String(seen)); }
+    parts.push(r.id + ':' + seen);
+  });
+  if (!parts.length) { return {}; }
+  const u = await api('/api/chat/unread?rooms=' + enc(parts.join(',')));
+  return u.ok ? (u.data.unread || {}) : {};
+}
+let roomsSig = '';
+async function loadRooms() {
+  const r = await api('/api/chat/rooms');
+  rooms = r.ok ? (r.data.rooms || []) : [];
+  rooms.sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+  const unread = await unreadCounts();
+  const list = $('roomList');
+  const sig = JSON.stringify([rooms.map(x => [x.id, x.title, x.lastText, x.lastUser, x.lastTime, x.live]), unread, roomId]);
+  if (sig === roomsSig && list.firstChild) { return; }
+  roomsSig = sig;
+  list.textContent = '';
+  rooms.forEach(rm => {
+    const d = el('div', null, 'room' + (rm.id === roomId ? ' active' : ''));
+    const peer = roomPeer(rm);
+    if (peer) { d.appendChild(avatar(peer, 36)); }
+    else { const ic = el('div', rm.live ? '\ud83d\udce1' : '#', 'av'); ic.style.cssText = 'width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700'; d.appendChild(ic); }
+    const g = el('div', null, 'grow');
+    g.appendChild(el('div', roomTitle(rm), 'name'));
+    g.appendChild(el('div', rm.lastText ? (rm.lastUser + ': ' + rm.lastText) : (rm.private ? 'Private' : 'Group'), 'last'));
+    d.appendChild(g);
+    const n = rm.id === roomId ? 0 : (unread[rm.id] || 0);
+    if (n > 0) { d.appendChild(el('span', String(n), 'badge')); }
+    d.addEventListener('click', () => openRoom(rm.id));
+    list.appendChild(d);
+  });
+  if (rooms.length === 0) { list.appendChild(el('div', 'No chats yet.', 'empty')); }
+  if (roomId && !roomPoll) { startRoomPoll(); }
+}
+async function privateChat(user) {
+  const r = await api('/api/chat/rooms');
+  const all = r.ok ? (r.data.rooms || []) : [];
+  const a = (me.username + ' & ' + user).toLowerCase(), b = (user + ' & ' + me.username).toLowerCase();
+  let found = all.find(x => x.private && (x.title.toLowerCase() === a || x.title.toLowerCase() === b));
+  if (!found) {
+    const c = await api('/api/chat/groups/create', { title: me.username + ' & ' + user, private: 'true' });
+    if (!c.ok) { toast('Could not start a private chat: ' + c.error); return; }
+    found = c.data;
+    const inv = await api('/api/chat/groups/invite/user', { room: found.id, username: user });
+    toast(inv.ok ? user + ' gets an invitation to the chat.' : 'Created, but the invitation failed: ' + inv.error);
+  }
+  roomId = found.id; roomSig = '';
+  await show('chat', 'rooms');
+}
+async function openRoom(id) {
+  roomId = id; roomSig = ''; replyTo = null; drawReply();
+  $('msgs').textContent = '';
+  await loadRooms();
+  await loadMessages();
+}
+function stopRoomPoll() { clearInterval(roomPoll); roomPoll = null; }
+function startRoomPoll() {
+  stopRoomPoll();
+  loadMessages();
+  roomPoll = setInterval(loadMessages, 3000);
+}
+async function loadMessages() {
+  if (!roomId) { return; }
+  const id = roomId;
+  const r = await api('/api/chat/messages?room=' + enc(id) + '&limit=50');
+  if (id !== roomId) { return; }
+  const rm = rooms.find(x => x.id === id);
+  $('convBottom').hidden = false;
+  if (!r.ok) { $('msgs').textContent = ''; $('msgs').appendChild(el('div', r.error, 'empty')); return; }
+  const d = r.data;
+  const title = rm ? roomTitle(rm) : d.title;
+  $('convTitle').textContent = title;
+  $('convSub').textContent = (d.private ? 'Private' : 'Group') + ' \u00b7 ' + (d.onlineCount || 0) + ' online';
+  const peer = rm ? roomPeer(rm) : null;
+  $('convCall').hidden = !(callsOn && peer); $('convVideo').hidden = !(callsOn && peer);
+  $('convCall').onclick = () => startCall(peer, false);
+  $('convVideo').onclick = () => startCall(peer, true);
+  const typing = (d.typing || []).filter(t => t !== me.username);
+  $('typingLine').textContent = typing.length ? typing.join(', ') + (typing.length > 1 ? ' are' : ' is') + ' typing...' : '';
+  const sig = JSON.stringify(d.messages);
+  if (sig === roomSig) { return; }
+  roomSig = sig;
+  const box = $('msgs');
+  const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.textContent = '';
+  (d.messages || []).forEach(m => box.appendChild(messageRow(m)));
+  if ((d.messages || []).length === 0) { box.appendChild(el('div', 'No messages yet - say hello!', 'empty')); }
+  if (nearBottom || box.dataset.room !== id) { box.scrollTop = box.scrollHeight; }
+  box.dataset.room = id;
+  if (d.lastId) {
+    store(seenKey(id), String(d.lastId));
+    api('/api/chat/read', { room: id, upTo: d.lastId });
+  }
+}
+function messageRow(m) {
+  const mine = m.user === me.username;
+  const row = el('div', null, 'msg' + (mine ? ' mine' : ''));
+  row.appendChild(avatar(m.user, 30));
+  const b = el('div', null, 'b');
+  const top = el('div', null, 'small');
+  if (!mine) { top.appendChild(nameLink(m.user)); top.appendChild(el('span', ' ')); }
+  top.appendChild(el('span', clock(m.time) + (m.edited ? ' \u00b7 edited' : '') + (m.pinned ? ' \u00b7 \ud83d\udccc' : ''), 'muted'));
+  b.appendChild(top);
+  if (m.forwardedFrom) { b.appendChild(el('div', 'Forwarded from ' + m.forwardedFrom, 'muted small')); }
+  if (m.reply) { b.appendChild(el('div', m.reply.user + ': ' + (m.reply.deleted ? '(deleted)' : m.reply.text), 'quote')); }
+  b.appendChild(el('div', m.deleted ? '(message deleted)' : m.text, 't' + (m.deleted ? ' muted' : '')));
+  if ((m.reactions || []).length) {
+    const rs = el('div');
+    m.reactions.forEach(x => {
+      const s = el('span', x.emoji + ' ' + x.count, 'react' + (x.mine ? ' mine' : ''));
+      s.addEventListener('click', () => react(m.id, x.emoji));
+      rs.appendChild(s);
+    });
+    b.appendChild(rs);
+  }
+  row.appendChild(b);
+  if (!m.deleted) {
+    const tools = el('div', null, 'tools');
+    ['\ud83d\udc4d', '\u2764\ufe0f', '\ud83d\ude02', '\ud83d\ude2e'].forEach(e => {
+      const t = el('button', e); t.title = 'React'; t.addEventListener('click', () => react(m.id, e)); tools.appendChild(t);
+    });
+    const rp = el('button', '\u21a9'); rp.title = 'Reply';
+    rp.addEventListener('click', () => { replyTo = m; drawReply(); $('msgText').focus(); });
+    tools.appendChild(rp);
+    if (mine) {
+      const del = el('button', '\ud83d\uddd1'); del.title = 'Delete';
+      del.addEventListener('click', async () => {
+        if (!confirm('Delete this message?')) { return; }
+        const x = await api('/api/chat/delete', { room: roomId, id: m.id });
+        if (x.ok) { roomSig = ''; loadMessages(); } else { toast(x.error); }
+      });
+      tools.appendChild(del);
+    } else {
+      const rep = el('button', '\u26a0'); rep.title = 'Report';
+      rep.addEventListener('click', async () => {
+        const reason = prompt('Why are you reporting this message?', '');
+        if (reason === null) { return; }
+        const x = await api('/api/chat/report', { room: roomId, id: m.id, reason: reason });
+        toast(x.ok ? 'Reported - thank you.' : x.error);
+      });
+      tools.appendChild(rep);
+    }
+    row.appendChild(tools);
+  }
+  return row;
+}
+async function react(id, emoji) {
+  const x = await api('/api/chat/react', { room: roomId, id: id, emoji: emoji });
+  if (x.ok) { roomSig = ''; loadMessages(); } else { toast(x.error); }
+}
+function drawReply() {
+  const bar = $('replyBar');
+  bar.textContent = '';
+  bar.hidden = !replyTo;
+  if (!replyTo) { return; }
+  bar.appendChild(el('span', 'Replying to ' + replyTo.user + ': ' + (replyTo.text || '').slice(0, 60) + ' '));
+  const x = el('button', '\u2715', 'link');
+  x.addEventListener('click', () => { replyTo = null; drawReply(); });
+  bar.appendChild(x);
+}
+$('sendForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = $('msgText').value.trim();
+  if (!text || !roomId) { return; }
+  $('msgText').value = '';
+  const r = await api('/api/chat/post', { room: roomId, text: text, reply: replyTo ? String(replyTo.id) : '0' });
+  if (!r.ok) { toast(r.error); $('msgText').value = text; return; }
+  replyTo = null; drawReply();
+  roomSig = '';
+  await loadMessages();
+  $('msgs').scrollTop = $('msgs').scrollHeight;
+});
+$('msgText').addEventListener('input', () => {
+  if (roomId && Date.now() - lastTypingSent > 3000) { lastTypingSent = Date.now(); api('/api/chat/typing', { room: roomId }); }
+});
+async function loadInvites() {
+  const r = await api('/api/chat/invitations');
+  const l = $('inviteList');
+  l.textContent = '';
+  const inv = r.ok ? (r.data.invitations || []) : [];
+  inv.forEach(i => {
+    const it = el('div', null, 'item');
+    it.appendChild(avatar(i.from, 36));
+    const g = el('div', null, 'grow');
+    g.appendChild(el('b', i.title));
+    g.appendChild(el('div', 'from ' + i.from + ' \u00b7 ' + ago(i.time), 'muted small'));
+    it.appendChild(g);
+    it.appendChild(btn('Accept', async () => {
+      const x = await api('/api/chat/invitations/accept', { room: i.room });
+      if (x.ok) { roomId = i.room; roomSig = ''; show('chat', 'rooms'); updateBadges(); } else { toast(x.error); }
+    }, 'primary'));
+    it.appendChild(btn('Decline', async () => {
+      const x = await api('/api/chat/invitations/decline', { room: i.room });
+      if (x.ok) { loadInvites(); updateBadges(); } else { toast(x.error); }
+    }));
+    l.appendChild(it);
+  });
+  if (inv.length === 0) { l.appendChild(el('div', 'No invitations right now.', 'empty')); }
+}
+$('joinBtn').addEventListener('click', async () => {
+  const code = $('joinCode').value.trim();
+  if (!code) { return; }
+  const x = await api('/api/chat/groups/join', { code: code });
+  if (x.ok) { $('joinCode').value = ''; roomId = (x.data.room && x.data.room.id) || x.data.id || roomId; roomSig = ''; show('chat', 'rooms'); } else { toast(x.error); }
+});
+$('groupCreate').addEventListener('click', async () => {
+  const title = $('groupTitle').value.trim();
+  if (!title) { toast('Give the group a name'); return; }
+  const x = await api('/api/chat/groups/create', { title: title, private: String($('groupPrivate').checked) });
+  if (!x.ok) { toast(x.error); return; }
+  $('groupTitle').value = '';
+  roomId = x.data.id; roomSig = '';
+  toast('Group created - invite people from the app\u2019s group info, or share an invite code.');
+  show('chat', 'rooms');
+});
+
+// ---------- calls ----------
+let callTimer = null;
+let call = null;
+let ringing = null;
+async function startCall(user, video) {
+  if (!callsOn) { toast('Calls are turned off on this server.'); return; }
+  if (call) { toast('You are already in a call.'); return; }
+  const r = await api('/api/calls/start', { to: user, video: String(!!video) });
+  if (!r.ok) { toast(r.error); return; }
+  call = r.data.call;
+  drawCall();
+  mediaSync(r.data);
+}
+async function pollCalls() {
+  if (!callsOn || !token) { return; }
+  const r = await api('/api/calls/poll');
+  if (!r.ok) { return; }
+  const inc = (r.data.incoming || [])[0] || null;
+  ringing = inc;
+  drawRing();
+  call = r.data.current || null;
+  drawCall();
+  if (call && !call.ended) {
+    const st = await api('/api/calls/state?id=' + enc(call.id));
+    if (st.ok) { mediaSync(st.data); }
+  } else { mediaStop(); }
+  if (typeof r.data.missed === 'number' && r.data.missed !== badges.missed) { badges.missed = r.data.missed; drawNav(); }
+}
+function drawRing() {
+  const box = $('ring');
+  if (!ringing) { box.hidden = true; document.title = 'Memoryq'; return; }
+  box.hidden = false;
+  const from = ringing.invitedBy || ringing.initiator;
+  $('ringAv').src = '/api/profiles/avatar?u=' + enc(from) + '&v=' + photoVer;
+  $('ringWho').textContent = from;
+  const others = ringing.participants.length - 1;
+  $('ringWhat').textContent = (ringing.video ? 'Video' : 'Voice') + ' call' + (ringing.group || others > 1 ? ' (group, ' + (others + 1) + ' people)' : '') + ' \u00b7 ringing ' + ringing.ringLeft + 's';
+  document.title = (document.title === 'Memoryq' ? '\ud83d\udcde ' + from + ' is calling' : 'Memoryq');
+}
+$('ringAccept').addEventListener('click', async () => {
+  if (!ringing) { return; }
+  const r = await api('/api/calls/accept', { id: ringing.id });
+  if (!r.ok) { toast(r.error); } else if (r.data && r.data.call) { call = r.data.call; drawCall(); mediaSync(r.data); }
+  ringing = null; drawRing(); pollCalls();
+});
+$('ringDecline').addEventListener('click', async () => {
+  if (!ringing) { return; }
+  await api('/api/calls/decline', { id: ringing.id });
+  ringing = null; drawRing();
+});
+function drawCall() {
+  const box = $('callBox');
+  if (!call || call.ended) { box.hidden = true; box.classList.remove('video'); return; }
+  box.hidden = false;
+  box.classList.toggle('video', !!call.video);
+  $('cbCam').hidden = !call.video;
+  const others = call.participants.filter(x => x.name !== me.username);
+  $('cbTitle').textContent = (call.video ? '\ud83c\udfa5 ' : '\ud83d\udcde ') + (call.roomTitle || others.map(x => x.name).join(', '));
+  const connected = call.answeredAt > 0;
+  $('cbState').textContent = connected ? 'Connected' : 'Ringing...';
+  $('cbTime').textContent = connected ? fmtDur(Date.now() - call.answeredAt) : '';
+  const ppl = $('cbPeople');
+  ppl.textContent = '';
+  call.participants.forEach(x => {
+    const d = el('div', null, 'p');
+    d.appendChild(avatar(x.name, 26));
+    const nm = el('span', x.name === me.username ? 'You' : x.name, 'grow');
+    const rd = callMedia.readers[x.name.toLowerCase()];
+    if (x.name !== me.username && x.state === 'JOINED') { const dot = el('span', null, 'lvl' + (rd && rd.live ? ' on' : '')); dot.title = rd && rd.live ? 'connected' : 'connecting'; nm.appendChild(dot); }
+    d.appendChild(nm);
+    d.appendChild(el('span', ({ JOINED: 'in the call', INVITED: 'ringing', DECLINED: 'declined', LEFT: 'left', MISSED: 'no answer', BUSY: 'busy' })[x.state] || x.state.toLowerCase(), 'muted small'));
+    ppl.appendChild(d);
+  });
+  $('cbEnd').hidden = call.initiator !== me.username;
+}
+function fmtDur(ms) {
+  const s = Math.floor(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+$('cbAdd').addEventListener('click', async () => {
+  if (!call) { return; }
+  const who = prompt('Add who? (username, or several separated by commas)', '');
+  if (!who) { return; }
+  const r = await api('/api/calls/add', { id: call.id, to: who.split(',').map(x => x.trim()).filter(Boolean).join(',') });
+  if (!r.ok) { toast(r.error); } else { pollCalls(); }
+});
+$('cbLeave').addEventListener('click', async () => {
+  if (!call) { return; }
+  await api('/api/calls/leave', { id: call.id });
+  call = null; drawCall(); mediaStop();
+});
+$('cbEnd').addEventListener('click', async () => {
+  if (!call) { return; }
+  await api('/api/calls/end', { id: call.id });
+  call = null; drawCall(); mediaStop();
+});
+async function loadCalls() {
+  $('callsOffNote').hidden = callsOn;
+  $('callsPrefs').hidden = !callsOn;
+  const l = $('callList');
+  l.textContent = '';
+  if (!callsOn) { return; }
+  const [h, p] = await Promise.all([api('/api/calls/history'), api('/api/calls/prefs')]);
+  if (p.ok) { $('dnd').checked = !!p.data.dnd; }
+  const list = h.ok ? (h.data.history || []) : [];
+  list.forEach(c => {
+    const it = el('div', null, 'item');
+    const peer = c.peer || (c.people || []).find(x => x !== me.username) || '';
+    it.appendChild(avatar(peer || me.username, 36));
+    const g = el('div', null, 'grow');
+    g.appendChild(el('b', c.roomTitle || (c.group ? (c.people || []).filter(x => x !== me.username).join(', ') : peer)));
+    const missed = c.outcome === 'missed' && !c.outgoing;
+    const line = (c.outgoing ? '\u2197 ' : '\u2199 ') + (c.video ? 'Video' : 'Voice') + ' \u00b7 ' + c.outcome + (c.duration ? ' \u00b7 ' + fmtDur(c.duration) : '') + ' \u00b7 ' + ago(c.time);
+    const sub = el('div', line, 'small ' + (missed ? '' : 'muted'));
+    if (missed) { sub.style.color = 'var(--bad)'; }
+    g.appendChild(sub);
+    it.appendChild(g);
+    if (peer && !c.group) { it.appendChild(btn('Call back', () => startCall(peer, c.video))); }
+    l.appendChild(it);
+  });
+  if (list.length === 0) { l.appendChild(el('div', 'No calls yet.', 'empty')); }
+  if (badges.missed) { api('/api/calls/history/seen', {}); badges.missed = 0; drawNav(); }
+}
+$('dnd').addEventListener('change', async () => {
+  const r = await api('/api/calls/prefs', { dnd: String($('dnd').checked) });
+  toast(r.ok ? ($('dnd').checked ? 'Do not disturb is on' : 'Do not disturb is off') : r.error);
+});
+
+
+// ---------- call sound and picture (WebRTC through MediaMTX: WHIP to send, WHEP to receive) ----------
+const callMedia = { callId: null, video: false, local: null, pub: null, pubBusy: false, pubRetry: 0, readers: {}, note: '', muted: false, camOff: false };
+function iceDone(pc) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === 'complete') { resolve(); return; }
+    const t = setTimeout(resolve, 2500);
+    pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); resolve(); } });
+  });
+}
+async function sdpExchange(pc, url) {
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await iceDone(pc);
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+  if (!r.ok) { throw new Error('media server said ' + r.status); }
+  await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+}
+function setNote(t) { callMedia.note = t; const n = $('cbNote'); if (n) { n.textContent = t; } }
+async function getLocal(video) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setNote('This browser can listen but not send your voice: the microphone needs the secure address (https://).');
+    return null;
+  }
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      video: video ? { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24 } } : false });
+  } catch (e) {
+    if (video) {
+      try { const a = await navigator.mediaDevices.getUserMedia({ audio: true }); setNote('No camera - you are sending sound only.'); return a; } catch (e2) { }
+    }
+    setNote('Microphone blocked or missing (' + e.name + '). Allow it in the browser\u2019s address bar and call again.');
+    return null;
+  }
+}
+function videoTile(key, label, stream, mine) {
+  let t = document.querySelector('#cbVideos .tile[data-k="' + key + '"]');
+  if (!t) {
+    t = el('div', null, 'tile' + (mine ? ' me' : ''));
+    t.dataset.k = key;
+    const v = el('video');
+    v.autoplay = true; v.playsInline = true; v.muted = true;
+    t.appendChild(v);
+    t.appendChild(el('span', label, 'tag'));
+    if (mine) { $('cbVideos').appendChild(t); } else { $('cbVideos').insertBefore(t, $('cbVideos').firstChild); }
+  }
+  const v = t.querySelector('video');
+  if (v.srcObject !== stream) { v.srcObject = stream; v.play().catch(() => {}); }
+}
+function removeTile(key) {
+  const t = document.querySelector('#cbVideos .tile[data-k="' + key + '"]');
+  if (t) { t.remove(); }
+}
+async function startPublish(m, video) {
+  if (callMedia.pubBusy || Date.now() < callMedia.pubRetry) { return; }
+  callMedia.pubBusy = true;
+  try {
+    if (!callMedia.local) {
+      callMedia.local = await getLocal(video);
+      if (!callMedia.local) { callMedia.pubRetry = Number.MAX_SAFE_INTEGER; return; }
+      callMedia.local.getAudioTracks().forEach(t => { t.enabled = !callMedia.muted; });
+      if (callMedia.local.getVideoTracks().length) { videoTile('me', 'You', callMedia.local, true); }
+    }
+    const pc = new RTCPeerConnection();
+    callMedia.local.getTracks().forEach(t => pc.addTransceiver(t, { direction: 'sendonly', streams: [callMedia.local] }));
+    pc.addEventListener('connectionstatechange', () => {
+      if ((pc.connectionState === 'failed' || pc.connectionState === 'closed') && callMedia.pub === pc) { callMedia.pub = null; callMedia.pubRetry = Date.now() + 3000; }
+    });
+    await sdpExchange(pc, m.whipUrl);
+    callMedia.pub = pc;
+    if (!callMedia.note || callMedia.note.indexOf('Could not') === 0) { setNote(''); }
+  } catch (e) {
+    callMedia.pubRetry = Date.now() + 4000;
+    setNote('Could not send your ' + (video ? 'video' : 'voice') + ' yet (' + e.message + ') - trying again...');
+  } finally {
+    callMedia.pubBusy = false;
+  }
+}
+async function startRead(name, url, video) {
+  const key = name.toLowerCase();
+  const rd = callMedia.readers[key] = { pc: null, live: false, busy: true, retry: 0, url: url };
+  try {
+    const pc = new RTCPeerConnection();
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+    if (video) { pc.addTransceiver('video', { direction: 'recvonly' }); }
+    const stream = new MediaStream();
+    pc.addEventListener('track', (ev) => {
+      stream.addTrack(ev.track);
+      if (ev.track.kind === 'audio') {
+        let a = document.querySelector('#cbAudio audio[data-k="' + key + '"]');
+        if (!a) { a = el('audio'); a.autoplay = true; a.dataset.k = key; $('cbAudio').appendChild(a); }
+        a.srcObject = stream; a.play().catch(() => { setNote('Click anywhere on the page to hear the call.'); });
+      } else {
+        videoTile(key, name, stream, false);
+      }
+    });
+    pc.addEventListener('connectionstatechange', () => {
+      rd.live = pc.connectionState === 'connected';
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') { dropReader(key); }
+      drawCall();
+    });
+    rd.pc = pc;
+    await sdpExchange(pc, url);
+  } catch (e) {
+    // Usually: they are not sending yet. Try again shortly.
+    if (rd.pc) { try { rd.pc.close(); } catch (x) { } }
+    rd.pc = null; rd.retry = Date.now() + 2500;
+  } finally {
+    rd.busy = false;
+  }
+}
+function dropReader(key) {
+  const rd = callMedia.readers[key];
+  if (rd && rd.pc) { try { rd.pc.close(); } catch (e) { } }
+  delete callMedia.readers[key];
+  const a = document.querySelector('#cbAudio audio[data-k="' + key + '"]');
+  if (a) { a.srcObject = null; a.remove(); }
+  removeTile(key);
+}
+function mediaSync(d) {
+  if (!d || !d.call || d.call.ended || d.call.myState !== 'JOINED' || !d.media) {
+    if (!d || !d.call || d.call.ended || d.call.myState !== 'JOINED') { mediaStop(); }
+    return;
+  }
+  if (callMedia.callId !== d.call.id) { mediaStop(); callMedia.callId = d.call.id; callMedia.video = !!d.call.video; }
+  if (!window.RTCPeerConnection) { setNote('This browser cannot do calls with sound.'); return; }
+  if (!callMedia.pub) { startPublish(d.media, callMedia.video); }
+  const want = {};
+  (d.streams || []).forEach(s => {
+    const key = s.name.toLowerCase();
+    want[key] = true;
+    const rd = callMedia.readers[key];
+    if (!rd || (!rd.pc && !rd.busy && Date.now() >= rd.retry)) { startRead(s.name, s.whepUrl, callMedia.video); }
+  });
+  Object.keys(callMedia.readers).forEach(k => { if (!want[k]) { dropReader(k); } });
+}
+function mediaStop() {
+  Object.keys(callMedia.readers).forEach(dropReader);
+  if (callMedia.pub) { try { callMedia.pub.close(); } catch (e) { } }
+  if (callMedia.local) { callMedia.local.getTracks().forEach(t => t.stop()); }
+  callMedia.pub = null; callMedia.local = null; callMedia.callId = null; callMedia.pubRetry = 0; callMedia.pubBusy = false;
+  callMedia.muted = false; callMedia.camOff = false;
+  $('cbVideos').textContent = '';
+  $('cbAudio').textContent = '';
+  $('cbMute').textContent = '\ud83c\udfa4 Mute';
+  $('cbCam').textContent = '\ud83c\udfa5 Camera off';
+  setNote('');
+}
+$('cbMute').addEventListener('click', () => {
+  callMedia.muted = !callMedia.muted;
+  if (callMedia.local) { callMedia.local.getAudioTracks().forEach(t => { t.enabled = !callMedia.muted; }); }
+  $('cbMute').textContent = callMedia.muted ? '\ud83d\udd07 Unmute' : '\ud83c\udfa4 Mute';
+});
+$('cbCam').addEventListener('click', () => {
+  callMedia.camOff = !callMedia.camOff;
+  if (callMedia.local) { callMedia.local.getVideoTracks().forEach(t => { t.enabled = !callMedia.camOff; }); }
+  $('cbCam').textContent = callMedia.camOff ? '\ud83c\udfa5 Camera on' : '\ud83c\udfa5 Camera off';
+});
+document.addEventListener('click', () => { document.querySelectorAll('#cbAudio audio').forEach(a => { if (a.paused) { a.play().catch(() => {}); } }); });
+
+// ---------- radio ----------
+const radio = { station: null, playing: false, timer: null };
+let radioSig = '';
+async function loadRadio() {
+  const g = $('radioGrid');
+  const r = await api('/api/radio/stations');
+  const list = r.ok ? (r.data.stations || []) : [];
+  // redraw only when something changed, so the page does not blink every few seconds
+  const sig = JSON.stringify([list.map(s => [s.id, s.name, s.description, s.live, s.liveDj, s.liveName, s.video, s.listeners, s.djName,
+    s.now && s.now.label, s.talk && s.talk.text]), radio.playing, radio.station && radio.station.id]);
+  if (sig === radioSig && g.firstChild) { return; }
+  radioSig = sig;
+  g.textContent = '';
+  list.forEach(s => {
+    const c = el('div', null, 'pcard');
+    c.style.textAlign = 'left';
+    const top = el('div', null, 'row');
+    top.appendChild(el('b', s.name, 'grow'));
+    if (s.liveDj) { top.appendChild(el('span', 'LIVE DJ', 'onair')); } else if (s.live) { top.appendChild(el('span', 'ON AIR', 'onair')); }
+    c.appendChild(top);
+    if (s.liveDj) { c.appendChild(el('div', '\ud83c\udfa7 Live: ' + (s.liveName || 'a DJ') + (s.video ? ' \u00b7 on video too' : ''), 'small')); }
+    if (s.description) { c.appendChild(el('div', s.description, 'muted small')); }
+    c.appendChild(el('div', s.now ? '\u266a ' + s.now.label : (s.live ? '' : 'Off air'), 'small'));
+    c.appendChild(el('div', 'with ' + s.djName + (s.live ? ' \u00b7 ' + s.listeners + ' listening' : ''), 'muted small'));
+    if (s.talk) { c.appendChild(el('div', '\ud83c\udf99 ' + s.talk.text, 'djline')); }
+    const playing = radio.playing && radio.station && radio.station.id === s.id;
+    const b = btn(playing ? '\u25a0 Stop' : '\u25b6 Listen', () => { if (playing) { radioStop(); } else { radioPlay(s); } loadRadio(); }, s.live ? 'primary' : '');
+    b.disabled = !s.live;
+    b.style.marginTop = '10px';
+    c.appendChild(b);
+    if (s.video) {
+      const w = btn('\ud83d\udcfa Watch', () => { dyn.watch = { channelId: s.video, title: (s.liveName || 'Live DJ') + ' on ' + s.name, broadcasterId: s.name, viewers: 0 }; show('live', 'watch'); });
+      w.style.marginTop = '10px'; w.style.marginLeft = '6px';
+      c.appendChild(w);
+    }
+    g.appendChild(c);
+  });
+  if (list.length === 0) { g.appendChild(el('div', 'No radio stations yet.', 'empty')); }
+}
+(function placeRadioBar() {
+  const app = $('app'), shell = app.querySelector('.shell');
+  app.insertBefore($('radioBar'), shell);
+})();
+$('rbLine').addEventListener('click', () => show('radio', 'stations'));
+function radioPlay(s) {
+  if (watchBeat) { stopWatching(); $('watchNote').textContent = 'Stopped - the radio is playing.'; }
+  radio.station = s;
+  $('radioBar').classList.add('on');
+  const a = $('rbAudio');
+  a.src = s.stream + '?t=' + Date.now();
+  a.play().catch(() => toast('Press play to start the radio'));
+  radio.playing = true;
+  $('radioBar').hidden = false;
+  document.body.classList.add('radio-on');
+  $('rbToggle').innerHTML = '&#9632;';
+  $('rbStation').textContent = s.name;
+  $('rbNow').textContent = s.now ? '\u00b7 ' + s.now.label : '\u00b7 tuning in...';
+  clearInterval(radio.timer);
+  radio.timer = setInterval(radioNow, 5000);
+  radioNow();
+}
+function radioStop() {
+  const a = $('rbAudio');
+  a.pause(); a.removeAttribute('src'); try { a.load(); } catch (e) { }
+  radio.playing = false;
+  $('radioBar').classList.remove('on');
+  $('rbToggle').innerHTML = '&#9654;';
+  clearInterval(radio.timer);
+}
+async function radioNow() {
+  if (!radio.station) { return; }
+  const r = await api('/api/radio/now?station=' + radio.station.id);
+  if (!r.ok) { $('rbNow').textContent = '\u00b7 off air'; return; }
+  const d = r.data;
+  const nowLine = d.talk ? '\u00b7 \ud83c\udf99 ' + d.djName + ': ' + d.talk.text
+    : (d.now ? '\u00b7 ' + d.now.label + (d.next ? '  \u00b7  next: ' + d.next + (d.nextRequestedBy ? ' (request from ' + d.nextRequestedBy + ')' : '') : '') : '');
+  if ($('rbNow').textContent !== nowLine) { $('rbNow').textContent = nowLine; }
+  radio.now = d.now;
+  const like = $('rbLike');
+  like.hidden = !d.now;
+  if (d.now) {
+    like.innerHTML = (d.now.liked ? '&#10084;' : '&#9825;') + ' ' + (d.now.likes || 0);
+    like.classList.toggle('on', !!d.now.liked);
+  }
+  $('rbGet').hidden = !(d.now && d.now.hasLink);
+  if (current.cat === 'radio') { loadRadio(); }
+}
+$('rbLike').addEventListener('click', async () => {
+  if (!radio.now) { return; }
+  const r = await api('/api/radio/like', { track: radio.now.trackId, like: String(!radio.now.liked) });
+  if (r.ok) { radio.now.liked = r.data.liked; radio.now.likes = r.data.likes; $('rbLike').innerHTML = (r.data.liked ? '&#10084;' : '&#9825;') + ' ' + r.data.likes; $('rbLike').classList.toggle('on', r.data.liked); }
+  else { toast(r.error); }
+});
+$('rbGet').addEventListener('click', async () => {
+  if (!radio.now) { return; }
+  const w = window.open('', '_blank');
+  const r = await api('/api/radio/tap', { track: radio.now.trackId });
+  const url = r.ok ? safeUrl(r.data.link) : null;
+  if (url && w) { w.opener = null; w.location = url; } else { if (w) { w.close(); } toast('No link for this song yet'); }
+});
+let reqSongs = [];
+function drawRequests() {
+  const box = $('reqList');
+  box.textContent = '';
+  const f = $('reqFilter').value.trim().toLowerCase();
+  reqSongs.filter(x => !f || (x.title + ' ' + x.artist).toLowerCase().indexOf(f) >= 0).forEach(x => {
+    const it = el('div', null, 'row');
+    it.style.padding = '6px 0';
+    it.style.borderBottom = '1px solid var(--line)';
+    const g = el('div', null, 'grow');
+    g.appendChild(el('div', x.title));
+    g.appendChild(el('div', (x.artist || '') + (x.likes ? '  \u00b7  \u2764 ' + x.likes : ''), 'muted small'));
+    it.appendChild(g);
+    it.appendChild(btn('Request', async () => {
+      const r = await api('/api/radio/request', { station: radio.station.id, track: x.id });
+      if (r.ok) { $('reqBox').hidden = true; toast(r.data.place === 1 ? 'Your song plays next!' : 'Requested - your song is number ' + r.data.place + ' in line'); radioNow(); }
+      else { toast(r.error); }
+    }, 'primary'));
+    box.appendChild(it);
+  });
+  if (!box.firstChild) { box.appendChild(el('div', 'No songs found.', 'empty')); }
+}
+$('rbRequest').addEventListener('click', async () => {
+  if (!radio.station) { return; }
+  const r = await api('/api/radio/songs?station=' + radio.station.id);
+  if (!r.ok) { toast(r.error); return; }
+  reqSongs = r.data.songs || [];
+  $('reqTitle').textContent = 'Request a song on ' + radio.station.name;
+  $('reqFilter').value = '';
+  drawRequests();
+  $('reqBox').hidden = false;
+});
+$('reqFilter').addEventListener('input', drawRequests);
+$('reqClose').addEventListener('click', () => { $('reqBox').hidden = true; });
+$('rbToggle').addEventListener('click', () => {
+  if (radio.playing) { radioStop(); } else if (radio.station) { radioPlay(radio.station); }
+  if (current.cat === 'radio') { loadRadio(); }
+});
+$('rbClose').addEventListener('click', () => {
+  radioStop(); radio.station = null; $('radioBar').hidden = true; document.body.classList.remove('radio-on');
+  if (current.cat === 'radio') { loadRadio(); }
+});
+$('rbAudio').addEventListener('error', () => {
+  if (radio.playing) { $('rbNow').textContent = '\u00b7 stopped - press play to try again'; radio.playing = false; $('radioBar').classList.remove('on'); $('rbToggle').innerHTML = '&#9654;'; }
+});
+
+// ---------- live channels ----------
+let hls = null;
+let watchBeat = null;
+const viewerId = (() => {
+  let v = recall('vs_viewer');
+  if (!v) { v = 'web-' + Math.random().toString(36).slice(2, 12) + Date.now().toString(36); store('vs_viewer', v); }
+  return v;
+})();
+async function loadLive() {
+  const g = $('liveGrid');
+  g.textContent = '';
+  let d = null;
+  try { d = await (await fetch('/channels')).json(); } catch (e) { }
+  const list = d ? (d.channels || []).filter(c => c.live) : [];
+  list.forEach(c => {
+    const card = el('div', null, 'pcard');
+    card.appendChild(el('div', '\ud83d\udd34 LIVE', 'chip'));
+    card.appendChild(el('b', c.title || c.channelId, 'name'));
+    card.appendChild(el('div', (c.broadcasterId || '') + ' \u00b7 ' + (c.viewers || 0) + ' watching', 'muted small'));
+    card.appendChild(el('div', 'started ' + ago(c.startTime), 'muted small'));
+    if (c.radio) { card.appendChild(el('div', '\ud83d\udcfb Also on the radio: ' + c.radio.name, 'small')); }
+    const b = btn('Watch', () => { dyn.watch = c; show('live', 'watch'); }, 'primary');
+    b.style.marginTop = '8px';
+    card.appendChild(b);
+    g.appendChild(card);
+  });
+  if (list.length === 0) { g.appendChild(el('div', 'Nobody is live right now.', 'empty')); }
+}
+function loadScript(src) {
+  return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+}
+async function startWatching() {
+  const c = dyn.watch;
+  if (!c) { return; }
+  stopWatching();
+  if (radio.playing) { radioStop(); toast('Radio paused while you watch'); }
+  $('vCtl').hidden = false;
+  $('watchTitle').textContent = c.title || c.channelId;
+  $('watchInfo').textContent = (c.broadcasterId || '') + ' \u00b7 ' + (c.viewers || 0) + ' watching';
+  const url = location.protocol === 'https:' ? '/hls/live/' + c.channelId + '/index.m3u8'
+    : 'http://' + location.hostname + ':8888/live/' + c.channelId + '/index.m3u8';
+  const v = $('player');
+  $('watchNote').textContent = 'Connecting...';
+  if (v.canPlayType('application/vnd.apple.mpegurl')) {
+    v.src = url;
+  } else {
+    try {
+      if (!window.Hls) { await loadScript('https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js'); }
+      hls = new window.Hls();
+      hls.loadSource(url);
+      hls.attachMedia(v);
+      hls.on(window.Hls.Events.ERROR, (ev, data) => { if (data.fatal) { $('watchNote').textContent = 'The stream stopped or is not reachable.'; } });
+    } catch (e) {
+      $('watchNote').textContent = 'This browser needs the internet once to load the video player.';
+      return;
+    }
+  }
+  v.play().catch(() => {});
+  v.onplaying = () => { $('watchNote').textContent = ''; };
+  const beat = () => fetch('/watch?channel=' + enc(c.channelId) + '&viewer=' + enc(viewerId), { method: 'POST' }).catch(() => {});
+  beat();
+  watchBeat = setInterval(beat, 15000);
+}
+function stopWatching() {
+  clearInterval(watchBeat); watchBeat = null;
+  if ($('vCtl')) { $('vCtl').hidden = true; }
+  if (hls) { try { hls.destroy(); } catch (e) { } hls = null; }
+  const v = $('player');
+  if (v) { v.pause(); v.removeAttribute('src'); try { v.load(); } catch (e) { } }
+}
+
+$('vStop').addEventListener('click', () => {
+  stopWatching();
+  $('watchNote').textContent = 'Stopped.';
+  show('live', 'onair');
+});
+$('vMute').addEventListener('click', () => {
+  const v = $('player');
+  v.muted = !v.muted;
+  $('vMute').innerHTML = v.muted ? '&#128263;' : '&#128266;';
+  $('vMute').title = v.muted ? 'Unmute' : 'Mute';
+});
+$('player').addEventListener('volumechange', () => { $('vMute').innerHTML = $('player').muted ? '&#128263;' : '&#128266;'; });
+
+// ---------- notifications ----------
+async function loadNotifications() {
+  const r = await api('/api/notify/list?limit=100');
+  const l = $('notifyList');
+  l.textContent = '';
+  if (!r.ok) { l.appendChild(el('div', r.error, 'empty')); return; }
+  const items = r.data.items || [];
+  const words = { comment: ' commented on your post', reply: ' replied to your comment', like: ' liked your post', friend: ' added you as a friend', market: ' (Marketplace)' };
+  items.forEach(o => {
+    const it = el('div', null, 'item click' + (o.read ? '' : ' unread'));
+    it.appendChild(avatar(o.actor, 40));
+    const g = el('div', null, 'grow');
+    const line = el('div');
+    line.appendChild(el('b', o.stageName || o.actor));
+    line.appendChild(el('span', words[o.type] || ''));
+    if (o.text && o.type !== 'friend') { line.appendChild(el('span', ': \u201c' + o.text + '\u201d', 'muted')); }
+    g.appendChild(line);
+    g.appendChild(el('div', ago(o.created), 'muted small'));
+    it.appendChild(g);
+    it.addEventListener('click', () => {
+      if (o.type === 'market') { location.href = '/market#' + (o.actor === 'Memoryq' ? 'mine' : 'messages'); }
+      else if (o.post > 0) { dyn.post = o.post; show('notify', 'post'); } else { openPerson(o.actor); }
+    });
+    l.appendChild(it);
+  });
+  if (items.length === 0) { l.appendChild(el('div', 'Nothing yet. When people comment on or like your posts, or add you as a friend, it shows here.', 'empty')); }
+  if (r.data.unread || items.some(o => !o.read)) { await api('/api/notify/read', {}); badges.notify = 0; drawNav(); }
+}
+async function loadOnePost() {
+  const box = $('onePost');
+  box.textContent = 'Loading...';
+  const r = await api('/api/wall/one?id=' + dyn.post);
+  box.textContent = '';
+  if (!r.ok || !r.data.post) { box.appendChild(el('div', 'This post was deleted or is not visible to you.', 'empty')); return; }
+  box.appendChild(postCard(r.data.post, { open: true }));
+}
+
+// ---------- my profile ----------
+async function refreshMe() {
+  const r = await api('/api/profiles/me');
+  if (r.ok) { myProfile = r.data; }
+  return r;
+}
+async function loadMyProfile() {
+  const v = $('myView');
+  v.textContent = 'Loading...';
+  const r = await refreshMe();
+  v.textContent = '';
+  if (!r.ok) { v.appendChild(el('div', r.error, 'empty')); return; }
+  const h = profileHero(myProfile, true);
+  const acts = el('div'); acts.style.marginTop = '10px';
+  acts.appendChild(btn('Edit profile', () => show('profile', 'edit'), 'primary'));
+  acts.appendChild(btn('Change photo', () => show('profile', 'photo')));
+  acts.appendChild(btn('My posts', () => show('wall', 'mine')));
+  h.info.appendChild(acts);
+  v.appendChild(h.hero);
+  v.appendChild(friendsStrip(myProfile));
+}
+async function loadEdit() {
+  await refreshMe();
+  const p = myProfile || {};
+  $('edFirst').value = p.firstName || ''; $('edLast').value = p.lastName || ''; $('edStage').value = p.stageName || '';
+  $('edCity').value = p.city || ''; $('edCountry').value = p.country || ''; $('edEdu').value = p.education || '';
+  $('edHobbies').value = (p.hobbies || []).join(', ');
+  $('edMsg').textContent = '';
+  drawColors();
+}
+// ---------- card colour ----------
+const CARD_COLORS = ['#c62828', '#ad1457', '#6a1b9a', '#4527a0', '#283593', '#1565c0', '#0277bd', '#00838f', '#00695c',
+  '#2e7d32', '#558b2f', '#8d6e00', '#e65100', '#bf360c', '#5d4037', '#455a64', '#37474f', '#212121'];
+function drawColors() {
+  const p = myProfile || {};
+  const now = (p.color || '').toLowerCase();
+  const pv = $('colorPreview');
+  pv.textContent = '';
+  const card = personCard(Object.assign({}, p, { username: me.username }));
+  card.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  pv.appendChild(card);
+  const sw = $('colorSwatches');
+  sw.textContent = '';
+  const auto = el('button', null, 'swatch auto' + (p.colorSet ? '' : ' on'));
+  auto.title = 'Automatic (worked out from your name)';
+  auto.setAttribute('aria-label', auto.title);
+  auto.addEventListener('click', () => saveColor('auto'));
+  sw.appendChild(auto);
+  CARD_COLORS.forEach(c => {
+    const b = el('button', null, 'swatch' + (p.colorSet && c === now ? ' on' : ''));
+    b.style.background = c; b.title = c; b.setAttribute('aria-label', 'Card colour ' + c);
+    b.addEventListener('click', () => saveColor(c));
+    sw.appendChild(b);
+  });
+  $('colorCustom').value = /^#[0-9a-f]{6}$/.test(now) ? now : '#1565c0';
+}
+async function saveColor(c) {
+  $('colorMsg').textContent = '';
+  const r = await api('/api/profiles/color', { color: c });
+  if (!r.ok) { toast(r.error); drawColors(); return; }
+  myProfile = r.data;
+  drawColors();
+  $('colorMsg').textContent = 'Saved';
+}
+$('colorCustom').addEventListener('change', (e) => saveColor(e.target.value));
+$('edSave').addEventListener('click', async () => {
+  const r = await api('/api/profiles/me', {
+    firstName: $('edFirst').value.trim(), lastName: $('edLast').value.trim(), stageName: $('edStage').value.trim(),
+    city: $('edCity').value.trim(), country: $('edCountry').value.trim(), education: $('edEdu').value.trim(),
+    hobbies: $('edHobbies').value.split(',').map(x => x.trim()).filter(Boolean).join(',') });
+  if (r.ok) { myProfile = r.data; $('edMsg').textContent = 'Saved'; $('hdrName').textContent = myProfile.stageName || me.username; }
+  else { $('edMsg').textContent = ''; toast(r.error); }
+});
+async function loadPhoto() {
+  await refreshMe();
+  $('photoNow').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
+  $('photoRemove').hidden = !(myProfile && myProfile.hasPhoto);
+}
+$('photoFile').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) { return; }
+  let data;
+  try { data = await shrink(f, 1024); } catch (err) { toast(err.message); return; }
+  const r = await api('/api/profiles/photo', { image: data });
+  if (!r.ok) { toast(r.error); return; }
+  photoVer = Date.now();
+  $('hdrAv').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
+  toast('Your photo is updated');
+  loadPhoto();
+});
+$('photoRemove').addEventListener('click', async () => {
+  const r = await api('/api/profiles/photo/remove', {});
+  if (!r.ok) { toast(r.error); return; }
+  photoVer = Date.now();
+  $('hdrAv').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
+  loadPhoto();
+});
+async function loadAccount() {
+  await refreshMe();
+  $('pwMsg').textContent = '';
+  const d = (myProfile && myProfile.deletion) || {};
+  const pending = d.status === 'pending';
+  $('delState').textContent = pending ? 'You asked for your account to be deleted ' + ago(d.at) + '. The admin will handle it.'
+    : (d.status === 'declined' ? 'The admin declined your last deletion request.' : 'The admin deletes accounts on request.');
+  $('delAsk').hidden = pending || me.role === 'BROADCASTER';
+  $('delCancel').hidden = !pending;
+}
+$('pwSave').addEventListener('click', async () => {
+  const r = await api('/api/password', { old: $('pwOld').value, new: $('pwNew').value });
+  $('pwMsg').className = r.ok ? 'ok' : 'error';
+  $('pwMsg').textContent = r.ok ? 'Password changed' : r.error;
+  if (r.ok) { $('pwOld').value = ''; $('pwNew').value = ''; }
+});
+$('delSend').addEventListener('click', async () => {
+  if (!confirm('Ask the admin to delete your account? Your profile, posts and chats go away.')) { return; }
+  const r = await api('/api/profiles/deletion/request', { reason: $('delReason').value.trim() });
+  if (!r.ok) { toast(r.error); return; }
+  myProfile = r.data;
+  toast('Request sent to the admin');
+  loadAccount();
+});
+$('delCancel').addEventListener('click', async () => {
+  const r = await api('/api/profiles/deletion/cancel', {});
+  if (!r.ok) { toast(r.error); return; }
+  loadAccount();
+});
+
+// ---------- badges and start ----------
+let pollTimer = null;
+let badgeTimer = null;
+async function updateBadges() {
+  if (!token) { return; }
+  const [n, inv] = await Promise.all([api('/api/notify/count'), api('/api/chat/invitations')]);
+  badges.notify = n.ok ? (n.data.unread || 0) : 0;
+  badges.invites = inv.ok ? (inv.data.invitations || []).length : 0;
+  const r = await api('/api/chat/rooms');
+  if (r.ok) {
+    rooms = r.data.rooms || [];
+    rooms.sort((a, b) => (b.lastTime || 0) - (a.lastTime || 0));
+    const u = await unreadCounts();
+    let total = 0;
+    Object.keys(u).forEach(k => { if (k !== roomId || current.tab !== 'rooms') { total += u[k] || 0; } });
+    badges.chat = total;
+  }
+  drawNav();
+}
+async function start() {
+  const r = await api('/api/me');
+  if (!r.ok) { signedOut(r.status === 0 ? r.error : ''); return; }
+  me = r.data;
+  $('login').hidden = true;
+  $('app').hidden = false;
+  $('hdrAv').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
+  $('adminLink').hidden = me.role !== 'ADMIN';
+  await refreshMe();
+  $('hdrName').textContent = (myProfile && myProfile.stageName) || me.username;
+  const f = await api('/api/calls/features');
+  callsOn = !!(f.ok && f.data.calls);
+  const h = (location.hash || '').replace('#', '').split('/');
+  if (h[1] === 'person' && h[2]) { dyn.person = decodeURIComponent(h[2]); dyn.personName = dyn.person; }
+  if (h[1] === 'post' && h[2]) { dyn.post = Number(h[2]) || 0; }
+  if (h[0] === 'videos' && h[1] === 'play' && h[2]) { dyn.video = Number(h[2]) || 0; }
+  await show(h[0] || 'home', h[1] || 'feed');
+  checkEmail();
+  updateBadges();
+  clearInterval(badgeTimer); badgeTimer = setInterval(updateBadges, 10000);
+  clearInterval(callTimer);
+  if (callsOn) { pollCalls(); callTimer = setInterval(pollCalls, 2500); }
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => {
+    if (current.cat === 'chat' && current.tab === 'rooms') { loadRooms(); }
+    if (call) { drawCall(); }
+  }, 10000);
+}
+if (token) { start(); } else { $('login').hidden = false; }
+
+// ================= Videos: watch, comment, and add / manage your own =================
+function vh(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'on') { Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn)); }
+    else if (k === 'style') { e.style.cssText = v; }
+    else if (v !== null && v !== undefined && v !== false) { e.setAttribute(k, v === true ? '' : v); }
+  });
+  kids.flat().forEach(c => { if (c !== null && c !== undefined && c !== false) { e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c); } });
+  return e;
+}
+function vLen(ms) { const s = Math.round((ms || 0) / 1000); return s ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : ''; }
+function vThumb(v) {
+  return vh('div', { class: 'vthumb' },
+    v.thumb ? vh('img', { src: v.thumb, alt: '', loading: 'lazy' }) : vh('span', {}, v.kind === 'youtube' ? 'YouTube' : (v.status === 'processing' ? 'Preparing...' : 'Video')),
+    v.durationMs ? vh('span', { class: 'vlen' }, vLen(v.durationMs)) : null);
+}
+function vCard(v) {
+  return vh('button', { class: 'vcard', on: { click: () => openVideo(v.id) } }, vThumb(v),
+    vh('div', { class: 'vt' }, v.title), vh('div', { class: 'muted small' }, v.owner + ' \u00B7 ' + v.views + ' views'));
+}
+
+let videoQ = '';
+async function loadVideos() {
+  const r = await api('/api/videos?scope=all&q=' + enc(videoQ));
+  const g = $('videoGrid');
+  g.textContent = '';
+  const list = (r.ok && r.data.videos) || [];
+  if (!list.length) { g.appendChild(vh('div', { class: 'empty' }, videoQ ? 'No video matches.' : 'No videos yet - be the first: My videos \u2192 add one.')); return; }
+  list.forEach(v => g.appendChild(vCard(v)));
+}
+
+async function openVideo(id) {
+  dyn.video = id;
+  await show('videos', 'play');
+}
+
+async function loadPlay() {
+  const box = $('videoPlay');
+  box.textContent = '';
+  if (!dyn.video) { return; }
+  const r = await api('/api/videos/one?id=' + dyn.video);
+  if (!r.ok) { box.appendChild(vh('div', { class: 'empty' }, r.error)); return; }
+  const v = r.data;
+  dyn.videoTitle = v.title;
+  drawNav();
+  const player = v.kind === 'youtube'
+    ? vh('iframe', { src: 'https://www.youtube-nocookie.com/embed/' + v.youtubeId + '?autoplay=1&rel=0', allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen', allowfullscreen: true, style: 'width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000' })
+    : vh('video', { src: v.src, controls: true, autoplay: true, playsinline: true, poster: v.thumb || null, style: 'width:100%;aspect-ratio:16/9;border-radius:10px;background:#000' });
+  box.appendChild(player);
+  box.appendChild(vh('h2', { style: 'margin:12px 0 4px' }, v.title));
+  box.appendChild(vh('div', { class: 'muted' }, 'by ', vh('a', { href: '#', on: { click: e => { e.preventDefault(); openPerson(v.owner); } } }, v.owner), ' \u00B7 ' + v.views + ' views \u00B7 ' + new Date(v.created).toLocaleDateString()));
+  if (v.description) { box.appendChild(vh('p', { style: 'white-space:pre-wrap' }, v.description)); }
+  api('/api/videos/view', { id: v.id });
+  const list = vh('div', { id: 'vComments' });
+  const text = vh('textarea', { rows: 2, maxlength: 1000, placeholder: 'Write a comment...' });
+  const err = vh('div', { class: 'error small' });
+  box.appendChild(vh('h3', { style: 'margin:18px 0 8px' }, 'Comments'));
+  box.appendChild(vh('div', { class: 'box' }, text, err, vh('div', { class: 'row' }, vh('span', { class: 'grow' }),
+    vh('button', { class: 'primary', on: { click: async () => {
+      if (!text.value.trim()) { return; }
+      const c = await api('/api/videos/comment', { id: v.id, text: text.value });
+      if (c.ok) { text.value = ''; err.textContent = ''; drawComments(v, c.data.comments); } else { err.textContent = c.error; }
+    } } }, 'Post'))));
+  box.appendChild(list);
+  const c = await api('/api/videos/comments?id=' + v.id);
+  drawComments(v, (c.ok && c.data.comments) || []);
+}
+
+function drawComments(v, list) {
+  const box = $('vComments');
+  if (!box) { return; }
+  box.textContent = '';
+  if (!list.length) { box.appendChild(vh('div', { class: 'muted' }, 'No comments yet.')); return; }
+  list.forEach(c => {
+    const body = vh('div', { style: 'white-space:pre-wrap;margin-top:4px' }, c.text);
+    const tools = vh('div', { class: 'row', style: 'gap:4px' },
+      c.canEdit ? vh('button', { class: 'link', on: { click: async () => {
+        const t = prompt('Change your comment:', c.text);
+        if (t === null || !t.trim()) { return; }
+        const r = await api('/api/videos/comment/edit', { id: c.id, text: t });
+        if (r.ok) { drawComments(v, r.data.comments); } else { alert(r.error); }
+      } } }, 'Edit') : null,
+      c.canDelete ? vh('button', { class: 'link', on: { click: async () => {
+        if (!confirm('Delete this comment?')) { return; }
+        const r = await api('/api/videos/comment/delete', { id: c.id });
+        if (r.ok) { drawComments(v, r.data.comments); } else { alert(r.error); }
+      } } }, 'Delete') : null);
+    box.appendChild(vh('div', { class: 'card', style: 'padding:10px 12px;margin-bottom:8px' },
+      vh('div', { class: 'row' }, vh('b', {}, c.author), vh('span', { class: 'muted small' }, ' ' + new Date(c.created).toLocaleString() + (c.edited ? ' (edited)' : '')), vh('span', { class: 'grow' }), tools),
+      body));
+  });
+}
+
+let myVideoTimer = null;
+async function loadMyVideos() {
+  clearTimeout(myVideoTimer);
+  const root = $('myVideos');
+  const r = await api('/api/videos?scope=mine');
+  root.textContent = '';
+  if (!r.ok) { root.appendChild(vh('div', { class: 'empty' }, r.error)); return; }
+  const d = r.data, list = d.videos || [];
+  $('vSpace').textContent = d.limitMb ? 'Space used: ' + d.usedMb + ' of ' + d.limitMb + ' MB \u00B7 files up to ' + d.maxUploadMb + ' MB' : '';
+  if (!list.length) { root.appendChild(vh('div', { class: 'empty' }, 'You have not added any videos yet.')); }
+  list.forEach(v => {
+    const status = v.status === 'processing' ? 'Preparing - it will be ready in a few minutes'
+      : v.status === 'failed' ? 'Could not be prepared' + (v.error ? ': ' + v.error : '')
+      : v.paused === 'admin' ? 'Paused by Memoryq (contact support@memoryq.com)'
+      : v.paused ? 'Paused - only you can see it' : (v.featured ? 'Showing \u00B7 on Memoryq TV' : 'Showing');
+    const title = vh('input', { value: v.title, maxlength: 120 });
+    const desc = vh('textarea', { rows: 2, maxlength: 2000 }, v.description);
+    const edit = vh('div', { hidden: true, style: 'margin-top:8px' }, title, desc,
+      vh('div', { class: 'row', style: 'margin-top:6px' },
+        vh('button', { class: 'primary', on: { click: async () => { const x = await api('/api/videos/edit', { id: v.id, title: title.value, description: desc.value }); if (x.ok) { loadMyVideos(); } else { alert(x.error); } } } }, 'Save'),
+        vh('button', { on: { click: () => { edit.hidden = true; } } }, 'Cancel')));
+    root.appendChild(vh('div', { class: 'card', style: 'display:flex;gap:12px;flex-wrap:wrap' },
+      vh('div', { style: 'width:180px' }, vThumb(v)),
+      vh('div', { style: 'flex:1;min-width:220px' },
+        vh('b', {}, v.title),
+        vh('div', { class: v.status === 'failed' || v.paused === 'admin' ? 'error small' : 'muted small' }, status),
+        vh('div', { class: 'muted small' }, v.views + ' views \u00B7 ' + v.comments + ' comments \u00B7 added ' + new Date(v.created).toLocaleDateString()),
+        vh('div', { class: 'row', style: 'gap:6px;margin-top:8px;flex-wrap:wrap' },
+          v.status === 'ready' && !v.paused ? vh('button', { on: { click: () => openVideo(v.id) } }, 'Watch') : null,
+          vh('button', { on: { click: () => { edit.hidden = !edit.hidden; } } }, 'Edit'),
+          v.status === 'ready' && v.paused !== 'admin' ? vh('button', { on: { click: async () => { const x = await api('/api/videos/pause', { id: v.id, paused: String(!v.paused) }); if (x.ok) { loadMyVideos(); } else { alert(x.error); } } } }, v.paused ? 'Show it' : 'Pause') : null,
+          vh('button', { on: { click: async () => { if (confirm('Delete "' + v.title + '" and its comments?')) { const x = await api('/api/videos/delete', { id: v.id }); if (x.ok) { loadMyVideos(); } else { alert(x.error); } } } } }, 'Delete')),
+        edit)));
+  });
+  if (list.some(v => v.status === 'processing') && current.cat === 'videos' && current.tab === 'mine') { myVideoTimer = setTimeout(loadMyVideos, 4000); }
+}
+
+// ---------- My streams: what I streamed, for how long, loyalty; e-mail alerts; register (testers) ----------
+function sDur(ms) {
+  const m = Math.round((ms || 0) / 60000);
+  if (m < 1) { return Math.round((ms || 0) / 1000) + ' s'; }
+  return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
+}
+async function loadMyStreams() {
+  const root = $('myStreams');
+  const r = await api('/api/me/streams');
+  root.textContent = '';
+  if (!r.ok) { root.appendChild(vh('div', { class: 'empty' }, r.error)); return; }
+  const d = r.data, t = d.totals;
+  if (d.anonymous) { root.appendChild(registerBox()); }
+  const tile = (k, v) => vh('div', { class: 'box', style: 'flex:1;min-width:120px;text-align:center;margin:0' }, vh('div', { class: 'muted small' }, k), vh('b', { style: 'font-size:20px' }, v));
+  root.appendChild(vh('div', { class: 'row', style: 'gap:8px;flex-wrap:wrap;margin-bottom:10px' },
+    tile('Streams', String(t.streams)), tile('Total time', sDur(t.totalMs)), tile('Longest', sDur(t.longestMs)),
+    tile('Average', sDur(t.averageMs)), tile('Points', String(t.points)), tile('Level', t.level)));
+  const next = t.nextLevel ? t.points + t.pointsToNext : t.points;
+  root.appendChild(vh('div', { class: 'box' },
+    vh('div', {}, vh('b', {}, 'Loyalty: ' + t.level), t.nextLevel ? ' \u00b7 ' + t.pointsToNext + ' points to ' + t.nextLevel : ' \u00b7 the top level - thank you!'),
+    vh('progress', { max: String(Math.max(1, next)), value: String(t.points), style: 'width:100%;margin-top:6px' }),
+    vh('div', { class: 'muted small' }, 'You get 1 point for every minute you stream and 10 for every stream of 5 minutes or more.')));
+  const cb = vh('input', { type: 'checkbox' }); cb.checked = d.alerts;
+  cb.addEventListener('change', async () => { const x = await api('/api/me/streams/alerts', { on: cb.checked ? '1' : '0' }); if (!x.ok) { alert(x.error); cb.checked = !cb.checked; } });
+  root.appendChild(vh('div', { class: 'box' }, vh('label', {}, cb, ' E-mail me when someone goes live on Memoryq')));
+  const list = d.sessions || [];
+  if (!list.length) { root.appendChild(vh('div', { class: 'empty' }, 'You have not streamed yet. Go live with the Vstream app.')); return; }
+  const player = vh('video', { controls: true, style: 'width:100%;max-width:720px;display:none;margin-bottom:8px;background:#000' });
+  root.appendChild(player);
+  list.forEach(x => {
+    const recs = (x.recordings || []).filter(y => !y.recording);
+    const v = x.video;
+    root.appendChild(vh('div', { class: 'card' },
+      vh('b', {}, x.title || x.channel), x.live ? vh('span', { class: 'chip', style: 'background:#e5484d;color:#fff;margin-left:6px' }, 'LIVE') : null,
+      vh('div', { class: 'muted small' }, new Date(x.start).toLocaleString() + ' \u00b7 ' + sDur(x.durationMs)
+        + (v ? ' \u00b7 kept as a video' + (v.onTv ? ' \u00b7 on Mkarimu TV' : '') : (recs.length ? ' \u00b7 recording kept 30 days' : ''))),
+      vh('div', { class: 'row', style: 'gap:6px;margin-top:8px;flex-wrap:wrap' },
+        recs.map(y => vh('button', { on: { click: () => { player.style.display = 'block'; player.src = y.url; player.play().catch(() => {}); window.scrollTo(0, player.offsetTop - 60); } } }, 'Watch')),
+        v && v.status === 'ready' ? vh('button', { on: { click: () => openVideo(v.id) } }, 'Watch the video') : null,
+        x.live ? null : vh('button', { on: { click: async () => {
+          if (!confirm('Remove this stream? Its recording' + (v ? ' and video are' : ' is') + ' deleted and it no longer counts for your points.')) { return; }
+          const q = await api('/api/me/streams/delete', { session: x.id }); if (q.ok) { loadMyStreams(); } else { alert(q.error); } } } }, 'Remove'))));
+  });
+}
+function registerBox() {
+  const err = vh('div', { class: 'error small' });
+  const u = vh('input', { placeholder: 'Choose a username', maxlength: 32 });
+  const p = vh('input', { type: 'password', placeholder: 'Choose a password' });
+  const e = vh('input', { type: 'email', placeholder: 'you@example.com' });
+  const c = vh('input', { inputmode: 'numeric', maxlength: 7, placeholder: '6-digit code', style: 'width:150px' });
+  const codeRow = vh('div', { class: 'row', hidden: true, style: 'gap:6px;margin-top:8px;flex-wrap:wrap' }, c,
+    vh('button', { class: 'primary', on: { click: async () => {
+      const q = await api('/api/vstream/claim/verify', { username: u.value.trim(), code: c.value.trim() });
+      if (!q.ok) { err.textContent = q.error; return; }
+      token = q.data.token; store('vs_token', token); location.hash = '#live/mystreams'; location.reload();
+    } } }, 'Confirm'),
+    vh('button', { class: 'link', on: { click: async () => { const q = await api('/api/vstream/claim/resend', { username: u.value.trim() }); err.textContent = q.ok ? 'A new code is on its way.' : q.error; } } }, 'Send again'));
+  return vh('div', { class: 'box', style: 'border-color:var(--accent);background:var(--accent-soft)' },
+    vh('b', {}, 'You are streaming as a guest tester.'),
+    vh('div', { class: 'small' }, 'Register to keep your streams, recordings and points under your own name. Your tester login stops working after that.'),
+    vh('div', { class: 'row', style: 'gap:6px;margin-top:8px;flex-wrap:wrap' }, u, p, e,
+      vh('button', { class: 'primary', on: { click: async () => {
+        err.textContent = '';
+        const q = await api('/api/vstream/claim', { username: u.value.trim(), password: p.value, email: e.value.trim() });
+        if (!q.ok) { err.textContent = q.error; return; }
+        codeRow.hidden = false; err.textContent = 'We sent a code to ' + q.data.email + ' - type it here.';
+      } } }, 'Register')),
+    codeRow, err);
+}
+
+function initVideoForms() {
+  $('vSearchGo').addEventListener('click', () => { videoQ = $('vSearch').value.trim(); loadVideos(); });
+  $('vSearch').addEventListener('keydown', e => { if (e.key === 'Enter') { videoQ = $('vSearch').value.trim(); loadVideos(); } });
+  $('vYtAdd').addEventListener('click', async () => {
+    const url = $('vYtUrl').value.trim();
+    if (!url) { $('vAddErr').textContent = 'Paste a YouTube link first.'; return; }
+    const r = await api('/api/videos/youtube', { url: url, title: $('vYtTitle').value.trim(), description: $('vDesc').value });
+    if (r.ok) { $('vYtUrl').value = ''; $('vYtTitle').value = ''; $('vDesc').value = ''; $('vAddErr').textContent = ''; loadMyVideos(); }
+    else { $('vAddErr').textContent = r.error; }
+  });
+  $('vUpGo').addEventListener('click', () => {
+    const f = $('vFile').files[0];
+    if (!f) { $('vAddErr').textContent = 'Choose a video file first.'; return; }
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/videos/upload?name=' + enc(f.name) + '&title=' + enc($('vUpTitle').value.trim()) + '&description=' + enc($('vDesc').value));
+    if (token) { x.setRequestHeader('Authorization', 'Bearer ' + token); }
+    const bar = $('vBar');
+    x.upload.onprogress = e => { if (e.lengthComputable) { bar.value = Math.round(e.loaded * 100 / e.total); $('vUpNote').textContent = 'Uploading ' + bar.value + '%'; } };
+    x.onload = () => {
+      bar.hidden = true; $('vUpGo').disabled = false;
+      let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { }
+      if (x.status === 200) { $('vUpNote').textContent = 'Uploaded - we are preparing it now.'; $('vFile').value = ''; $('vUpTitle').value = ''; $('vDesc').value = ''; $('vAddErr').textContent = ''; loadMyVideos(); }
+      else { $('vUpNote').textContent = ''; $('vAddErr').textContent = d.error || ('Upload failed (' + x.status + ')'); }
+    };
+    x.onerror = () => { bar.hidden = true; $('vUpGo').disabled = false; $('vUpNote').textContent = ''; $('vAddErr').textContent = 'The upload stopped - check your connection and try again.'; };
+    bar.hidden = false; bar.value = 0; $('vUpGo').disabled = true; $('vUpNote').textContent = 'Uploading 0%';
+    x.send(f);
+  });
+}
+initVideoForms();
+</script>
+<script src="/alma.js" defer></script>
+</body>
+</html>

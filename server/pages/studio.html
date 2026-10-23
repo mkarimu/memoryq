@@ -1,0 +1,2194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memoryq Studio</title>
+<meta name="description" content="Run your own radio station on Memoryq: your music, an AI DJ, live shows and listener statistics.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232f6fed'/%3E%3Cpath d='M16 46V20l16 15 16-15v26' fill='none' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f2f4f7; --panel: #ffffff; --ink: #1b1f23; --muted: #5f6e7d; --line: #e2e7ed; --soft: #f6f8fa;
+    --night: #16202a; --accent: #2f6fed; --accent-soft: #e8efff; --good: #2e7d32; --bad: #c62828; --warn: #b26a00; --live: #e5484d;
+    --bar: #2f6fed; --bar-2: #9db8f5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --panel: #182029; --ink: #e6ebf0; --muted: #8b9aa8; --line: #2a3542; --soft: #1e2833;
+            --accent: #5b8cff; --accent-soft: #1f2d4a; --good: #5cb860; --bad: #ef6b6b; --warn: #e0a24a; --bar: #5b8cff; --bar-2: #2c4a86; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); line-height: 1.45; }
+  a { color: var(--accent); }
+  header { background: var(--night); color: #fff; position: sticky; top: 0; z-index: 10; }
+  header .in { max-width: 1320px; margin: 0 auto; padding: 0 20px; height: 58px; display: flex; align-items: center; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; font-weight: 800; font-size: 19px; }
+  .brand svg { width: 28px; height: 28px; }
+  .brand small { font-weight: 600; color: #9fb0c0; font-size: 15px; }
+  header .grow { flex: 1; }
+  header .who { color: #dfe7ee; font-size: 14px; }
+  header button, header a.hl { background: none; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; text-decoration: none; }
+  main { max-width: 1320px; margin: 0 auto; padding: 22px 20px 60px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -.3px; }
+  h2 { font-size: 18px; margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .grow { flex: 1; min-width: 0; }
+  button, .btn { cursor: pointer; padding: 8px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 9px; font: inherit; font-size: 14px; text-decoration: none; display: inline-block; }
+  button:hover { border-color: var(--accent); }
+  button.primary, a.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; font: inherit; font-size: 14px; background: var(--panel); color: var(--ink); }
+  label.f { display: block; font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+  label.f input, label.f select, label.f textarea { display: block; width: 100%; margin-top: 5px; }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; margin-right: 16px; font-size: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }
+  .error { color: var(--bad); font-size: 14px; min-height: 18px; }
+  .ok { color: var(--good); }
+  .badge { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .5px; padding: 3px 8px; border-radius: 6px; color: #fff; background: var(--muted); text-transform: uppercase; }
+  .badge.active { background: var(--good); } .badge.pending { background: var(--warn); } .badge.suspended { background: var(--bad); } .badge.live { background: var(--live); }
+  #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 16px 0; overflow-x: auto; }
+  #tabs button { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 10px 14px; color: var(--muted); white-space: nowrap; }
+  #tabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .n { font-size: 26px; font-weight: 750; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+  .tile .l { color: var(--muted); font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td input { width: 100%; padding: 6px 8px; }
+  .conn { display: grid; grid-template-columns: 160px 1fr auto; gap: 8px 14px; align-items: center; font-size: 15px; }
+  .conn .k { color: var(--muted); font-size: 13px; }
+  .conn code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; background: var(--soft); padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); word-break: break-all; }
+  .np { display: flex; gap: 16px; align-items: center; }
+  .np .t { font-size: 20px; font-weight: 700; }
+  .chart { width: 100%; height: 220px; display: block; }
+  .chart text { fill: var(--muted); font-size: 11px; }
+  .tip { position: fixed; pointer-events: none; background: var(--night); color: #fff; font-size: 12px; padding: 6px 9px; border-radius: 7px; z-index: 50; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--night); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px; z-index: 60; }
+  .hero { background: linear-gradient(135deg, #16202a, #233a63); color: #fff; border: 0; }
+  .hero .muted { color: #b9c6d3; }
+  .hero h1 { color: #fff; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 16px 0 4px; }
+  .steps div { background: rgba(255,255,255,.07); border-radius: 10px; padding: 12px; font-size: 14px; }
+  .steps b { display: block; margin-bottom: 2px; }
+  .wiz { max-width: 720px; margin: 10px auto; }
+  .stepper { display: flex; gap: 6px; margin: 4px 0 18px; }
+  .stepper div { flex: 1; font-size: 13px; color: var(--muted); border-top: 4px solid var(--line); padding-top: 6px; }
+  .stepper div.on { color: var(--ink); border-top-color: var(--accent); font-weight: 650; }
+  .stepper div.done { color: var(--good); border-top-color: var(--good); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: -6px; margin-bottom: 12px; }
+  .plans { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0 14px; }
+  .plan { border: 2px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: pointer; background: var(--panel); text-align: left; }
+  .plan.on { border-color: var(--accent); background: var(--accent-soft); }
+  .plan .price { font-size: 26px; font-weight: 750; letter-spacing: -.5px; }
+  .plan .per { color: var(--muted); font-size: 14px; }
+  .bstate { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .bstate .big { font-size: 20px; font-weight: 700; }
+  .params { display: grid; grid-template-columns: 170px 1fr auto; gap: 8px 14px; align-items: center; font-size: 15px; }
+  .params .k { color: var(--muted); font-size: 13px; }
+  .params code, pre.code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; background: var(--soft); padding: 6px 10px;
+    border-radius: 8px; border: 1px solid var(--line); word-break: break-all; white-space: pre-wrap; margin: 0; }
+  .embedrow { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0 16px; }
+  .embedrow pre { flex: 1; min-width: 0; }
+  .plans3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 10px 0 14px; }
+  .plan ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); }
+  .plan ul li { margin: 2px 0; }
+  .plan .pname { font-weight: 750; font-size: 15px; margin-bottom: 4px; }
+  .plan[disabled] { opacity: .5; cursor: default; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 7px 14px; }
+  .seg button.on { background: var(--accent); color: #fff; }
+  .usage { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 20px; }
+  .usage .u .t { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 5px; }
+  .usage .u .t b { color: var(--ink); font-weight: 650; }
+  .bar { height: 8px; border-radius: 5px; background: var(--soft); border: 1px solid var(--line); overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--good); }
+  .bar i.warn { background: var(--warn); } .bar i.full { background: var(--bad); }
+  .dj { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .dj .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .dj .top b { font-size: 16px; }
+  .dj .det { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; background: var(--soft); border-radius: 8px; padding: 8px 10px; margin-top: 8px; white-space: pre-wrap; word-break: break-all; }
+  .days label { display: inline-flex; align-items: center; gap: 3px; margin-right: 8px; font-size: 13px; }
+  .week { position: relative; min-width: 760px; }
+  .week .hrs, .week .wrow { display: grid; grid-template-columns: 46px repeat(24, 1fr); }
+  .week .hrs div { font-size: 11px; color: var(--muted); text-align: left; padding: 0 0 4px 2px; }
+  .week .wrow { position: relative; height: 38px; border-top: 1px solid var(--line); }
+  .week .wrow:last-child { border-bottom: 1px solid var(--line); }
+  .week .wrow .d { font-size: 12px; color: var(--muted); align-self: center; }
+  .week .wrow .c { border-left: 1px solid var(--line); cursor: pointer; }
+  .week .wrow .c:hover { background: var(--accent-soft); }
+  .week .blk { position: absolute; top: 4px; bottom: 4px; border-radius: 6px; color: #fff; font-size: 11px; font-weight: 650;
+    padding: 3px 6px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .week .blk.off { opacity: .45; }
+  .week .nowline { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--live); pointer-events: none; }
+  .pl { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; }
+  .pl .sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+  .pl b { font-size: 15px; }
+  .picker { max-height: 340px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+  .picker label { display: flex; gap: 8px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 14px; cursor: pointer; }
+  .picker label:last-child { border-bottom: 0; }
+  .picker label span.muted { margin-left: auto; font-size: 12px; }
+  .welcome { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 800px) {
+    .welcome, .plans { grid-template-columns: 1fr; }
+    .params { grid-template-columns: 1fr; }
+    .embedrow { flex-direction: column; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+    .grid2, .steps { grid-template-columns: 1fr; }
+    .conn { grid-template-columns: 1fr; }
+    header .who { display: none; }
+    main { padding: 16px 16px 50px; }
+    .hide-sm { display: none; }
+  }
+  /* side menu (General, Configuration, Statistics, Server, AutoDJ, Account) */
+  .shell { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 22px; align-items: start; }
+  .side { position: sticky; top: 76px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; }
+  .side .grp { padding: 6px 0 8px; border-bottom: 1px solid var(--line); }
+  .side .grp:last-child { border-bottom: 0; }
+  .side .gl { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 750; letter-spacing: .7px; text-transform: uppercase; color: var(--muted); padding: 6px 10px 4px; }
+  .side .gl i { width: 18px; height: 18px; border-radius: 6px; display: inline-grid; place-items: center; font-style: normal; font-size: 11px; color: #fff; }
+  .side button.it { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 10px 7px 36px; font-size: 14px; color: var(--ink); }
+  .side button.it:hover { background: var(--soft); }
+  .side button.it.on { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+  .side .acts { display: flex; gap: 6px; padding: 4px 10px 2px 36px; flex-wrap: wrap; }
+  .side .acts button { padding: 4px 9px; font-size: 12px; border-radius: 7px; }
+  .side .state { font-size: 12px; padding: 0 10px 4px 36px; }
+  .side .state b.on { color: var(--good); } .side .state b.off { color: var(--bad); }
+  .side .pro { margin: 8px 6px 4px; display: block; text-align: center; }
+  .trycard { border: 2px solid var(--accent); }
+  .trylogin { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; background: var(--soft); border-radius: 10px; padding: 10px 12px; }
+  .trylogin span { color: var(--muted); font-size: 13px; }
+  .trylogin code { font-size: 17px; font-weight: 700; user-select: all; }
+  .trybar { background: #1e3a8a; color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .trybar button { background: #fff; color: #1e3a8a; border-color: #fff; font-weight: 700; }
+  .asbar { background: #7c2d12; color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .asbar button { background: #fff; color: #7c2d12; border-color: #fff; font-weight: 700; }
+  /* statistics report */
+  .period { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+    border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; }
+  .period .pp { display: flex; gap: 2px; flex-wrap: wrap; }
+  .period .pp button { border: 0; background: none; padding: 5px 10px; font-weight: 650; border-radius: 7px; }
+  .period .pp button.on { background: var(--accent); color: #fff; }
+  .period input[type=date] { padding: 5px 8px; }
+  .rtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }
+  .rtabs button { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: 9px 13px; color: var(--muted); white-space: nowrap; }
+  .rtabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 650; }
+  .mgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+  table.metric td { padding: 7px 10px; }
+  table.metric td.g { font-weight: 700; width: 34%; }
+  table.metric tr.first td { border-top: 2px solid var(--line); }
+  table.metric td.v { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .sbar { height: 8px; background: var(--soft); border-radius: 4px; overflow: hidden; min-width: 60px; }
+  .sbar i { display: block; height: 100%; background: var(--accent); }
+  .lchart { width: 100%; height: 240px; display: block; }
+  .lchart text { fill: var(--muted); font-size: 11px; }
+  .dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .dl a { display: block; border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-decoration: none; color: var(--ink); background: var(--panel); }
+  .dl a:hover { border-color: var(--accent); }
+  .dl a b { display: block; margin-bottom: 3px; }
+  .qlinks { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+  .qlinks .q { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--panel); }
+  .qlinks .q b { display: block; margin-bottom: 4px; }
+  .qlinks .q code { display: block; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; background: var(--soft); padding: 6px 8px; border-radius: 7px; margin: 6px 0; word-break: break-all; }
+  table.pltab td { padding: 9px 8px; }
+  .pltool { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .pltool button { font-weight: 800; letter-spacing: .4px; min-width: 92px; }
+  table.plgrid { width: 100%; border-collapse: collapse; }
+  table.plgrid th { background: #2440ff; color: #fff; padding: 10px 8px; text-align: left; font-weight: 700; }
+  table.plgrid th.num, table.plgrid td.num { text-align: right; }
+  table.plgrid tr:nth-child(even) td { background: #e8e8fd; }
+  @media (prefers-color-scheme: dark) { table.plgrid tr:nth-child(even) td { background: #1d2340; } }
+  table.plgrid td { border-bottom: 1px solid #c7ccff; }
+  table.plgrid tr.ticked td { background: var(--accent-soft); }
+  table.plgrid td a { font-weight: 650; color: var(--ink); }
+  .plstate { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .5px; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--line); }
+  .plstate.st-air { background: var(--live); color: #fff; border-color: var(--live); }
+  .plstate.st-on { color: var(--good); }
+  .plstate.st-sus { color: var(--muted); }
+  .plopt { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+  .plopt label.chk { display: flex; align-items: center; margin: 6px 0; font-size: 14px; }
+  table.pltab .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+  .st-on { color: var(--good); font-weight: 650; } .st-off { color: var(--muted); }
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { position: static; display: flex; gap: 4px; overflow-x: auto; padding: 6px; }
+    .side .grp { display: flex; gap: 2px; border: 0; padding: 0; align-items: center; }
+    .side .gl, .side .state, .side .acts, .side .pro { display: none; }
+    .side button.it { padding: 7px 10px; white-space: nowrap; }
+    .mgrid { grid-template-columns: 1fr; }
+  }
+  /* Live DJ Pro is open: a way back to the console */
+  .djbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: #111827; color: #fff; border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; }
+  .djbar .dot { width: 10px; height: 10px; border-radius: 50%; background: #34d399; flex: none; }
+  .djbar .dot.live { background: #e5484d; box-shadow: 0 0 0 4px rgba(229,72,77,.3); }
+  .djbar span.t { color: #cbd5e1; font-size: 14px; }
+  body.embedded #signOut, body.embedded header a.hl { display: none !important; }
+</style>
+</head>
+<body>
+<header><div class="in">
+  <a class="brand" href="/"><svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#2f6fed"/><path d="M16 46V20l16 15 16-15v26" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>Memoryq <small>Studio</small></a>
+  <span class="grow"></span>
+  <span class="who" id="who"></span>
+  <a class="hl" href="/me">Web app</a>
+  <button id="signOut" hidden>Sign out</button>
+</div></header>
+
+<main>
+  <div class="djbar" id="djBar" hidden>
+    <span class="dot" id="djBarDot"></span><b>Live DJ Pro is open</b><span class="t" id="djBarText"></span>
+    <span class="grow"></span>
+    <button id="djBarStop" class="danger" title="Go off air and stop the decks, mic and camera">&#9632; Stop DJ Pro</button>
+    <button class="primary" id="djBarBack">&#8592; Return to the console</button>
+  </div>
+  <!-- Not signed in: start a station or sign in -->
+  <div id="signin" hidden>
+    <div class="welcome">
+      <div class="card hero">
+        <h1>Your own radio station</h1>
+        <p class="muted">Your music on air around the clock, with an AI DJ who introduces your songs, reads the news and gives
+          listeners shout-outs. Go live from your PC whenever you want, put a player on your website, and see who is listening.</p>
+        <div class="steps">
+          <div><b>1. Your account</b>Username, password and email (we send a code).</div>
+          <div><b>2. Your station</b>Name, slogan, website, live port and stream password.</div>
+          <div><b>3. Payment</b>Pay by card. You are on air straight away.</div>
+        </div>
+        <p style="margin:16px 0 0"><button class="primary" id="goSignup" style="font-size:16px;padding:11px 20px">Create my station</button></p>
+      </div>
+      <div>
+      <div class="card trycard" id="tryCard" hidden>
+        <h2>Try it first - no sign-up</h2>
+        <p class="muted small" style="margin-top:0">Run our trial station <b id="tryStation"></b>: add songs, make playlists,
+          let Alma introduce them and listen to the result.</p>
+        <div class="trylogin">
+          <span>Login user</span><code id="tryUser"></code>
+          <span>Password</span><code id="tryPass"></code>
+        </div>
+        <button class="primary" id="tryGo" style="margin-top:12px">Try the Studio now</button>
+        <p class="muted small" style="margin-bottom:0">Everyone trying it shares this station, and it goes back to the start
+          every <span id="tryEvery">2 hours</span> (next: <span id="tryNext"></span>). Please don't upload anything private.</p>
+      </div>
+      <div class="card">
+        <h2>Sign in</h2>
+        <p class="muted small" style="margin-top:0">Station owners: use the login user and password for your station.</p>
+        <form id="loginForm">
+          <label class="f">Login user<input id="u" autocomplete="username" required></label>
+          <label class="f">Password<input id="p" type="password" autocomplete="current-password" required></label>
+          <button class="primary" type="submit">Sign in</button>
+          <div class="error" id="loginErr"></div>
+        </form>
+      </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign-up: account, station, payment -->
+  <div id="start" hidden>
+    <div class="wiz">
+      <h1>Create your station</h1>
+      <div class="stepper"><div data-s="account">1. Account</div><div data-s="station">2. Station</div><div data-s="pay">3. Payment</div></div>
+
+      <div class="card" data-step="account">
+        <h2>Your account</h2>
+        <div id="suForm">
+          <label class="f">Login user<input id="suUser" maxlength="20" autocomplete="username" placeholder="e.g. nelsonfm"></label>
+          <div class="hint">Usually your station's name, without spaces. You sign in to the studio with it.</div>
+          <label class="f">Password (8+ characters)<input id="suPass" type="password" autocomplete="new-password"></label>
+          <label class="f">Email<input id="suEmail" type="email" autocomplete="email" placeholder="you@example.com"></label>
+          <div class="hint">We send a 6-digit code to check it. Receipts and station news go here.</div>
+          <div class="row"><button class="primary" id="suNext">Continue</button>
+            <span class="muted small">Already have an account? <a href="#" id="suToLogin">Sign in</a></span></div>
+        </div>
+        <div id="suCodeBox" hidden>
+          <p>We sent a code to <b id="suMasked"></b>. Type it here:</p>
+          <div class="row"><input id="suCode" inputmode="numeric" maxlength="6" placeholder="123456" style="width:140px;font-size:18px;letter-spacing:3px">
+            <button class="primary" id="suVerify">Confirm</button> <button id="suResend">Send a new code</button> <button id="suBack">Back</button></div>
+        </div>
+        <div class="error" id="suErr"></div>
+      </div>
+
+      <div class="card" data-step="station" hidden>
+        <h2>Your station</h2>
+        <div class="grid2">
+          <label class="f">Station name<input id="fName" maxlength="40" placeholder="e.g. Nelson FM"></label>
+          <label class="f">Slogan<input id="fSlogan" maxlength="160" placeholder="e.g. Afrobeats and good vibes, all day"></label>
+          <label class="f">Website (optional)<input id="fWeb" maxlength="200" placeholder="https://nelsonfm.com"></label>
+          <label class="f">Login user<input id="fLogin" readonly></label>
+          <label class="f">Live port<select id="fPort"></select></label>
+          <label class="f">Stream password<span class="row" style="margin-top:5px;flex-wrap:nowrap"><input id="fPass" maxlength="40" class="grow" style="margin:0">
+            <button id="fGen" type="button">New</button></span></label>
+        </div>
+        <div class="hint">The live port and stream password are what your DJ software (BUTT, Mixxx) uses to go live. You can change the password later.</div>
+        <div class="row"><button class="primary" id="fNext">Continue to payment</button></div>
+        <div class="error" id="fErr"></div>
+      </div>
+
+      <div class="card" data-step="pay" hidden>
+        <h2>Payment</h2>
+        <div id="wizPay"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stations -->
+  <div id="studio" hidden>
+   <div class="trybar" id="tryBar" hidden><b>Trial studio</b><span id="tryBarText"></span><span class="grow"></span><button id="tryOwn">Create my own station</button></div>
+   <div class="asbar" id="asBar" hidden><b>Admin view</b><span id="asText"></span><span class="grow"></span><button id="asExit">Close this view</button></div>
+   <div class="shell">
+    <nav class="side" id="side" aria-label="Station menu"></nav>
+    <div class="content">
+    <div class="row">
+      <div class="grow">
+        <h1 id="stName"></h1>
+        <div class="muted" id="stSlogan"></div>
+      </div>
+      <select id="stPick" hidden aria-label="Station"></select>
+      <span id="stBadges"></span>
+    </div>
+    <div class="card" id="stNotice" hidden style="margin-top:14px"></div>
+    <div style="height:14px"></div>
+
+    <!-- Overview -->
+    <section data-tab="overview">
+      <div class="tiles" id="ovTiles"></div>
+      <div class="card" id="ovUsageCard"><div class="row" style="margin-bottom:10px"><h2 class="grow" style="margin:0">Your plan</h2><span id="ovPlan" class="muted"></span></div><div class="usage" id="ovUsage"></div></div>
+      <div class="card">
+        <div class="np">
+          <button class="primary" id="listenBtn" style="border-radius:50%;width:56px;height:56px;padding:0;font-size:20px" aria-label="Listen">&#9654;</button>
+          <div class="grow">
+            <div class="muted small" id="npLabel">Now playing</div>
+            <div class="t" id="npTitle">-</div>
+            <div class="muted" id="npNext"></div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button id="skipBtn">Skip song</button>
+          <button id="talkBtn">DJ talks now</button>
+          <span class="muted small" id="ctlNote"></span>
+        </div>
+        <audio id="audio" preload="none"></audio>
+      </div>
+      <div class="card">
+        <h2>Share your station</h2>
+        <div class="muted small">Listeners can tune in on Memoryq (app and web: Radio), or in any radio app or player with this address:</div>
+        <div class="row" style="margin-top:8px"><code id="streamUrl" style="font-family:ui-monospace,monospace;background:var(--soft);padding:6px 10px;border-radius:8px;border:1px solid var(--line);word-break:break-all"></code><button id="copyStream">Copy</button></div>
+      </div>
+      <div class="card">
+        <h2>On air log</h2>
+        <table id="logTable"></table>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section data-tab="settings" hidden>
+      <div class="card">
+        <div class="grid2">
+          <label class="f">Station name<input id="sName" maxlength="40"></label>
+          <label class="f">Slogan<input id="sSlogan" maxlength="160"></label>
+          <label class="f">Website<input id="sWeb" maxlength="200" placeholder="https://..."></label>
+          <label class="f">Time zone (for DJ hours, schedules and statistics)<select id="sTz"></select></label>
+          <label class="f">Company / organisation<input id="sCompany" maxlength="80"></label>
+          <label class="f">Contact e-mail (for the station)<input id="sEmail" type="email" maxlength="120"></label>
+          <label class="f">DJ name<input id="sDj" maxlength="40"></label>
+          <label class="f">DJ voice<select id="sVoice"></select></label>
+          <label class="f">The DJ talks about every ... songs (0 = never)<input id="sEvery" type="number" min="0" max="20"></label>
+          <label class="f">Promo line (the DJ says it now and then)<input id="sPromo" maxlength="200" placeholder="e.g. Get all my songs on Spotify - just search my name!"></label>
+          <label class="f">Says the station name over a song about every ... songs (0 = never)<input id="sIdEvery" type="number" min="0" max="20"></label>
+        </div>
+        <div style="margin:4px 0 14px">
+          <label class="chk"><input type="checkbox" id="sOn"> On air</label>
+          <label class="chk"><input type="checkbox" id="sNews"> News</label>
+          <label class="chk"><input type="checkbox" id="sShout"> Shout-outs</label>
+          <label class="chk"><input type="checkbox" id="sIntros"> Song intros</label>
+          <label class="chk" title="Off: only the song's title is said - voices often mispronounce artists' names"><input type="checkbox" id="sArtist"> Say artists' names</label>
+        </div>
+        <div class="row">
+          <button class="primary" id="saveBtn">Save</button>
+          <button id="voiceBtn">Hear the DJ voice</button>
+          <span id="saveMsg" class="small"></span>
+        </div>
+        <audio id="voiceAudio" controls hidden style="width:100%;margin-top:10px"></audio>
+      </div>
+    </section>
+
+    <!-- Music -->
+    <section data-tab="music" hidden>
+      <div class="card">
+        <div class="row">
+          <label class="btn primary" style="background:var(--accent);color:#fff;border-color:var(--accent)">Add songs
+            <input type="file" id="files" multiple accept=".mp3,.m4a,.aac,.ogg,.opus,.flac,.wav,audio/*" hidden></label>
+          <label class="small muted">and put them in <select id="upInto"><option value="">(no playlist)</option></select></label>
+          <span id="upMsg" class="muted small"></span>
+        </div>
+        <div class="muted small" style="margin-top:8px">MP3, M4A, AAC, OGG, OPUS, FLAC or WAV, up to 60 MB each. Title and artist come from the
+          song's tags (or a file name like "Artist - Title.mp3"). Add a link (Spotify, YouTube, your shop) so listeners can tap "Get this song".
+          Only add music you own or have the rights to broadcast.</div>
+      </div>
+      <div class="card" style="overflow-x:auto"><table id="tracks"></table></div>
+    </section>
+
+    <!-- Playlists -->
+    <section data-tab="playlists" hidden>
+      <div class="card">
+        <div class="row">
+          <h2 class="grow" style="margin:0">What plays when</h2>
+          <span class="muted small" id="plNow"></span>
+        </div>
+        <p class="muted small" style="margin:6px 0 10px">Listener requests come first, then the show that is on, then jingles that are due, then
+          your rotation playlists (by weight). Without playlists, all songs are shuffled.</p>
+        <div class="row">
+          <span class="small">Don't repeat a song within</span>
+          <select id="plNoRep"><option value="0">(off)</option><option value="30">30 minutes</option><option value="60">1 hour</option>
+            <option value="120">2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option>
+            <option value="360">6 hours</option><option value="720">12 hours</option></select>
+          <button id="plNoRepSave">Save</button>
+          <span class="muted small" id="plTz"></span>
+        </div>
+      </div>
+      <div class="card" style="overflow-x:auto">
+        <div class="row" style="margin-bottom:8px"><h2 class="grow" style="margin:0">Week planner</h2>
+          <span class="muted small">Click an empty hour to put a show there, or a show to change it.</span></div>
+        <div class="week" id="week"></div>
+      </div>
+      <div class="card" id="plCard">
+        <div class="pltool">
+          <button class="primary" id="plNew">NEW</button>
+          <button id="plEditBtn" disabled>EDIT</button>
+          <button id="plRemove" class="danger" disabled>REMOVE</button>
+          <button id="plSuspend" disabled>SUSPEND</button>
+          <span class="muted small grow" id="plTickNote"></span>
+          <a class="btn primary" id="plStudioBtn" href="/djpro" target="memoryq-djpro" hidden title="Live DJ Pro with the playlists marked Studio">OPEN LIVE STUDIO</a>
+        </div>
+        <div id="plList"></div>
+      </div>
+      <div class="card" id="plEdit" hidden></div>
+      <div class="card" id="stCard">
+        <div class="row" style="margin-bottom:6px"><h2 class="grow" style="margin:0">Alma's stories</h2>
+          <span class="small">Alma reads a part every</span>
+          <select id="stEvery"><option value="0">(off)</option><option value="2">2 songs</option><option value="3">3 songs</option>
+            <option value="4">4 songs</option><option value="5">5 songs</option><option value="6">6 songs</option><option value="8">8 songs</option>
+            <option value="10">10 songs</option></select>
+          <button id="stEverySave">Save</button></div>
+        <p class="muted small" style="margin:0 0 10px">Add a book: Alma reads about one paragraph, says "Let's listen to this song before we continue
+          with our story of ...", plays a song, and carries on at the next story break - book after book, from the top of the list.
+          Only add books you may broadcast (your own writing, or out of copyright).</p>
+        <div id="stList"></div>
+        <details id="stAdd" style="margin-top:10px"><summary><b>Add a book</b></summary>
+          <div class="grid2" style="margin-top:8px">
+            <label class="f">Title<input id="stTitle" maxlength="120" placeholder="e.g. The Lion and the Jewel"></label>
+            <label class="f">Author (optional)<input id="stAuthor" maxlength="80"></label>
+          </div>
+          <label class="f">The text - paste it, or choose a .txt file <input type="file" id="stFile" accept=".txt,text/plain" style="width:auto"></label>
+          <textarea id="stText" rows="8" style="width:100%" placeholder="Paste the book here. Leave an empty line between paragraphs."></textarea>
+          <div class="row" style="margin-top:6px"><button class="primary" id="stSave">Add the book</button> <span class="small" id="stMsg"></span></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Live DJ -->
+    <section data-tab="live" hidden>
+      <div class="card" id="djproCard">
+        <div class="row" style="margin-bottom:6px"><h2 class="grow" style="margin:0">Live DJ Pro - mix in your browser</h2>
+          <a id="djproOpen" class="btn primary" href="/djpro" target="memoryq-djpro">Open Live DJ Pro</a></div>
+        <p class="muted small" style="margin:0" id="djproNote"></p>
+      </div>
+      <div class="card">
+        <div class="row" style="margin-bottom:12px">
+          <h2 class="grow" style="margin:0">Go live - station login</h2>
+          <span id="liveState"></span>
+          <button id="kickBtn" class="danger" hidden>Disconnect the DJ</button>
+        </div>
+        <p class="muted small" style="margin-top:0">Broadcast live from your PC with free DJ software such as <b>BUTT</b> (broadcast using this tool) or
+          <b>Mixxx</b>. When you connect, your music fades out and you are on air; when you disconnect, the playlist comes back by itself.</p>
+        <div class="conn" id="conn"></div>
+        <div class="row" style="margin-top:14px">
+          <input id="ownPass" maxlength="40" placeholder="Your own password (8+ letters/numbers)" style="width:280px">
+          <button id="setPass">Set password</button>
+          <button id="newPass">Make a new one for me</button>
+          <span class="muted small">Give the password only to DJs you trust. A new password stops the old one from working.</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="row" style="margin-bottom:6px"><h2 class="grow" style="margin:0">Remote DJs</h2><span id="djCount" class="muted small"></span></div>
+        <p class="muted small" style="margin-top:0">DJs who play from somewhere else - a club, a party, their home - each with their own login.
+          When one connects, they are on air and AutoDJ waits in the background; when they stop, AutoDJ comes back by itself.
+          One DJ is live at a time.</p>
+        <div id="djList"></div>
+        <div id="djFormBox"></div>
+      </div>
+      <div class="card">
+        <h2>Recent live shows</h2>
+        <table id="showTable"></table>
+      </div>
+      <div class="card">
+        <h2>Setting up BUTT</h2>
+        <p class="small muted" style="margin-top:0">Remote DJs use the same address, port and mount, with their own login as the user
+          and their own password.</p>
+        <ol class="small" style="margin:0;padding-left:20px">
+          <li>Install BUTT from danielnoethen.de/butt, open <b>Settings - Main - Server - Add</b>.</li>
+          <li>Type <b>Icecast</b>, and copy the address, port, password, mount and user from above.</li>
+          <li>In <b>Audio</b>, choose MP3, 128 kbps, 44100 Hz, stereo. Pick your microphone or mixer as the input.</li>
+          <li>Press <b>Play</b> to go live. Press <b>Stop</b> to hand back to the playlist.</li>
+        </ol>
+        <h2 style="margin-top:16px">Setting up Mixxx</h2>
+        <ol class="small" style="margin:0;padding-left:20px">
+          <li>Open <b>Preferences - Live Broadcasting</b>, add a connection of type <b>Icecast 2</b>.</li>
+          <li>Copy host, port, mount, login and password from above. Format MP3, 128 kbps, stereo.</li>
+          <li>Tick <b>Enable live broadcasting</b> (or Options - Enable Live Broadcasting).</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Player and links -->
+    <section data-tab="embed" hidden>
+      <div class="card">
+        <h2>Your station</h2>
+        <div class="params" id="paramList"></div>
+      </div>
+      <div class="card">
+        <h2>Put the player on your website</h2>
+        <p class="muted small" style="margin-top:0">Copy this code into your website (in WordPress: a "Custom HTML" block; in Wix or Squarespace: an
+          "Embed code" element). It shows your station's name, what is playing and a play button.</p>
+        <div class="row" style="margin-bottom:8px"><span class="muted small">Colours</span>
+          <select id="embTheme"><option value="">Follow the visitor's light/dark setting</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+        <div class="embedrow"><pre class="code" id="embIframe"></pre><button id="cpIframe">Copy</button></div>
+        <div class="muted small" style="margin-bottom:6px">How it looks:</div>
+        <iframe id="embPreview" title="Player preview" style="width:100%;max-width:480px;height:96px;border:0;display:block"></iframe>
+      </div>
+      <div class="card">
+        <h2>Other ways to share</h2>
+        <div class="muted small">A plain player (works on any page that allows audio):</div>
+        <div class="embedrow"><pre class="code" id="embAudio"></pre><button id="cpAudio">Copy</button></div>
+        <div class="muted small">A link to listen (send it in messages, put it on social media):</div>
+        <div class="embedrow"><pre class="code" id="embLink"></pre><button id="cpLink">Copy</button></div>
+        <div class="muted small">For radio apps and players (VLC, Winamp, car apps): the stream address or the playlist file:</div>
+        <div class="embedrow"><pre class="code" id="embM3u"></pre><button id="cpM3u">Copy</button></div>
+      </div>
+    </section>
+
+    <!-- Billing -->
+    <section data-tab="billing" hidden>
+      <div class="card"><div id="billBox"></div></div>
+    </section>
+
+    <!-- Quick links -->
+    <section data-tab="quick" hidden>
+      <div class="qlinks" id="qlinks"></div>
+    </section>
+
+    <!-- Statistics: report -->
+    <section data-tab="report" hidden>
+      <div class="period">
+        <span class="grow" id="rpLabel">Statistics</span>
+        <div class="pp" id="rpPeriods"></div>
+        <span id="rpCustom" hidden><input type="date" id="rpFrom"> to <input type="date" id="rpTo"> <button id="rpGo">Show</button></span>
+      </div>
+      <div class="rtabs" id="rpTabs"></div>
+      <div id="rpBody"></div>
+      <div id="rpOld" hidden>
+        <div class="card">
+          <div class="row" style="margin-bottom:8px"><h2 class="grow" style="margin:0">Daily totals (from the start)</h2>
+            <select id="range"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="365">12 months</option></select></div>
+          <div class="tiles" id="statTiles"></div>
+          <div class="muted small" style="margin-bottom:6px">Listening hours per day (UTC days)</div>
+          <svg class="chart" id="chart" role="img" aria-label="Listening hours per day"></svg>
+        </div>
+        <div class="card" style="overflow-x:auto"><h2>Most played songs (all time)</h2><table id="topSongs"></table></div>
+      </div>
+    </section>
+
+    <!-- Statistics: listeners now -->
+    <section data-tab="listeners" hidden>
+      <div class="card">
+        <div class="row" style="margin-bottom:8px"><h2 class="grow" style="margin:0">Listening right now</h2><span class="muted small" id="lnCount"></span></div>
+        <div style="overflow-x:auto"><table id="lnTable"></table></div>
+        <div class="muted small" style="margin-top:8px" id="lnNote"></div>
+      </div>
+    </section>
+
+    <!-- Statistics: logs -->
+    <section data-tab="logs" hidden>
+      <div class="card">
+        <div class="row" style="margin-bottom:10px">
+          <h2 class="grow" style="margin:0">Station log</h2>
+          <select id="lgKind"><option value="">Everything</option><option value="events">Station events</option><option value="songs">Songs played</option></select>
+          <select id="lgDays"><option value="1">Last 24 hours</option><option value="7" selected>Last 7 days</option><option value="30">Last 30 days</option></select>
+          <a class="btn" id="lgCsv" href="#">Download songs (CSV)</a>
+        </div>
+        <div style="overflow-x:auto"><table id="lgTable"></table></div>
+      </div>
+    </section>
+    </div>
+   </div>
+  </div>
+</main>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const enc = encodeURIComponent;
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+// The Memoryq admin can open an owner's Studio ("Login to this account"): that token lives only in this tab.
+const AS = (() => {
+  const m = /[#&]as=([A-Za-z0-9_\-]+)/.exec(location.hash || '');
+  if (m) { try { sessionStorage.setItem('studio_as', m[1]); } catch (e) { } history.replaceState(null, '', location.pathname + location.search); }
+  try { return sessionStorage.getItem('studio_as'); } catch (e) { return null; }
+})();
+let token = AS || recall('vs_token');
+let me = null;
+let status = null;
+let current = 0;
+let tab = 'overview';
+let pollTimer = null;
+try { tab = sessionStorage.getItem('studio_tab') || 'overview'; } catch (e) { }
+
+function el(tag, text, cls) { const e = document.createElement(tag); if (text !== undefined && text !== null) { e.textContent = text; } if (cls) { e.className = cls; } return e; }
+function toast(msg) {
+  const t = el('div', msg, 'toast'); document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+async function api(path, form) {
+  const opts = { method: form ? 'POST' : 'GET', headers: {} };
+  if (token) { opts.headers['Authorization'] = 'Bearer ' + token; }
+  if (form) { opts.headers['Content-Type'] = 'application/x-www-form-urlencoded'; opts.body = new URLSearchParams(form).toString(); }
+  try {
+    const r = await fetch(path, opts);
+    let data = {}; try { data = await r.json(); } catch (e) { }
+    if (r.status === 401 && token) { signedOut(); }
+    return { ok: r.ok, status: r.status, data: data, error: (data && data.error) || ('error ' + r.status) };
+  } catch (e) { return { ok: false, status: 0, data: {}, error: 'Cannot reach the server' }; }
+}
+function fmt(n) { return Number(n || 0).toLocaleString(); }
+function dur(ms) { const s = Math.round((ms || 0) / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+// ---------- sign in ----------
+$('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('loginErr').textContent = '';
+  const r = await api('/api/login', { username: $('u').value.trim(), password: $('p').value });
+  if (!r.ok) { $('loginErr').textContent = r.error; return; }
+  token = r.data.token; store('vs_token', token); $('p').value = '';
+  start();
+});
+// ---------- try it first (the shared trial login) ----------
+let tryInfo = null;
+function clock(ms) { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+function minutesTo(ms) { return Math.max(0, Math.round((ms - Date.now()) / 60000)); }
+async function loadTry() {
+  try { const r = await fetch('/api/demo', { cache: 'no-store' }); tryInfo = r.ok ? await r.json() : null; } catch (e) { tryInfo = null; }
+  if (tryInfo && tryInfo.on && tryInfo.now) { tryInfo.skew = Date.now() - tryInfo.now; }
+  const on = !!(tryInfo && tryInfo.on);
+  $('tryCard').hidden = !on;
+  if (!on) { return; }
+  $('tryStation').textContent = tryInfo.stationName;
+  $('tryUser').textContent = tryInfo.user; $('tryPass').textContent = tryInfo.password;
+  const h = tryInfo.periodMin / 60; $('tryEvery').textContent = h === 1 ? 'hour' : (Number.isInteger(h) ? h + ' hours' : tryInfo.periodMin + ' minutes');
+  $('tryNext').textContent = clock(tryInfo.nextReset + (tryInfo.skew || 0));
+  if (/[#&]try\b/.test(location.hash)) { $('tryCard').scrollIntoView({ block: 'center' }); }
+}
+$('tryGo').addEventListener('click', async () => {
+  if (!tryInfo || !tryInfo.on) { return; }
+  const r = await api('/api/login', { username: tryInfo.user, password: tryInfo.password });
+  if (!r.ok) { toast(r.error); loadTry(); return; }
+  token = r.data.token; store('vs_token', token); tab = 'overview';
+  start();
+});
+$('tryOwn').addEventListener('click', async () => {
+  await api('/api/logout', {});
+  signedOut();
+  $('suForm').hidden = false; $('suCodeBox').hidden = true; wizStep('account'); $('suUser').focus();
+});
+function drawTryBar() {
+  const on = !!(status && status.trialLogin);
+  $('tryBar').hidden = !on;
+  if (!on) { return; }
+  const next = tryInfo && tryInfo.on ? tryInfo.nextReset + (tryInfo.skew || 0) : 0;
+  const m = next ? minutesTo(next) : 0;
+  $('tryBarText').textContent = ' Everyone trying Memoryq shares this station. ' + (next
+    ? 'At ' + clock(next) + ' (in ' + (m < 1 ? 'less than a minute' : m + ' min') + ') it goes back to the start and you are signed out.'
+    : 'It goes back to the start every 2 hours.') + ' DJ logins and payments are only in your own station.';
+}
+function signedOut() {
+  if (AS) { try { sessionStorage.removeItem('studio_as'); } catch (e) { } token = null; clearInterval(pollTimer); document.body.innerHTML = '<p style="padding:40px;font:16px system-ui">This admin view has ended. You can close this tab.</p>'; return; }
+  token = null; me = null; status = null; store('vs_token', null); clearInterval(pollTimer); $('tryBar').hidden = true; loadTry();
+  ['start', 'studio'].forEach(id => $(id).hidden = true);
+  $('signin').hidden = false; $('signOut').hidden = true; $('who').textContent = '';
+}
+
+// ---------- sign-up wizard ----------
+let wizStation = 0;
+function wizStep(step) {
+  $('signin').hidden = true; $('studio').hidden = true; $('start').hidden = false;
+  const order = ['account', 'station', 'pay'];
+  document.querySelectorAll('[data-step]').forEach(c => { c.hidden = c.dataset.step !== step; });
+  document.querySelectorAll('.stepper div').forEach(d => {
+    const i = order.indexOf(d.dataset.s), k = order.indexOf(step);
+    d.className = i < k ? 'done' : (i === k ? 'on' : '');
+  });
+  window.scrollTo(0, 0);
+}
+$('goSignup').addEventListener('click', () => { $('suForm').hidden = false; $('suCodeBox').hidden = true; wizStep('account'); $('suUser').focus(); });
+$('suToLogin').addEventListener('click', (e) => { e.preventDefault(); signedOut(); });
+$('suNext').addEventListener('click', async () => {
+  $('suErr').textContent = '';
+  const user = $('suUser').value.trim();
+  const r = await api('/api/register', { username: user, password: $('suPass').value, email: $('suEmail').value.trim() });
+  if (!r.ok) { $('suErr').textContent = r.error; return; }
+  if (r.data.token) { await signedIn(r.data.token); return; }
+  $('suMasked').textContent = r.data.email || 'your email';
+  $('suForm').hidden = true; $('suCodeBox').hidden = false; $('suCode').value = ''; $('suCode').focus();
+});
+$('suVerify').addEventListener('click', async () => {
+  $('suErr').textContent = '';
+  const r = await api('/api/register/verify', { username: $('suUser').value.trim(), code: $('suCode').value.trim() });
+  if (!r.ok) { $('suErr').textContent = r.error; return; }
+  await signedIn(r.data.token);
+});
+$('suCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') { $('suVerify').click(); } });
+$('suResend').addEventListener('click', async () => {
+  const r = await api('/api/register/resend', { username: $('suUser').value.trim() });
+  $('suErr').textContent = r.ok ? '' : r.error; if (r.ok) { toast('A new code is on its way'); }
+});
+$('suBack').addEventListener('click', () => { $('suForm').hidden = false; $('suCodeBox').hidden = true; });
+async function signedIn(t) {
+  token = t; store('vs_token', token);
+  await start();
+}
+function newPassword() {
+  const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const r = new Uint32Array(12); crypto.getRandomValues(r);
+  return Array.from(r, x => abc[x % abc.length]).join('');
+}
+$('fGen').addEventListener('click', () => { $('fPass').value = newPassword(); });
+function stationStep() {
+  wizStep('station');
+  $('fLogin').value = me.username;
+  const sel = $('fPort'); sel.innerHTML = '';
+  (status.freePorts || []).forEach(p => { const o = el('option', String(p)); o.value = p; sel.appendChild(o); });
+  if (!sel.options.length) { const o = el('option', 'none free - ask Memoryq'); o.value = ''; sel.appendChild(o); }
+  if (!$('fPass').value) { $('fPass').value = newPassword(); }
+  if (!$('fName').value && /fm|radio/i.test(me.username)) { $('fName').value = me.username; }
+  $('fName').focus();
+}
+$('fNext').addEventListener('click', async () => {
+  $('fErr').textContent = '';
+  const r = await api('/api/studio/request', { name: $('fName').value.trim(), description: $('fSlogan').value.trim(),
+    website: $('fWeb').value.trim(), livePort: $('fPort').value, livePass: $('fPass').value.trim() });
+  if (!r.ok) { $('fErr').textContent = r.error; return; }
+  wizStation = r.data.id; current = r.data.id;
+  await refresh(true);
+  wizStep('pay');
+  renderPay($('wizPay'), st(), true);
+});
+
+// ---------- payment (sign-up step 3 and the Billing tab) ----------
+function money(amount) {
+  const b = status.billing || {};
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: (b.currency || 'usd').toUpperCase() }).format(Number(amount)); }
+  catch (e) { return (b.currency || '').toUpperCase() + ' ' + amount; }
+}
+function day(ms) { return new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }); }
+function sizeText(bytes) {
+  if (bytes >= 1073741824) { return (bytes / 1073741824).toFixed(bytes >= 10737418240 ? 0 : 1) + ' GB'; }
+  return Math.round(bytes / 1048576) + ' MB';
+}
+function planFeatures(p) {
+  return [p.listeners ? fmt(p.listeners) + ' listeners at once' : 'Unlimited listeners',
+    p.kbps + ' kbps sound',
+    p.storageMb ? sizeText(p.storageMb * 1048576) + ' music storage' : 'Unlimited music storage',
+    p.transferGb ? fmt(p.transferGb) + ' GB listening data / month' : 'Unlimited listening data',
+    p.djs ? p.djs + ' remote DJ' + (p.djs > 1 ? 's' : '') : 'No remote DJs',
+    'AI DJ, live DJ, website player, statistics'].concat(p.djPro ? ['Live DJ Pro console'] : []);
+}
+function usageRow(label, used, max, fmtFn) {
+  const u = el('div', null, 'u');
+  const t = el('div', null, 't');
+  t.appendChild(el('span', label));
+  const v = el('b', fmtFn(used) + (max ? ' of ' + fmtFn(max) : ' (no limit)')); t.appendChild(v);
+  u.appendChild(t);
+  const bar = el('div', null, 'bar'); const i = el('i');
+  const pct = max ? Math.min(100, used / max * 100) : 0;
+  i.style.width = (max ? Math.max(pct, used > 0 ? 2 : 0) : 0) + '%';
+  i.className = pct >= 100 ? 'full' : (pct >= 80 ? 'warn' : '');
+  bar.appendChild(i); u.appendChild(bar);
+  return u;
+}
+function drawUsage(box, s) {
+  box.innerHTML = '';
+  const p = s.plan || {}; const u = s.usage || {};
+  box.appendChild(usageRow('Listeners now', u.listeners || 0, p.listeners || 0, fmt));
+  box.appendChild(usageRow('Music storage', u.storageBytes || 0, (p.storageMb || 0) * 1048576, sizeText));
+  box.appendChild(usageRow('Listening data this month', u.monthBytes || 0, (p.transferGb || 0) * 1073741824, sizeText));
+  box.appendChild(usageRow('Remote DJs', u.djs || 0, s.maxDjs || 0, fmt));
+}
+function planList(s) {
+  const list = ((status.billing || {}).plans || []).slice();
+  if (s.plan && !list.some(p => p.id === s.plan.id)) { list.unshift(s.plan); }
+  return list;
+}
+
+function renderPay(box, s, wizard) {
+  const b = status.billing || {};
+  box.innerHTML = '';
+  const state = el('div', null, 'bstate');
+  let line, cls;
+  if (s.billing === 'paid') { line = s.paidUntil ? 'Paid until ' + day(s.paidUntil) : 'Paid'; cls = 'active'; }
+  else if (s.billing === 'trial') { line = 'Free trial until ' + day(s.paidUntil); cls = 'pending'; }
+  else { line = 'Payment needed'; cls = 'suspended'; }
+  state.appendChild(el('span', s.billing === 'unpaid' ? 'not paid' : s.billing, 'badge ' + cls));
+  state.appendChild(el('span', line, 'big'));
+  if (s.paidOnline && s.billing === 'paid') {
+    state.appendChild(el('span', (s.plan === 'year' ? 'Renews every year' : 'Renews every month') + ' by card', 'muted'));
+  }
+  box.appendChild(state);
+  if (s.paidOnline) {
+    const m = el('button', 'Change card, see receipts or cancel');
+    m.addEventListener('click', async () => {
+      const r = await api('/api/studio/billing/portal', { station: s.id });
+      if (r.ok) { location.href = r.data.url; } else { toast(r.error); }
+    });
+    box.appendChild(m);
+  }
+  const needs = s.billing !== 'paid' || (!s.paidOnline && s.paidUntil && s.paidUntil - Date.now() < 14 * 86400000);
+  if (!needs) {
+    if (wizard) { const go = el('button', 'Go to my studio', 'primary'); go.addEventListener('click', () => { history.replaceState(null, '', '/studio'); refresh(); }); box.appendChild(go); }
+    return;
+  }
+  const plans = planList(s);
+  let chosen = s.planId && plans.some(p => p.id === s.planId) ? s.planId : (plans[0] ? plans[0].id : 0);
+  const anyYear = plans.some(p => Number(p.year) > 0), anyMonth = plans.some(p => Number(p.month) > 0);
+  let period = anyMonth ? 'month' : 'year';
+  if (plans.length) {
+    const head = el('div', null, 'row');
+    head.appendChild(el('b', 'Choose your plan', 'grow'));
+    if (anyYear && anyMonth) {
+      const seg = el('div', null, 'seg');
+      [['month', 'Monthly'], ['year', 'Yearly']].forEach(([v, t]) => {
+        const bt = el('button', t); bt.type = 'button'; bt.className = v === period ? 'on' : '';
+        bt.addEventListener('click', () => { period = v; seg.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === bt)); drawCards(); });
+        seg.appendChild(bt);
+      });
+      head.appendChild(seg);
+    }
+    box.appendChild(head);
+  }
+  const cardsBox = el('div', null, 'plans3');
+  box.appendChild(cardsBox);
+  const payRow = el('div');
+  box.appendChild(payRow);
+  function priceOf(p) { return Number(period === 'year' ? p.year : p.month); }
+  function drawCards() {
+    cardsBox.innerHTML = '';
+    plans.forEach(p => {
+      const c = el('button', null, 'plan' + (p.id === chosen ? ' on' : '')); c.type = 'button';
+      c.appendChild(el('div', p.name + (p.id === s.planId && s.billing !== 'unpaid' ? ' (your plan)' : ''), 'pname'));
+      const pr = el('div');
+      if (priceOf(p) > 0) { pr.appendChild(el('span', money(priceOf(p)), 'price')); pr.appendChild(el('span', period === 'year' ? ' per year' : ' per month', 'per')); }
+      else { pr.appendChild(el('span', period === 'year' ? 'No yearly price' : 'No monthly price', 'per')); }
+      c.appendChild(pr);
+      const ul = el('ul'); planFeatures(p).forEach(f => ul.appendChild(el('li', f))); c.appendChild(ul);
+      c.addEventListener('click', async () => {
+        chosen = p.id; drawCards();
+        if (s.billing === 'unpaid' && p.id !== s.planId) {
+          const r = await api('/api/studio/plan/change', { station: s.id, plan: p.id });
+          if (r.ok) { s.planId = p.id; } else { toast(r.error); }
+        }
+      });
+      cardsBox.appendChild(c);
+    });
+    drawPay();
+  }
+  function drawPay() {
+    payRow.innerHTML = '';
+    const p = plans.find(x => x.id === chosen);
+    if (b.online && p) {
+      const pay = el('button', priceOf(p) > 0 ? 'Pay ' + money(priceOf(p)) + (period === 'year' ? ' / year' : ' / month') + ' by card' : 'Pay by card', 'primary');
+      pay.style.cssText = 'font-size:16px;padding:11px 22px';
+      pay.disabled = !(priceOf(p) > 0);
+      pay.addEventListener('click', async () => {
+        pay.disabled = true;
+        const r = await api('/api/studio/pay', { station: s.id, planId: chosen, period: period });
+        if (r.ok) { location.href = r.data.url; } else { pay.disabled = false; toast(r.error); }
+      });
+      payRow.appendChild(pay);
+      payRow.appendChild(el('div', 'Secure card payment by Stripe. The subscription renews by itself; you can cancel any time.'
+        + (b.testMode ? ' (TEST MODE - use card 4242 4242 4242 4242)' : ''), 'muted small'));
+    } else {
+      const t = el('p');
+      t.textContent = 'Online card payment is not open yet. Memoryq will contact you by email to arrange payment (or write to '
+        + 'support@memoryq.com). Your station is saved - you can already add your music.';
+      payRow.appendChild(t);
+    }
+  }
+  drawCards();
+  if (b.trialDays > 0 && !s.trialUsed && s.billing === 'unpaid') {
+    const t = el('button', 'Start my ' + b.trialDays + '-day free trial');
+    t.style.marginTop = '12px';
+    t.addEventListener('click', async () => {
+      if (chosen && chosen !== s.planId) { await api('/api/studio/plan/change', { station: s.id, plan: chosen }); }
+      const r = await api('/api/studio/trial', { station: s.id });
+      if (!r.ok) { toast(r.error); return; }
+      toast('Your free trial has started - you are on air');
+      history.replaceState(null, '', '/studio'); tab = 'music'; refresh();
+    });
+    box.appendChild(el('div')).appendChild(t);
+  }
+  if (wizard) {
+    const later = el('button', 'Do this later - go to my studio'); later.style.marginTop = '12px';
+    later.addEventListener('click', () => { history.replaceState(null, '', '/studio'); refresh(); });
+    box.appendChild(el('div')).appendChild(later);
+  }
+}
+$('asExit').addEventListener('click', () => {
+  if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  try { sessionStorage.removeItem('studio_as'); } catch (e) { }
+  window.close(); setTimeout(() => { location.href = '/admin'; }, 300);
+});
+$('signOut').addEventListener('click', () => {
+  if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  signedOut();
+});
+
+async function start() {
+  if (!token) { signedOut(); return; }
+  const r = await api('/api/me');
+  if (!r.ok) { signedOut(); return; }
+  me = r.data;
+  $('signin').hidden = true; $('signOut').hidden = false;
+  $('who').textContent = 'Signed in as ' + me.username;
+  if (AS) {
+    $('asBar').hidden = false; $('signOut').hidden = true;
+    $('asText').textContent = ' You are looking at ' + me.username + '\'s Studio as the Memoryq admin - changes are real.';
+  }
+  if (me.role === 'GUEST') {
+    wizStep('account'); $('suErr').textContent = 'Guest accounts cannot run a station. Sign out and create an account.';
+    return;
+  }
+  const q = new URLSearchParams(location.search);
+  if (q.get('station')) { current = Number(q.get('station')); }
+  if (tab === 'stats') { tab = 'report'; }
+  if (q.get('paid')) {
+    const r = await api('/api/studio/paid', { station: q.get('station'), session: q.get('paid') });
+    history.replaceState(null, '', '/studio');
+    if (r.ok) { toast('Payment received - thank you! You are on air.'); tab = 'billing'; }
+    else { toast(r.error); tab = 'billing'; }
+  } else if (q.get('cancelled')) {
+    history.replaceState(null, '', '/studio'); toast('Payment cancelled - nothing was charged'); tab = 'billing';
+  }
+  await refresh();
+  clearInterval(pollTimer);
+  pollTimer = setInterval(() => { if (!document.hidden) { refresh(true); } }, 10000);
+}
+
+// ---------- stations ----------
+async function refresh(quiet) {
+  const r = await api('/api/studio/status');
+  if (!r.ok) { if (!quiet) { toast(r.error); } return; }
+  status = r.data;
+  if (status.trialLogin && (!tryInfo || !tryInfo.on)) { await loadTry(); }
+  drawTryBar();
+  const list = status.stations || [];
+  if (!list.length) { if (quiet && !$('start').hidden) { return; } stationStep(); return; }
+  if (quiet && !$('start').hidden) { return; }
+  $('start').hidden = true; $('studio').hidden = false;
+  if (!list.some(s => s.id === current)) { current = list[0].id; }
+  const pick = $('stPick');
+  pick.hidden = list.length < 2;
+  pick.innerHTML = '';
+  list.forEach(s => { const o = el('option', s.name); o.value = s.id; if (s.id === current) { o.selected = true; } pick.appendChild(o); });
+  drawHeader();
+  if (!quiet) { drawTabs(); await showTab(tab); } else { refreshTab(); }
+}
+function st() { return (status.stations || []).find(s => s.id === current); }
+// Staff the Memoryq admin gave this login: a co-admin has everything but Billing; a presenter does the programme.
+const PRESENTER_TABS = ['overview', 'quick', 'playlists', 'music', 'listeners'];
+function myRole() { const s = st(); return (s && s.myRole) || 'owner'; }
+function tabAllowed(id) {
+  const r = myRole();
+  if (r === 'coadmin') { return id !== 'billing'; }
+  if (r === 'presenter') { return PRESENTER_TABS.includes(id); }
+  return true;
+}
+$('stPick').addEventListener('change', () => { current = Number($('stPick').value); stopListening(); refresh(); });
+
+function drawHeader() {
+  const s = st();
+  $('stName').textContent = s.name;
+  $('stSlogan').textContent = s.description || '';
+  const b = $('stBadges'); b.innerHTML = '';
+  b.appendChild(el('span', s.status, 'badge ' + s.status));
+  if (s.myRole === 'coadmin' || s.myRole === 'presenter') {
+    b.appendChild(document.createTextNode(' '));
+    const rb = el('span', s.myRole === 'coadmin' ? 'co-admin' : 'presenter', 'badge');
+    rb.title = 'Memoryq made you ' + rb.textContent + ' of this station (owner: ' + (s.owner || 'Memoryq') + ')'; b.appendChild(rb);
+  }
+  const staffMe = s.myRole === 'coadmin' || s.myRole === 'presenter';
+  if (s.liveOn) { b.appendChild(document.createTextNode(' ')); b.appendChild(el('span', 'live dj', 'badge live')); }
+  const n = $('stNotice');
+  if (staffMe && s.billing === 'unpaid' && s.status !== 'suspended') {
+    n.hidden = false; n.textContent = 'Off air until the station owner pays for it. You can already work on the music and playlists.';
+  } else if (s.billing === 'unpaid' && s.status !== 'suspended') {
+    n.hidden = false; n.innerHTML = '';
+    n.appendChild(el('b', s.paidUntil ? 'Off air - payment needed. ' : 'Last step: payment. '));
+    n.appendChild(document.createTextNode('Your station goes on air as soon as it is paid for. You can already add your music. '));
+    const go = el('button', 'Pay now', 'primary'); go.addEventListener('click', () => showTab('billing')); n.appendChild(go);
+  } else if (s.status === 'pending') {
+    n.hidden = false;
+    n.innerHTML = '<b>Waiting for Memoryq to activate it.</b> You can already set it up and add your music.';
+  } else if (s.billing === 'trial' && s.paidUntil && !staffMe) {
+    n.hidden = false; n.innerHTML = '';
+    n.appendChild(el('b', 'Free trial until ' + day(s.paidUntil) + '. '));
+    n.appendChild(document.createTextNode('Pay before then to stay on air. '));
+    const go = el('button', 'Choose a plan'); go.addEventListener('click', () => showTab('billing')); n.appendChild(go);
+  } else if (s.status === 'suspended') {
+    n.hidden = false;
+    n.innerHTML = '<b>This station is paused by Memoryq.</b> Contact support@memoryq.com to bring it back.';
+  } else if (!s.enabled) {
+    n.hidden = false; n.textContent = 'The station is switched off. Switch it on in Settings.';
+  } else if (!s.songs && !s.liveOn) {
+    n.hidden = false; n.textContent = 'Add some music (Music tab) and the station goes on air by itself.';
+  } else { n.hidden = true; }
+}
+
+// ---------- the side menu (General, Configuration, Statistics, Server, AutoDJ, Account) ----------
+const MENU = [
+  ['General', '#2f6fed', '\u2302', [['overview', 'Overview'], ['quick', 'Quick links']]],
+  ['Configuration', '#6a1b9a', '\u2699', [['settings', 'Settings'], ['embed', 'Widgets'], ['live', 'DJs']]],
+  ['Statistics', '#ef6c00', '\u25d4', [['report', 'Report'], ['listeners', 'Listeners'], ['logs', 'Logs']]],
+  ['Server', '#2e7d32', '\u25b6', [], 'server'],
+  ['AutoDJ', '#00838f', '\u266b', [['playlists', 'Playlists'], ['music', 'Media']], 'autodj'],
+  ['Account', '#5d4037', '\u2605', [['billing', 'Billing']]]];
+function drawTabs() { drawSide(); }
+function drawSide() {
+  const s = st(); const side = $('side'); if (!s) { return; } side.innerHTML = '';
+  MENU.forEach(([name, color, icon, items, extra]) => {
+    const g = el('div', null, 'grp');
+    const gl = el('div', null, 'gl'); const ic = el('i', icon); ic.style.background = color; gl.appendChild(ic); gl.appendChild(document.createTextNode(name)); g.appendChild(gl);
+    if (status.trialLogin) { items = items.filter(([id]) => id !== 'billing' && id !== 'live'); if (!items.length && !extra) { return; } }
+    items = items.filter(([id]) => tabAllowed(id)); if (!items.length && !extra) { return; }
+    items.forEach(([id, label]) => { const b = el('button', label, 'it' + (id === tab ? ' on' : '')); b.addEventListener('click', () => showTab(id)); g.appendChild(b); });
+    if (extra === 'server') {
+      const state = el('div', null, 'state');
+      const on = s.onAir && s.live;
+      state.appendChild(el('b', on ? 'Running' : (s.onAir ? 'Starting' : 'Stopped'), on || s.onAir ? 'on' : 'off'));
+      state.appendChild(document.createTextNode(on ? ' \u00b7 ' + (s.kbpsNow || (s.plan && s.plan.kbps) || 128) + ' kbps \u00b7 ' + fmt(s.listeners) + ' listening' : ''));
+      g.appendChild(state);
+      const acts = el('div', null, 'acts'); acts.hidden = myRole() === 'presenter';
+      const ss = el('button', s.enabled ? 'Stop' : 'Start'); ss.title = s.enabled ? 'Take the station off air' : 'Put the station on air';
+      ss.addEventListener('click', () => serverOnOff(!s.enabled)); acts.appendChild(ss);
+      const rs = el('button', 'Restart'); rs.title = 'Stop the stream and start it again (listeners reconnect)'; rs.disabled = !s.onAir;
+      rs.addEventListener('click', serverRestart); acts.appendChild(rs);
+      g.appendChild(acts);
+    }
+    if (extra === 'autodj') {
+      const acts = el('div', null, 'acts');
+      const can = s.onAir && s.live && !s.liveOn;
+      const sk = el('button', '\u23ed Skip'); sk.title = 'Skip to the next song'; sk.disabled = !can;
+      sk.addEventListener('click', async () => { const r = await api('/api/studio/skip', { station: current }); toast(r.ok ? 'Skipping...' : r.error); });
+      const tk = el('button', '\ud83c\udf99 Talk'); tk.title = 'The AI DJ talks after this song'; tk.disabled = !can;
+      tk.addEventListener('click', async () => { const r = await api('/api/studio/talk', { station: current }); toast(r.ok ? 'The DJ is getting ready to talk...' : r.error); });
+      acts.appendChild(sk); acts.appendChild(tk); g.appendChild(acts);
+      if (s.liveOn) { g.appendChild(el('div', 'A live DJ is on air', 'state')); }
+    }
+    side.appendChild(g);
+  });
+  const pro = el('a', 'Live DJ Pro', 'btn primary pro'); pro.href = '/djpro'; pro.target = 'memoryq-djpro';
+  pro.addEventListener('click', (e) => { if (consoleAlive()) { e.preventDefault(); backToConsole(); } });
+  side.appendChild(pro);
+}
+async function serverOnOff(on) {
+  if (!on && !confirm('Stop ' + st().name + '? Listeners are disconnected until you start it again.')) { return; }
+  const r = await api('/api/studio/station/save', { id: current, enabled: on });
+  toast(r.ok ? (on ? 'Starting the station...' : 'The station is stopped') : r.error);
+  setTimeout(() => refresh(true), 1200);
+}
+async function serverRestart() {
+  if (!confirm('Restart the stream? Listeners drop for a moment and reconnect.')) { return; }
+  const r = await api('/api/studio/restart', { station: current });
+  toast(r.ok ? 'Restarting...' : r.error);
+  setTimeout(() => refresh(true), 2500);
+}
+async function showTab(id) {
+  if (id === 'stats') { id = 'report'; }
+  if (status && status.trialLogin && (id === 'billing' || id === 'live')) { id = 'overview'; }
+  if (status && st() && !tabAllowed(id)) { id = 'overview'; }
+  tab = id; try { sessionStorage.setItem('studio_tab', id); } catch (e) { }
+  drawTabs();
+  document.querySelectorAll('section[data-tab]').forEach(s => s.hidden = s.dataset.tab !== id);
+  if (id === 'overview') { drawOverview(); }
+  if (id === 'settings') { drawSettings(); }
+  if (id === 'music') { await loadTracks(); }
+  if (id === 'live') { drawLive(); drawDjs(); }
+  if (id === 'playlists') { plShowList(true); await loadPlaylists(); loadStories(); }
+  if (id === 'report') { await loadReport(); }
+  if (id === 'listeners') { await loadListeners(); }
+  if (id === 'logs') { await loadLogs(); }
+  if (id === 'quick') { drawQuick(); }
+  if (id === 'embed') { drawEmbed(); }
+  if (id === 'billing') {
+    renderPay($('billBox'), st(), false);
+    const u = el('div', null, 'usage'); u.style.marginTop = '18px';
+    drawUsage(u, st()); $('billBox').appendChild(el('h2', 'Usage')).style.marginTop = '20px'; $('billBox').appendChild(u);
+  }
+}
+function refreshTab() {
+  drawSide();
+  if (tab === 'overview') { drawOverview(); }
+  if (tab === 'listeners') { loadListeners(); }
+  if (tab === 'live') { drawLive(); }
+}
+
+// ---------- overview ----------
+function tile(n, label) { const t = el('div', null, 'tile'); t.appendChild(el('div', n, 'n')); t.appendChild(el('div', label, 'l')); return t; }
+function drawOverview() {
+  const s = st();
+  $('ovPlan').textContent = s.plan ? s.plan.name + ' \u00b7 ' + s.plan.kbps + ' kbps' : 'No plan limits';
+  drawUsage($('ovUsage'), s);
+  const tiles = $('ovTiles'); tiles.innerHTML = '';
+  tiles.appendChild(tile(fmt(s.listeners), 'listening now'));
+  tiles.appendChild(tile(fmt(s.songs), 'songs'));
+  tiles.appendChild(tile(s.onAir ? (s.live ? 'On air' : 'Starting') : 'Off air', 'status'));
+  tiles.appendChild(tile(s.liveOn ? 'Live' : 'Playlist', s.liveOn && s.liveDj ? s.liveDj : 'what is playing'));
+  const now = s.now;
+  $('npLabel').textContent = s.talk ? 'On the mic: ' + (s.djName || 'DJ') : (s.liveOn ? 'Live show' : 'Now playing');
+  $('npTitle').textContent = now ? (now.title || now.label) : (s.onAir ? 'Starting up...' : 'Off air');
+  $('npNext').textContent = (s.show && !s.liveOn ? 'Show: ' + s.show + '. ' : '')
+    + (s.next && !s.liveOn ? 'Next: ' + s.next + (s.nextRequestedBy ? ' (requested by ' + s.nextRequestedBy + ')' : '') : '');
+  const can = s.onAir && s.live && !s.liveOn;
+  $('skipBtn').disabled = !can; $('talkBtn').disabled = !can;
+  $('ctlNote').textContent = s.liveOn ? 'A live DJ is on - the controls come back when they leave.' : '';
+  $('streamUrl').textContent = location.origin + s.stream;
+  $('listenBtn').disabled = !(s.onAir && s.live);
+  const t = $('logTable'); t.innerHTML = '';
+  (s.recent || []).slice(0, 12).forEach(e => {
+    const tr = el('tr');
+    tr.appendChild(el('td', new Date(e.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), 'muted'));
+    tr.appendChild(el('td', e.kind === 'song' ? '\u266b' : (e.kind === 'note' ? '\u2022' : '\ud83c\udf99')));
+    tr.appendChild(el('td', e.text.length > 160 ? e.text.slice(0, 157) + '...' : e.text));
+    t.appendChild(tr);
+  });
+  if (!t.childNodes.length) { t.appendChild(el('tr')).appendChild(el('td', 'Nothing yet.', 'muted')); }
+}
+let listening = false;
+function stopListening() { const a = $('audio'); a.pause(); a.removeAttribute('src'); a.load(); listening = false; $('listenBtn').innerHTML = '&#9654;'; }
+$('listenBtn').addEventListener('click', () => {
+  if (listening) { stopListening(); return; }
+  const a = $('audio'); a.src = st().stream + '?t=' + Date.now(); a.play().catch(() => {}); listening = true; $('listenBtn').innerHTML = '&#10074;&#10074;';
+});
+$('skipBtn').addEventListener('click', async () => { const r = await api('/api/studio/skip', { station: current }); toast(r.ok ? 'Skipping...' : r.error); });
+$('talkBtn').addEventListener('click', async () => { const r = await api('/api/studio/talk', { station: current }); toast(r.ok ? 'The DJ is getting ready to talk...' : r.error); });
+$('copyStream').addEventListener('click', () => copy($('streamUrl').textContent));
+function copy(text) { (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('Copied'), () => toast(text)); }
+
+// ---------- settings ----------
+function drawSettings() {
+  const s = st();
+  $('sCompany').value = s.company || ''; $('sEmail').value = s.email || '';
+  $('sName').value = s.name; $('sSlogan').value = s.description || ''; $('sDj').value = s.djName || ''; $('sWeb').value = s.website || '';
+  ['sName', 'sWeb', 'sCompany', 'sEmail'].forEach(f => { $(f).disabled = !!status.trialLogin; $(f).title = status.trialLogin ? 'Not in the trial - your own station can change this' : ''; });
+  $('sEvery').value = s.talkEvery; $('sPromo').value = s.promo || '';
+  $('sOn').checked = s.enabled; $('sNews').checked = s.newsOn; $('sShout').checked = s.shoutOn; $('sIntros').checked = s.introsOn;
+  $('sArtist').checked = !!s.sayArtist; $('sIdEvery').value = s.idEvery == null ? 4 : s.idEvery;
+  const v = $('sVoice'); v.innerHTML = '';
+  const voices = (status.voices && status.voices.length) ? status.voices : [''];
+  voices.forEach(x => { const o = el('option', x || '(default voice)'); o.value = x; if (x === s.voice) { o.selected = true; } v.appendChild(o); });
+  const tz = $('sTz'); tz.innerHTML = '';
+  let zones = [];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = []; }
+  if (!zones.includes('UTC')) { zones.unshift('UTC'); }
+  if (s.timezone && !zones.includes(s.timezone)) { zones.unshift(s.timezone); }
+  zones.forEach(z => { const o = el('option', z.replace(/_/g, ' ')); o.value = z; if (z === (s.timezone || 'UTC')) { o.selected = true; } tz.appendChild(o); });
+  $('saveMsg').textContent = '';
+}
+$('saveBtn').addEventListener('click', async () => {
+  const r = await api('/api/studio/station/save', { id: current, name: $('sName').value, description: $('sSlogan').value, website: $('sWeb').value.trim(), timezone: $('sTz').value,
+    company: $('sCompany').value.trim(), email: $('sEmail').value.trim(),
+    djName: $('sDj').value, voice: $('sVoice').value, talkEvery: $('sEvery').value, promo: $('sPromo').value,
+    enabled: $('sOn').checked, newsOn: $('sNews').checked, shoutOn: $('sShout').checked, introsOn: $('sIntros').checked,
+    sayArtist: $('sArtist').checked, idEvery: $('sIdEvery').value });
+  $('saveMsg').textContent = r.ok ? 'Saved.' : r.error; $('saveMsg').className = 'small ' + (r.ok ? 'ok' : 'error');
+  if (r.ok) { await refresh(true); drawHeader(); }
+});
+$('voiceBtn').addEventListener('click', async () => {
+  $('voiceBtn').disabled = true; $('saveMsg').textContent = 'Making a sample...'; $('saveMsg').className = 'small muted';
+  const r = await api('/api/studio/testvoice', { station: current });
+  $('voiceBtn').disabled = false;
+  if (r.ok && r.data.ok) { const a = $('voiceAudio'); a.src = r.data.wav; a.hidden = false; a.play().catch(() => {}); $('saveMsg').textContent = ''; }
+  else { $('saveMsg').textContent = (r.data && r.data.error) || r.error || 'No voice available'; $('saveMsg').className = 'small error'; }
+});
+
+// ---------- music ----------
+async function loadTracks() {
+  const pr = await api('/api/studio/playlists?station=' + current);
+  const sel = $('upInto'); const keep = sel.value; sel.innerHTML = '<option value="">(no playlist)</option>';
+  if (pr.ok) { (pr.data.playlists || []).forEach(p => { const o = el('option', p.name); o.value = p.id; sel.appendChild(o); }); }
+  if ([...sel.options].some(o => o.value === keep)) { sel.value = keep; }
+  const r = await api('/api/studio/tracks?station=' + current);
+  const t = $('tracks'); t.innerHTML = '';
+  if (!r.ok) { t.appendChild(el('tr')).appendChild(el('td', r.error, 'error')); return; }
+  const head = el('tr');
+  ['Title', 'Artist', 'Link ("Get this song")', 'Length', 'Plays', 'Likes', 'Requests', 'Taps', ''].forEach((h, i) => head.appendChild(el('th', h, i >= 3 && i <= 7 ? 'num' : '')));
+  t.appendChild(head);
+  if (!r.data.tracks.length) { const tr = el('tr'); const td = el('td', 'No songs yet - add some above.', 'muted'); td.colSpan = 9; tr.appendChild(td); t.appendChild(tr); }
+  r.data.tracks.forEach(x => {
+    const tr = el('tr');
+    const ti = el('input'); ti.value = x.title; ti.maxLength = 120;
+    const ar = el('input'); ar.value = x.artist; ar.maxLength = 120;
+    const li = el('input'); li.value = x.link || ''; li.placeholder = 'https://...';
+    [ti, ar, li].forEach(i => { const td = el('td'); td.appendChild(i); tr.appendChild(td); });
+    [dur(x.durationMs), fmt(x.plays), fmt(x.likes), fmt(x.requests), fmt(x.taps)].forEach(v => tr.appendChild(el('td', v, 'num')));
+    const act = el('td'); act.style.whiteSpace = 'nowrap';
+    const save = el('button', 'Save');
+    save.addEventListener('click', async () => {
+      const s = await api('/api/studio/track/save', { id: x.id, title: ti.value, artist: ar.value, link: li.value });
+      toast(s.ok ? 'Saved' : s.error);
+    });
+    const del = el('button', 'Delete', 'danger');
+    del.addEventListener('click', async () => {
+      if (!confirm('Delete "' + x.title + '"?')) { return; }
+      const s = await api('/api/studio/track/delete', { id: x.id });
+      toast(s.ok ? 'Deleted' : s.error); if (s.ok) { loadTracks(); refresh(true); }
+    });
+    act.appendChild(save); act.appendChild(document.createTextNode(' ')); act.appendChild(del);
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+function uploadOne(file, onProgress) {
+  return new Promise((resolve) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/studio/upload?station=' + current + '&name=' + enc(file.name) + ($('upInto').value ? '&playlist=' + $('upInto').value : ''));
+    x.setRequestHeader('Authorization', 'Bearer ' + token);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) { onProgress(Math.round(100 * e.loaded / e.total)); } };
+    x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { } resolve({ ok: x.status === 200, data: d }); };
+    x.onerror = () => resolve({ ok: false, data: { error: 'upload failed' } });
+    x.send(file);
+  });
+}
+$('files').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []); e.target.value = '';
+  if (!files.length) { return; }
+  let ok = 0; const errors = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const r = await uploadOne(f, (p) => { $('upMsg').textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + ': ' + f.name + ' ' + p + '%'; });
+    if (r.ok) { ok++; } else { errors.push(f.name + ': ' + (r.data.error || 'failed')); }
+  }
+  $('upMsg').textContent = ok + ' song(s) added' + (errors.length ? '. Not added: ' + errors.join('; ') : '');
+  await loadTracks(); refresh(true);
+});
+
+// ---------- live DJ ----------
+let showPass = false;
+function drawLive() {
+  const s = st();
+  const state = $('liveState'); state.innerHTML = '';
+  if (s.liveOn) { state.appendChild(el('span', 'live now' + (s.liveDj ? ': ' + s.liveDj : ''), 'badge live')); }
+  else { state.appendChild(el('span', s.onAir ? 'waiting for a DJ' : 'off air', 'muted small')); }
+  $('kickBtn').hidden = !s.liveOn;
+  const pro = !s.plan || s.plan.djPro;
+  $('djproOpen').hidden = !pro;
+  $('djproNote').textContent = pro
+    ? 'Two decks, mixer, effects, mic, sampler and a camera - no software to install. Press ON AIR and AutoDJ steps aside; '
+      + 'with the camera on, your set also shows in Live Channels. Remote DJs sign in there with station number ' + s.id
+      + ' and their own DJ login.'
+    : 'Live DJ Pro is not in your plan (' + s.plan.name + '). A bigger plan (Billing) includes it.';
+  const c = $('conn'); c.innerHTML = '';
+  const rows = [['Server type', 'Icecast 2', false], ['Address', status.liveHost, true], ['Port', String(s.livePort), true],
+    ['Mount', '/live', true], ['User', 'source', true], ['Password', s.livePass, true]];
+  rows.forEach(([k, v, copyable]) => {
+    c.appendChild(el('div', k, 'k'));
+    const code = el('code', k === 'Password' && !showPass ? '\u2022'.repeat(12) : v);
+    c.appendChild(code);
+    const cell = el('div');
+    if (k === 'Password') {
+      const sh = el('button', showPass ? 'Hide' : 'Show'); sh.addEventListener('click', () => { showPass = !showPass; drawLive(); }); cell.appendChild(sh);
+      cell.appendChild(document.createTextNode(' '));
+    }
+    if (copyable) { const b = el('button', 'Copy'); b.addEventListener('click', () => copy(v)); cell.appendChild(b); }
+    c.appendChild(cell);
+  });
+  if (s.liveProblem) { const p = el('div', s.liveProblem, 'muted small'); p.style.gridColumn = '1 / -1'; c.appendChild(p); }
+  if (s.status !== 'active') { const p = el('div', 'Live DJs can connect once the station is approved and on air.', 'muted small'); p.style.gridColumn = '1 / -1'; c.appendChild(p); }
+}
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function djHours(d) {
+  const days = d.days === '1111111' ? 'Every day' : DAYS.filter((x, i) => d.days[i] === '1').join(', ');
+  const h = (d.from === 0 && d.to === 24) ? 'any time' : String(d.from).padStart(2, '0') + ':00-' + String(d.to % 24).padStart(2, '0') + ':00';
+  return days + ', ' + h;
+}
+let djShow = {};
+function drawDjs(editId) {
+  const s = st();
+  const list = s.djs || [];
+  $('djCount').textContent = list.length + ' of ' + (s.maxDjs || 0) + ' on your plan';
+  const box = $('djList'); box.innerHTML = '';
+  if (!list.length) { box.appendChild(el('p', s.maxDjs ? 'No remote DJs yet.' : 'Your plan has no remote DJs - a bigger plan (Billing) adds up to 3.', 'muted small')); }
+  list.forEach(d => {
+    const c = el('div', null, 'dj');
+    const top = el('div', null, 'top');
+    top.appendChild(el('b', d.name));
+    top.appendChild(el('span', d.enabled ? 'on' : 'off', 'badge ' + (d.enabled ? 'active' : 'suspended')));
+    if (s.liveOn && s.liveDj === d.name) { top.appendChild(el('span', 'live now', 'badge live')); }
+    top.appendChild(el('span', d.studio ? 'studio' : 'no studio', 'badge ' + (d.studio ? 'active' : '')));
+    top.appendChild(el('span', djHours(d) + ' (' + (s.timezone || 'UTC') + ')', 'muted small grow'));
+    const ed = el('button', 'Edit'); ed.addEventListener('click', () => drawDjs(d.id)); top.appendChild(ed);
+    const del = el('button', 'Remove', 'danger');
+    del.addEventListener('click', async () => {
+      if (!confirm('Remove ' + d.name + '? Their login stops working.')) { return; }
+      const r = await api('/api/studio/dj/delete', { station: s.id, id: d.id });
+      if (r.ok) { await refresh(true); drawDjs(); } else { toast(r.error); }
+    });
+    top.appendChild(del);
+    c.appendChild(top);
+    const shown = !!djShow[d.id];
+    const details = 'Server type:  Icecast 2\nAddress:      ' + status.liveHost + '\nPort:         ' + s.livePort
+      + '\nMount:        /live\nUser:         ' + d.login + '\nPassword:     ' + (shown ? d.password : '\u2022'.repeat(10))
+      + (d.lastLive ? '\nLast live:    ' + new Date(d.lastLive).toLocaleString() : '');
+    c.appendChild(el('div', details, 'det'));
+    const row = el('div', null, 'row'); row.style.marginTop = '8px';
+    const sh = el('button', shown ? 'Hide password' : 'Show password'); sh.addEventListener('click', () => { djShow[d.id] = !shown; drawDjs(); });
+    const cp = el('button', 'Copy details for the DJ');
+    cp.addEventListener('click', () => copy(s.name + ' - live DJ login for ' + d.name + '\n' + details.replace(/\u2022+/, d.password)
+      + '\nAllowed: ' + djHours(d) + ' (' + (s.timezone || 'UTC') + ')\nFormat: MP3 128 kbps, 44100 Hz, stereo (BUTT or Mixxx)'
+      + (d.studio ? '\nLive studio in the browser: ' + location.origin + '/djpro  (station number ' + s.id + ', the same login and password)' : '')));
+    row.appendChild(sh); row.appendChild(cp);
+    c.appendChild(row);
+    if (editId === d.id) { c.appendChild(djForm(s, d)); }
+    box.appendChild(c);
+  });
+  const fb = $('djFormBox'); fb.innerHTML = '';
+  if (editId === undefined && list.length < (s.maxDjs || 0)) {
+    const add = el('button', 'Add a remote DJ', 'primary');
+    add.addEventListener('click', () => { fb.innerHTML = ''; fb.appendChild(djForm(s, null)); });
+    fb.appendChild(add);
+  }
+  const t = $('showTable'); t.innerHTML = '';
+  (s.shows || []).forEach(x => {
+    const tr = el('tr');
+    tr.appendChild(el('td', x.dj || 'Live DJ'));
+    tr.appendChild(el('td', new Date(x.start).toLocaleString(), 'muted'));
+    tr.appendChild(el('td', Math.round((x.end - x.start) / 60000) + ' min', 'num'));
+    t.appendChild(tr);
+  });
+  if (!t.childNodes.length) { t.appendChild(el('tr')).appendChild(el('td', 'No live shows yet.', 'muted')); }
+}
+function djForm(s, d) {
+  const f = el('div'); f.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid var(--line)';
+  const g = el('div', null, 'grid2');
+  const field = (label, value, attrs) => { const l = el('label', label, 'f'); const i = el('input'); i.value = value; Object.assign(i, attrs || {}); l.appendChild(i); g.appendChild(l); return i; };
+  const name = field('DJ name (shown to listeners)', d ? d.name : '', { maxLength: 40, placeholder: 'e.g. DJ Kali' });
+  const login = field('Login (their user name in BUTT/Mixxx)', d ? d.login : '', { maxLength: 30, placeholder: 'e.g. kali' });
+  const pass = field('Password (8+ letters and numbers)', d ? d.password : newPassword(), { maxLength: 40 });
+  const hrs = el('label', 'Allowed hours (' + (s.timezone || 'UTC') + ')', 'f');
+  const hrow = el('span', null, 'row'); hrow.style.marginTop = '5px';
+  const from = el('select'), to = el('select');
+  for (let h = 0; h < 24; h++) { const o = el('option', String(h).padStart(2, '0') + ':00'); o.value = h; from.appendChild(o); }
+  for (let h = 1; h <= 24; h++) { const o = el('option', h === 24 ? '24:00 (midnight)' : String(h).padStart(2, '0') + ':00'); o.value = h; to.appendChild(o); }
+  from.value = d ? d.from : 0; to.value = d ? d.to : 24;
+  hrow.appendChild(from); hrow.appendChild(document.createTextNode(' to ')); hrow.appendChild(to);
+  hrs.appendChild(hrow); g.appendChild(hrs);
+  f.appendChild(g);
+  const days = el('div', null, 'days'); days.appendChild(el('span', 'Days: ', 'muted small'));
+  const boxes = DAYS.map((x, i) => { const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.checked = d ? d.days[i] === '1' : true; l.appendChild(c); l.appendChild(document.createTextNode(x)); days.appendChild(l); return c; });
+  f.appendChild(days);
+  const on = el('label', null, 'chk'); const onBox = el('input'); onBox.type = 'checkbox'; onBox.checked = d ? d.enabled : true;
+  on.appendChild(onBox); on.appendChild(document.createTextNode(' Login switched on')); f.appendChild(on);
+  const stu = el('label', null, 'chk'); const stuBox = el('input'); stuBox.type = 'checkbox'; stuBox.checked = d ? !!d.studio : false;
+  stu.appendChild(stuBox); stu.appendChild(document.createTextNode(' Live studio: this DJ may mix in the browser (Live DJ Pro, with the playlists marked Studio)')); f.appendChild(stu);
+  const row = el('div', null, 'row'); row.style.marginTop = '10px';
+  const save = el('button', d ? 'Save' : 'Add DJ', 'primary');
+  const gen = el('button', 'New password'); gen.addEventListener('click', () => { pass.value = newPassword(); });
+  const cancel = el('button', 'Cancel'); cancel.addEventListener('click', () => drawDjs());
+  const err = el('span', '', 'error');
+  save.addEventListener('click', async () => {
+    const r = await api('/api/studio/dj/save', { station: s.id, id: d ? d.id : 0, name: name.value.trim(), login: login.value.trim(),
+      password: pass.value.trim(), days: boxes.map(c => c.checked ? '1' : '0').join(''), from: from.value, to: to.value, enabled: onBox.checked, studio: stuBox.checked });
+    if (!r.ok) { err.textContent = r.error; return; }
+    toast(d ? 'Saved' : 'DJ added - copy their details and send them');
+    await refresh(true); djShow[r.data.id] = true; drawDjs();
+  });
+  row.appendChild(save); row.appendChild(gen); row.appendChild(cancel); row.appendChild(err);
+  f.appendChild(row);
+  return f;
+}
+
+$('setPass').addEventListener('click', async () => {
+  const p = $('ownPass').value.trim();
+  if (!p) { toast('Type the password you want first'); return; }
+  const r = await api('/api/studio/live/password', { station: current, pass: p });
+  if (r.ok) { $('ownPass').value = ''; showPass = true; await refresh(true); drawLive(); toast('Stream password changed'); } else { toast(r.error); }
+});
+$('newPass').addEventListener('click', async () => {
+  if (!confirm('Make a new live password? DJs using the old one will not be able to connect again.')) { return; }
+  const r = await api('/api/studio/live/password', { station: current });
+  if (r.ok) { showPass = true; await refresh(true); drawLive(); toast('New password made'); } else { toast(r.error); }
+});
+$('kickBtn').addEventListener('click', async () => {
+  if (!confirm('Disconnect the live DJ? The playlist comes back.')) { return; }
+  const r = await api('/api/studio/live/kick', { station: current }); toast(r.ok ? 'Disconnected' : r.error);
+  setTimeout(() => refresh(true), 1500);
+});
+
+// ---------- Alma's stories ----------
+async function loadStories() {
+  const r = await api('/api/studio/stories?station=' + current);
+  const box = $('stList'); box.innerHTML = '';
+  if (!r.ok) { box.appendChild(el('p', r.error, 'muted small')); return; }
+  $('stEvery').value = String(r.data.storyEvery || 0);
+  if (![...$('stEvery').options].some(o => o.value === String(r.data.storyEvery || 0))) {
+    const o = el('option', r.data.storyEvery + ' songs'); o.value = r.data.storyEvery; $('stEvery').appendChild(o); $('stEvery').value = String(r.data.storyEvery);
+  }
+  const books = r.data.books || [];
+  if (!books.length) { box.appendChild(el('p', 'No books yet.', 'muted small')); return; }
+  books.forEach((b, i) => {
+    const row = el('div'); row.style.cssText = 'border:1px solid var(--line,#ddd);border-radius:8px;padding:8px 10px;margin-bottom:8px';
+    const head = el('div', null, 'row');
+    const t = el('b', (b.reading ? '\u25b6 ' : '') + b.title, 'grow'); head.appendChild(t);
+    const prog = b.pos >= b.parts ? 'finished' : (b.pos === 0 ? 'not started' : 'part ' + (b.pos + 1) + ' of ' + b.parts + ' next');
+    head.appendChild(el('span', (b.author ? 'by ' + b.author + ' \u00b7 ' : '') + b.parts + ' parts \u00b7 ' + prog + (b.enabled ? '' : ' \u00b7 off'), 'muted small'));
+    row.appendChild(head);
+    if (b.next && b.pos < b.parts) { const n = el('div', 'Next: ' + b.next, 'small muted'); n.style.margin = '4px 0'; row.appendChild(n); }
+    const act = el('div', null, 'row'); act.style.marginTop = '4px';
+    const upd = async (form, msg) => { const x = await api('/api/studio/story/update', Object.assign({ station: current, id: b.id }, form)); toast(x.ok ? msg : x.error); loadStories(); };
+    const on = el('button', b.enabled ? 'Switch off' : 'Switch on'); on.addEventListener('click', () => upd({ enabled: !b.enabled }, b.enabled ? 'Paused' : 'Switched on')); act.appendChild(on);
+    const back = el('button', 'Back one part'); back.disabled = b.pos === 0; back.addEventListener('click', () => upd({ pos: b.pos - 1 }, 'Alma reads the last part again')); act.appendChild(back);
+    const skip = el('button', 'Skip a part'); skip.disabled = b.pos >= b.parts; skip.addEventListener('click', () => upd({ pos: b.pos + 1 }, 'Skipped')); act.appendChild(skip);
+    const re = el('button', 'Start again'); re.addEventListener('click', () => upd({ pos: 0 }, 'Back to the beginning')); act.appendChild(re);
+    if (i > 0) { const up = el('button', '\u2191'); up.title = 'Read earlier'; up.addEventListener('click', async () => {
+      await api('/api/studio/story/update', { station: current, id: b.id, order: books[i - 1].order });
+      await api('/api/studio/story/update', { station: current, id: books[i - 1].id, order: b.order === books[i - 1].order ? b.order + 1 : b.order });
+      loadStories(); }); act.appendChild(up); }
+    const del = el('button', 'Delete', 'danger'); del.addEventListener('click', async () => {
+      if (!confirm('Delete the book ' + b.title + '?')) { return; }
+      const x = await api('/api/studio/story/delete', { station: current, id: b.id }); toast(x.ok ? 'Deleted' : x.error); loadStories(); });
+    act.appendChild(del);
+    row.appendChild(act);
+    box.appendChild(row);
+  });
+}
+$('stEverySave').addEventListener('click', async () => {
+  const r = await api('/api/studio/station/save', { id: current, storyEvery: $('stEvery').value });
+  toast(r.ok ? ($('stEvery').value === '0' ? 'Stories are off' : 'Alma reads a part every ' + $('stEvery').value + ' songs') : r.error);
+  if (r.ok) { await refresh(true); }
+});
+$('stFile').addEventListener('change', () => {
+  const f = $('stFile').files[0]; if (!f) { return; }
+  if (f.size > 2 * 1024 * 1024) { $('stMsg').textContent = 'That file is over 2 MB - split the book in parts.'; return; }
+  const rd = new FileReader();
+  rd.onload = () => { $('stText').value = String(rd.result || ''); if (!$('stTitle').value.trim()) { $('stTitle').value = f.name.replace(/\.txt$/i, '').replace(/[_-]+/g, ' '); } };
+  rd.readAsText(f);
+});
+$('stSave').addEventListener('click', async () => {
+  $('stMsg').textContent = 'Adding...'; $('stMsg').className = 'small muted';
+  const r = await api('/api/studio/story/add', { station: current, title: $('stTitle').value.trim(), author: $('stAuthor').value.trim(), text: $('stText').value });
+  if (!r.ok) { $('stMsg').textContent = r.error; $('stMsg').className = 'small error'; return; }
+  $('stMsg').textContent = 'Added - ' + r.data.parts + ' parts.'; $('stMsg').className = 'small ok';
+  $('stTitle').value = ''; $('stAuthor').value = ''; $('stText').value = ''; $('stFile').value = '';
+  if ($('stEvery').value === '0') { toast('Book added - now choose how often Alma reads, and Save'); }
+  loadStories();
+});
+
+// ---------- playlists ----------
+const PL_COLORS = ['#2f6fed', '#2e7d32', '#ad1457', '#6a1b9a', '#ef6c00', '#00838f', '#5d4037', '#c62828', '#455a64', '#8d6e00'];
+let plData = null, plTracks = [];
+function hm(m) { m = ((m % 1440) + 1440) % 1440; return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function plColor(p) { return PL_COLORS[p.id % PL_COLORS.length]; }
+async function loadPlaylists() {
+  const [r, t] = await Promise.all([api('/api/studio/playlists?station=' + current), api('/api/studio/tracks?station=' + current)]);
+  if (!r.ok) { toast(r.error); return; }
+  plData = r.data; plTracks = t.ok ? (t.data.tracks || []) : [];
+  $('plNoRep').value = String(plData.noRepeatMin);
+  if (![...$('plNoRep').options].some(o => o.value === String(plData.noRepeatMin))) {
+    const o = el('option', plData.noRepeatMin + ' minutes'); o.value = plData.noRepeatMin; $('plNoRep').appendChild(o); $('plNoRep').value = String(plData.noRepeatMin);
+  }
+  $('plTz').textContent = 'Times are in ' + plData.tz + ' (Settings)';
+  $('plNow').textContent = plData.showNow ? 'On now: ' + plData.showNow : 'On now: rotation';
+  drawWeek(); drawPlList();
+}
+$('plNoRepSave').addEventListener('click', async () => {
+  const r = await api('/api/studio/station/save', { id: current, noRepeatMin: $('plNoRep').value });
+  toast(r.ok ? 'Saved' : r.error);
+});
+function drawWeek() {
+  const w = $('week'); w.innerHTML = '';
+  const hrs = el('div', null, 'hrs'); hrs.appendChild(el('div'));
+  for (let h = 0; h < 24; h++) { hrs.appendChild(el('div', h % 3 === 0 ? String(h).padStart(2, '0') : '')); }
+  w.appendChild(hrs);
+  const shows = (plData.playlists || []).filter(p => p.type === 'scheduled');
+  DAYS.forEach((d, di) => {
+    const row = el('div', null, 'wrow');
+    row.appendChild(el('div', d, 'd'));
+    for (let h = 0; h < 24; h++) {
+      const c = el('div', null, 'c'); c.title = d + ' ' + String(h).padStart(2, '0') + ':00 - new show';
+      c.addEventListener('click', () => editPlaylist(null, { type: 'scheduled', days: '0000000'.split('').map((x, i) => i === di ? '1' : '0').join(''), start: h * 60, end: Math.min(24, h + 2) * 60 }));
+      row.appendChild(c);
+    }
+    shows.forEach(p => {
+      const segs = [];
+      const end = p.end <= p.start ? p.end + 1440 : p.end;
+      if (p.days[di] === '1') { segs.push([p.start, Math.min(end, 1440)]); }
+      if (end > 1440 && p.days[(di + 6) % 7] === '1') { segs.push([0, end - 1440]); }
+      segs.forEach(([a, b]) => {
+        const blk = el('div', p.name, 'blk' + (p.enabled ? '' : ' off'));
+        blk.style.background = plColor(p);
+        blk.style.left = 'calc(46px + (100% - 46px) * ' + (a / 1440) + ')';
+        blk.style.width = 'calc((100% - 46px) * ' + ((b - a) / 1440) + ' - 2px)';
+        blk.title = p.name + ' ' + hm(p.start) + '-' + hm(p.end) + ' (' + p.tracks.length + ' songs)';
+        blk.addEventListener('click', (e) => { e.stopPropagation(); editPlaylist(p); });
+        row.appendChild(blk);
+      });
+    });
+    w.appendChild(row);
+  });
+  // a red line at "now" (station time) on today's row
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: plData.tz, weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date());
+    const wd = parts.find(x => x.type === 'weekday').value, hh = Number(parts.find(x => x.type === 'hour').value) % 24, mm = Number(parts.find(x => x.type === 'minute').value);
+    const di = DAYS.indexOf(wd);
+    if (di >= 0) {
+      const line = el('div', null, 'nowline'); line.style.left = 'calc(46px + (100% - 46px) * ' + ((hh * 60 + mm) / 1440) + ')';
+      w.querySelectorAll('.wrow')[di].appendChild(line);
+    }
+  } catch (e) { }
+}
+const PL_TYPE = { general: 'Rotation', scheduled: 'Scheduled', interval: 'Interval', immediate: 'Play now' };
+const plTicked = new Set();
+function plRepeatText(p) {
+  if (p.type === 'general') { return 'All the time (rotation)' + (p.timed ? ', ' + hm(p.start) + '-' + hm(p.end) + ' only' : ''); }
+  if (p.type === 'immediate') { return 'Once, right now'; }
+  if (p.type === 'interval') {
+    const hours = p.unit === 'minutes' && p.every >= 60 && p.every % 60 === 0;
+    const n = hours ? p.every / 60 : p.every, u = p.unit === 'minutes' ? (hours ? 'hour' : 'minute') : 'song';
+    return 'Every ' + (n === 1 ? '' : n + ' ') + u + (n === 1 ? '' : 's') + (p.style === 'all' ? ' (all its songs)' : ' (one song)');
+  }
+  const days = p.days === '1111111' ? 'every day' : (p.days === '1111100' ? 'Mon-Fri' : (p.days === '0000011' ? 'Sat-Sun' : DAYS.filter((x, i) => p.days[i] === '1').join(', ')));
+  return (p.whenText ? p.whenText.charAt(0).toUpperCase() + p.whenText.slice(1) : 'On ' + days) + ', ' + hm(p.start) + '-' + hm(p.end);
+}
+function plRule(p) { return plRepeatText(p); }
+function drawPlList() {
+  const box = $('plList'); box.innerHTML = '';
+  const list = (plData.playlists || []).slice().sort((a, b) => a.id - b.id);
+  [...plTicked].forEach(id => { if (!list.some(p => p.id === id)) { plTicked.delete(id); } });
+  const tbl = el('table', null, 'pltab plgrid'); const head = el('tr');
+  const all = el('input'); all.type = 'checkbox'; all.title = 'Tick all'; all.checked = list.length > 0 && list.every(p => plTicked.has(p.id));
+  all.addEventListener('change', () => { list.forEach(p => { if (all.checked) { plTicked.add(p.id); } else { plTicked.delete(p.id); } }); drawPlList(); });
+  const th0 = el('th'); th0.appendChild(all); head.appendChild(th0);
+  ['ID', 'Playlist', 'Repeat', 'Weight', 'Files', 'AI', 'Studio', 'Active'].forEach((h, i) => head.appendChild(el('th', h, i === 0 || i === 3 || i === 4 ? 'num' : '')));
+  tbl.appendChild(head);
+  if (!list.length) {
+    const tr = el('tr'); const td = el('td', 'No playlists yet - all your songs are shuffled. Press New to make one.', 'muted'); td.colSpan = 9; tr.appendChild(td); tbl.appendChild(tr);
+  }
+  list.forEach(p => {
+    const tr = el('tr'); if (plTicked.has(p.id)) { tr.className = 'ticked'; }
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = plTicked.has(p.id);
+    cb.addEventListener('change', () => { if (cb.checked) { plTicked.add(p.id); } else { plTicked.delete(p.id); } drawPlList(); });
+    const td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
+    tr.appendChild(el('td', String(p.id), 'num'));
+    const tn = el('td'); const sw = el('span', null, 'sw'); sw.style.background = plColor(p); tn.appendChild(sw);
+    const nm = el('a', p.name); nm.href = '#'; nm.title = 'Open ' + p.name; nm.addEventListener('click', (e) => { e.preventDefault(); editPlaylist(p); });
+    tn.appendChild(nm); tr.appendChild(tn);
+    tr.appendChild(el('td', plRepeatText(p), 'small'));
+    tr.appendChild(el('td', p.type === 'general' ? String(p.weight) : '-', 'num'));
+    tr.appendChild(el('td', String(p.tracks.length), 'num'));
+    tr.appendChild(el('td', plData.aiOn === false ? 'off (station)' : (p.ai ? 'ON' : 'OFF'), p.ai && plData.aiOn !== false ? 'st-on' : 'st-off'));
+    tr.appendChild(el('td', p.studio ? 'ON' : '-', p.studio ? 'st-on' : 'st-off'));
+    const playing = plData.playingNow === p.name || plData.showNow === p.name;
+    const act = !p.enabled ? ['SUSPENDED', 'st-sus'] : (playing ? ['ON AIR', 'st-air'] : ['ONLINE', 'st-on']);
+    const ta = el('td'); ta.appendChild(el('span', act[0], 'plstate ' + act[1])); tr.appendChild(ta);
+    tr.addEventListener('dblclick', () => editPlaylist(p));
+    tbl.appendChild(tr);
+  });
+  const wrap = el('div'); wrap.style.overflowX = 'auto'; wrap.appendChild(tbl); box.appendChild(wrap);
+  const n = plTicked.size;
+  $('plEditBtn').disabled = n !== 1; $('plRemove').disabled = n === 0; $('plSuspend').disabled = n === 0;
+  const picked = list.filter(p => plTicked.has(p.id));
+  $('plSuspend').textContent = picked.length && picked.every(p => !p.enabled) ? 'RESUME' : 'SUSPEND';
+  $('plTickNote').textContent = n ? n + ' ticked' : 'Tick playlists, or click a name to open it';
+  $('plStudioBtn').hidden = !list.some(p => p.studio);
+  $('plStudioBtn').href = '/djpro?station=' + current;
+}
+$('plNew').addEventListener('click', () => editPlaylist(null, { type: 'general' }));
+$('plEditBtn').addEventListener('click', () => { const p = (plData.playlists || []).find(x => plTicked.has(x.id)); if (p) { editPlaylist(p); } });
+$('plRemove').addEventListener('click', async () => {
+  const picked = (plData.playlists || []).filter(p => plTicked.has(p.id));
+  if (!picked.length || !confirm('Remove ' + picked.map(p => p.name).join(', ') + '? The songs stay in your music library.')) { return; }
+  for (const p of picked) { const r = await api('/api/studio/playlist/delete', { station: current, id: p.id }); if (!r.ok) { toast(r.error); } }
+  plTicked.clear(); toast('Removed'); loadPlaylists();
+});
+$('plSuspend').addEventListener('click', async () => {
+  const picked = (plData.playlists || []).filter(p => plTicked.has(p.id));
+  const resume = picked.every(p => !p.enabled);
+  for (const p of picked) { const r = await api('/api/studio/playlist/enable', { station: current, id: p.id, on: resume }); if (!r.ok) { toast(r.error); } }
+  toast(resume ? 'Resumed' : 'Suspended - they do not play until you resume them'); loadPlaylists();
+});
+function plShowList(show) {
+  document.querySelectorAll('section[data-tab="playlists"] > .card').forEach(c => { if (c.id !== 'plEdit') { c.hidden = !show; } });
+  $('plEdit').hidden = show;
+}
+function todayIso() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+/** The playlist's own page: name, repeat, interrupt, weight, files, AI, studio - Save / Update / Delete. */
+function editPlaylist(p, preset) {
+  const d = Object.assign({ id: 0, name: '', type: 'general', enabled: true, weight: 5, sequential: false, days: '1111111', start: 360, end: 600, every: 4, unit: 'songs', tracks: [],
+    style: '', timed: false, inShows: true, when: '', whenText: '', interrupt: 'yes', djOverride: true, ai: true, studio: false }, p || {}, preset || {});
+  const box = $('plEdit'); box.innerHTML = '';
+  plShowList(false);
+  const top = el('div', null, 'row'); top.style.marginBottom = '8px';
+  const back = el('button', '\u2190 All playlists'); back.addEventListener('click', () => { plShowList(true); loadPlaylists(); });
+  top.appendChild(back); top.appendChild(el('h2', p ? p.name : 'New playlist', 'grow')).style.margin = '0';
+  if (p) { top.appendChild(el('span', 'ID ' + p.id, 'muted small')); }
+  box.appendChild(top);
+  // repeat: what it is from the stored playlist
+  let rep = 'rotation', n = 1, from = todayIso();
+  if (d.type === 'immediate') { rep = 'now'; }
+  else if (d.type === 'interval') {
+    if (d.unit !== 'minutes') { rep = 'songs'; n = d.every; } else if (d.every >= 60 && d.every % 60 === 0) { rep = 'hours'; n = d.every / 60; } else { rep = 'minutes'; n = d.every; }
+  } else if (d.type === 'scheduled') {
+    const w = d.when || '';
+    if (!w) { rep = 'weekdays'; }
+    else if (w.startsWith('once:')) { rep = 'once'; from = w.slice(5); }
+    else if (w.startsWith('every:')) { const f = w.split(':'); n = Number(f[1]); rep = { day: 'days', week: 'weeks', month: 'months' }[f[2]] || 'days'; from = f[3]; }
+    else { rep = 'rule'; }
+  }
+  const g = el('div', null, 'grid2');
+  const lab = (t, parent) => { const l = el('label', t, 'f'); (parent || g).appendChild(l); return l; };
+  const name = el('input'); name.maxLength = 40; name.value = d.name; name.placeholder = 'e.g. Morning Drive, Afrobeats, Station IDs'; lab('Playlist name').appendChild(name);
+  const repL = lab('Repeat'); const repeat = el('select');
+  [['rotation', 'All the time (rotation, by weight)'], ['once', 'Once, on a date'], ['minutes', 'Every ... minutes'], ['hours', 'Every ... hours'],
+    ['days', 'Every ... days'], ['weeks', 'Every ... weeks'], ['months', 'Every ... months'], ['weekdays', 'On chosen weekdays'], ['songs', 'Every ... songs (jingles, IDs)'],
+    ['now', 'Once, right now (play it next)']].concat(rep === 'rule' ? [['rule', 'Keep its date rule: ' + d.whenText]] : [])
+    .forEach(([v, t]) => { const o = el('option', t); o.value = v; repeat.appendChild(o); });
+  repeat.value = rep; repL.appendChild(repeat);
+  const nL = lab('Every'); const nIn = el('input'); nIn.type = 'number'; nIn.min = 1; nIn.max = 999; nIn.value = n; const nU = el('span', '', 'small');
+  nIn.style.cssText = 'width:100px;display:inline-block;margin-right:6px'; nL.appendChild(el('br')); nL.appendChild(nIn); nL.appendChild(nU);
+  const dateL = lab('Starting on'); const dateIn = el('input'); dateIn.type = 'date'; dateIn.value = from; dateL.appendChild(dateIn);
+  const timeL = lab('From - to (' + plData.tz + ')'); const tr = el('span', null, 'row'); tr.style.marginTop = '5px';
+  const st = el('input'); st.type = 'time'; st.step = 300; st.value = hm(d.start);
+  const en = el('input'); en.type = 'time'; en.step = 300; en.value = hm(d.end);
+  [st, en].forEach(x => { x.style.cssText = 'display:inline-block;width:auto;margin:0'; });
+  tr.appendChild(st); tr.appendChild(document.createTextNode(' to ')); tr.appendChild(en); timeL.appendChild(tr);
+  const styleL = lab('Each time'); const style = el('select'); styleL.appendChild(style);
+  const weightL = lab('Weight (0-10: how often against other rotation playlists; 0 = not in the rotation)');
+  const weight = el('input'); weight.type = 'range'; weight.min = 0; weight.max = 10; weight.value = d.weight;
+  const wv = el('b', ' ' + d.weight); weight.addEventListener('input', () => { wv.textContent = ' ' + weight.value; });
+  weightL.appendChild(weight); weightL.appendChild(wv);
+  const orderL = lab('Order'); const ord = el('select');
+  [['0', 'Shuffled'], ['1', 'In the order of the files below']].forEach(([v, t]) => { const o = el('option', t); o.value = v; ord.appendChild(o); });
+  ord.value = d.sequential ? '1' : '0'; orderL.appendChild(ord);
+  box.appendChild(g);
+  const chk = (text, on, parent) => { const l = el('label', null, 'chk'); const c = el('input'); c.type = 'checkbox'; c.checked = !!on; c.style.cssText = 'width:auto;margin:0 6px 0 0'; l.appendChild(c); l.appendChild(document.createTextNode(text)); (parent || box).appendChild(l); return c; };
+  const days = el('div', null, 'days'); days.appendChild(el('span', 'Days: ', 'muted small'));
+  const dayBoxes = DAYS.map((x, i) => { const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.checked = d.days[i] === '1'; l.appendChild(c); l.appendChild(document.createTextNode(x)); days.appendChild(l); return c; });
+  box.appendChild(days);
+  const timedB = chk('Only between the times above (e.g. calm songs in the morning)', d.timed);
+  const inShowsB = chk('Also during scheduled shows', d.inShows !== false);
+  // interrupt: scheduled playlists
+  const intBox = el('div', null, 'plopt');
+  intBox.appendChild(el('b', 'Interrupt'));
+  intBox.appendChild(el('div', 'When another scheduled playlist\'s time comes while this one is playing (or this one runs past its end):', 'muted small'));
+  const intRow = el('div', null, 'row');
+  const ri = (v, t) => { const l = el('label', null, 'chk'); const r = el('input'); r.type = 'radio'; r.name = 'plint'; r.value = v; r.checked = d.interrupt === v; r.style.cssText = 'width:auto;margin:0 6px 0 0'; l.appendChild(r); l.appendChild(document.createTextNode(t)); intRow.appendChild(l); return r; };
+  const intYes = ri('yes', 'YES - the other playlist takes over at once');
+  ri('no', 'NO - this one goes on to its own end (the other waits)');
+  intBox.appendChild(intRow);
+  const djB = chk('A remote DJ may take over (go live) while this playlist is on', d.djOverride !== false, intBox);
+  intBox.appendChild(el('div', 'While a live DJ is on, the playlist keeps going silently underneath and comes back where it is when the DJ leaves.', 'muted small'));
+  box.appendChild(intBox);
+  // AI and studio
+  const optBox = el('div', null, 'plopt');
+  const aiB = chk('Enable AI - Alma introduces the songs and talks while this playlist plays', d.ai !== false, optBox);
+  if (plData.aiOn === false) { optBox.appendChild(el('div', 'The AI presenter is switched off for this whole station by Memoryq.', 'muted small')); }
+  const studioB = chk('Studio - the station\'s admin and DJs get this playlist in the live studio (Live DJ Pro), ready to play', d.studio, optBox);
+  const onB = chk('Active (untick to suspend it)', d.enabled, optBox);
+  box.appendChild(optBox);
+  function fillStyle(kind) {
+    const opts = kind === 'interval' ? [['', 'Play one song from it'], ['all', 'Play all its songs, in order (an ad break)']]
+      : [['', 'Fill its time (the list repeats)'], ['once', 'Play the list once, then back to rotation'], ['one', 'Play one song, then back to rotation']];
+    const keep = style.value || d.style || '';
+    style.innerHTML = ''; opts.forEach(([v, t]) => { const o = el('option', t); o.value = v; style.appendChild(o); });
+    style.value = opts.some(o => o[0] === keep) ? keep : '';
+  }
+  function kindOf(r) { return r === 'rotation' ? 'general' : (r === 'now' ? 'immediate' : (['minutes', 'hours', 'songs'].indexOf(r) >= 0 ? 'interval' : 'scheduled')); }
+  function showFields() {
+    const r = repeat.value, k = kindOf(r);
+    nL.hidden = ['minutes', 'hours', 'days', 'weeks', 'months', 'songs'].indexOf(r) < 0;
+    nU.textContent = { minutes: 'minutes', hours: 'hours', days: 'days', weeks: 'weeks', months: 'months', songs: 'songs' }[r] || '';
+    dateL.hidden = ['once', 'days', 'weeks', 'months'].indexOf(r) < 0;
+    timeL.hidden = !(k === 'scheduled' || (k === 'general' && timedB.checked));
+    days.hidden = r !== 'weekdays';
+    timedB.parentNode.hidden = k !== 'general';
+    inShowsB.parentNode.hidden = k !== 'interval';
+    weightL.hidden = k !== 'general';
+    orderL.hidden = k === 'immediate';
+    styleL.hidden = !(k === 'interval' || k === 'scheduled');
+    intBox.hidden = k !== 'scheduled';
+    if (!styleL.hidden) { fillStyle(k); }
+  }
+  repeat.addEventListener('change', showFields); timedB.addEventListener('change', showFields); showFields();
+  // files: linked from the station's music library (never copied)
+  const sel = new Set(d.tracks);
+  const head = el('div', null, 'row'); head.style.marginTop = '14px';
+  head.appendChild(el('b', 'Files - from your music library (linked, never copied)', 'grow'));
+  const cnt = el('span', '', 'muted small'); head.appendChild(cnt);
+  const search = el('input'); search.placeholder = 'Search title or artist'; search.style.width = '220px'; head.appendChild(search);
+  const allB = el('button', 'Tick all shown'); const noneB = el('button', 'Untick all shown'); head.appendChild(allB); head.appendChild(noneB);
+  box.appendChild(head);
+  const pick = el('div', null, 'picker'); box.appendChild(pick);
+  const byId = {}; plTracks.forEach(t => { byId[t.id] = t; });
+  const ordered = d.tracks.filter(id => byId[id]).map(id => byId[id]).concat(plTracks.filter(t => !sel.has(t.id)));
+  function drawPick() {
+    pick.innerHTML = '';
+    const q = search.value.trim().toLowerCase();
+    let shown = 0;
+    ordered.forEach(t => {
+      if (q && !((t.title || '') + ' ' + (t.artist || '')).toLowerCase().includes(q)) { return; }
+      shown++;
+      const l = el('label'); const c = el('input'); c.type = 'checkbox'; c.checked = sel.has(t.id);
+      c.addEventListener('change', () => { if (c.checked) { sel.add(t.id); } else { sel.delete(t.id); } cnt.textContent = sel.size + ' chosen'; });
+      l.appendChild(c); l.appendChild(document.createTextNode(t.title + (t.artist ? ' - ' + t.artist : '')));
+      l.appendChild(el('span', dur(t.durationMs), 'muted'));
+      pick.appendChild(l);
+    });
+    if (!plTracks.length) { pick.appendChild(el('p', 'No files in the library yet - add music in the Media tab first.', 'muted small')).style.padding = '10px'; }
+    else if (!shown) { pick.appendChild(el('p', 'Nothing matches.', 'muted small')).style.padding = '10px'; }
+    cnt.textContent = sel.size + ' chosen';
+  }
+  search.addEventListener('input', drawPick);
+  allB.addEventListener('click', () => { pick.querySelectorAll('input').forEach(c => { if (!c.checked) { c.click(); } }); });
+  noneB.addEventListener('click', () => { pick.querySelectorAll('input').forEach(c => { if (c.checked) { c.click(); } }); });
+  drawPick();
+  const row = el('div', null, 'row'); row.style.marginTop = '14px';
+  const save = el('button', p ? 'UPDATE' : 'SAVE', 'primary');
+  const err = el('span', '', 'error');
+  save.addEventListener('click', async () => {
+    err.textContent = '';
+    const toMin = (v) => { const [h, m] = (v || '0:0').split(':').map(Number); return h * 60 + m; };
+    let end = toMin(en.value); if (end === 0) { end = 1440; }
+    const r0 = repeat.value, k = kindOf(r0), num = Math.max(1, Math.round(Number(nIn.value) || 1));
+    if (!dateL.hidden && !/^\d{4}-\d{2}-\d{2}$/.test(dateIn.value)) { err.textContent = 'Choose the date it starts'; return; }
+    let when = '', every = d.every, unit = d.unit, dayStr = dayBoxes.map(c => c.checked ? '1' : '0').join('');
+    if (r0 === 'once') { when = 'once:' + dateIn.value; }
+    if (['days', 'weeks', 'months'].indexOf(r0) >= 0) { when = 'every:' + num + ':' + r0.slice(0, -1) + ':' + dateIn.value; }
+    if (r0 === 'rule') { when = d.when; }
+    if (k === 'scheduled' && r0 !== 'weekdays') { dayStr = '1111111'; }
+    if (r0 === 'minutes') { every = num; unit = 'minutes'; }
+    if (r0 === 'hours') { every = num * 60; unit = 'minutes'; }
+    if (r0 === 'songs') { every = num; unit = 'songs'; }
+    const ids = ordered.filter(t => sel.has(t.id)).map(t => t.id);
+    const intr = (box.querySelector('input[name="plint"]:checked') || intYes).value;
+    const r = await api('/api/studio/playlist/save', { station: current, id: d.id, name: name.value.trim(), type: k, enabled: onB.checked,
+      weight: weight.value, sequential: ord.value === '1', days: dayStr, start: toMin(st.value), end: end,
+      every: every, unit: unit, tracks: ids.join(','), style: styleL.hidden ? '' : style.value, timed: timedB.checked,
+      inShows: inShowsB.checked, when: when, interrupt: intr, djOverride: djB.checked, ai: aiB.checked, studio: studioB.checked });
+    if (!r.ok) { err.textContent = r.error; return; }
+    toast((p ? 'Updated - ' : 'Saved - ') + r.data.songs + ' file(s)'); plShowList(true); loadPlaylists();
+  });
+  row.appendChild(save);
+  if (p) {
+    const del = el('button', 'DELETE', 'danger');
+    del.addEventListener('click', async () => {
+      if (!confirm('Delete the playlist ' + p.name + '? The files stay in your music library.')) { return; }
+      const r = await api('/api/studio/playlist/delete', { station: current, id: p.id });
+      if (r.ok) { plTicked.delete(p.id); plShowList(true); loadPlaylists(); } else { toast(r.error); }
+    });
+    row.appendChild(del);
+  }
+  const cancel = el('button', 'Cancel'); cancel.addEventListener('click', () => { plShowList(true); }); row.appendChild(cancel);
+  row.appendChild(err);
+  box.appendChild(row);
+  window.scrollTo(0, 0);
+  name.focus();
+}
+
+// ---------- player and links ----------
+function esc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function drawEmbed() {
+  const s = st();
+  const base = location.origin;
+  const listen = base + '/radio/' + s.id + '.mp3', m3u = base + '/radio/' + s.id + '.m3u';
+  const p = $('paramList'); p.innerHTML = '';
+  const rows = [['Station name', s.name], ['Slogan', s.description || '-'], ['Website', s.website || '-'], ['Station number', String(s.id)],
+    ['Login user', me.username], ['Status', s.onAir ? (s.live ? 'On air' : 'Ready - add music to go on air') : 'Off air'],
+    ['Payment', s.billing === 'paid' ? (s.paidUntil ? 'Paid until ' + day(s.paidUntil) : 'Paid') : (s.billing === 'trial' ? 'Trial until ' + day(s.paidUntil) : 'Not paid')],
+    ['Stream address', listen], ['Live server (Icecast)', status.liveHost], ['Live port', String(s.livePort)], ['Mount', '/live'],
+    ['Source user', 'source'], ['Stream password', s.livePass]];
+  rows.forEach(([k, v]) => {
+    p.appendChild(el('div', k, 'k'));
+    const secret = k === 'Stream password';
+    const code = el('code', secret && !showPass ? '\u2022'.repeat(12) : v); p.appendChild(code);
+    const cell = el('div');
+    if (secret) { const sh = el('button', showPass ? 'Hide' : 'Show'); sh.addEventListener('click', () => { showPass = !showPass; drawEmbed(); }); cell.appendChild(sh); cell.appendChild(document.createTextNode(' ')); }
+    if (v && v !== '-' && !['Status', 'Payment', 'Station number'].includes(k)) { const b = el('button', 'Copy'); b.addEventListener('click', () => copy(v)); cell.appendChild(b); }
+    p.appendChild(cell);
+  });
+  const theme = $('embTheme').value;
+  const src = base + '/radio/embed/' + s.id + (theme ? '?theme=' + theme : '');
+  const iframe = '<iframe src="' + src + '" title="' + esc(s.name) + '" width="100%" height="96" style="max-width:480px;border:0" allow="autoplay"></iframe>';
+  $('embIframe').textContent = iframe;
+  if ($('embPreview').getAttribute('src') !== src) { $('embPreview').setAttribute('src', src); }
+  $('embAudio').textContent = '<audio controls preload="none" src="' + listen + '"></audio>';
+  $('embLink').textContent = listen;
+  $('embM3u').textContent = listen + '\n' + m3u;
+}
+$('embTheme').addEventListener('change', drawEmbed);
+$('cpIframe').addEventListener('click', () => copy($('embIframe').textContent));
+$('cpAudio').addEventListener('click', () => copy($('embAudio').textContent));
+$('cpLink').addEventListener('click', () => copy($('embLink').textContent));
+$('cpM3u').addEventListener('click', () => copy($('embM3u').textContent));
+
+// ---------- statistics: report ----------
+// Periods like a broadcaster's report: last 48 hours, yesterday, 7 / 14 / 30 days or custom dates; tabs for each table.
+const PERIODS = [['48h', 'Last 48 hours'], ['yesterday', 'Yesterday'], ['7', '7 days'], ['14', '14 days'], ['30', '30 days'], ['custom', 'Custom']];
+const RTABS = [['activity', 'Recent activity'], ['sessions', 'Listeners'], ['agents', 'Players'], ['countries', 'Countries'], ['tracks', 'Tracks'],
+  ['history', 'Historical'], ['downloads', 'Downloads']];
+let rpPeriod = '48h', rpTab = 'activity', rpData = null;
+try { rpPeriod = sessionStorage.getItem('rp_period') || '48h'; rpTab = sessionStorage.getItem('rp_tab') || 'activity'; } catch (e) { }
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
+function rpRange() {
+  const now = Date.now();
+  if (rpPeriod === 'yesterday') { const t = startOfDay(now); return [t - 86400000, t]; }
+  if (rpPeriod === '7' || rpPeriod === '14' || rpPeriod === '30') { return [startOfDay(now) - (Number(rpPeriod) - 1) * 86400000, now]; }
+  if (rpPeriod === 'custom') {
+    const f = $('rpFrom').value, t = $('rpTo').value;
+    if (f && t) { return [new Date(f + 'T00:00:00').getTime(), new Date(t + 'T00:00:00').getTime() + 86400000]; }
+  }
+  return [now - 48 * 3600000, now];
+}
+function drawPeriods() {
+  const pp = $('rpPeriods'); pp.innerHTML = '';
+  PERIODS.forEach(([id, label]) => {
+    const b = el('button', label); if (id === rpPeriod) { b.className = 'on'; }
+    b.addEventListener('click', () => { rpPeriod = id; try { sessionStorage.setItem('rp_period', id); } catch (e) { } if (id !== 'custom') { loadReport(); } else { drawPeriods(); } });
+    pp.appendChild(b);
+  });
+  $('rpCustom').hidden = rpPeriod !== 'custom';
+  if (!$('rpFrom').value) { const d = new Date(Date.now() - 6 * 86400000); $('rpFrom').value = d.toISOString().slice(0, 10); $('rpTo').value = new Date().toISOString().slice(0, 10); }
+  const [f, t] = rpRange();
+  const fmtD = (x) => new Date(x).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  $('rpLabel').textContent = 'Statistics for ' + (PERIODS.find(p => p[0] === rpPeriod) || ['', ''])[1].toLowerCase()
+    + (rpPeriod === '48h' ? '' : ' (' + fmtD(f) + (t - f > 86400000 + 1000 ? ' - ' + fmtD(t - 1) : '') + ')');
+}
+$('rpGo').addEventListener('click', loadReport);
+function drawRTabs() {
+  const tb = $('rpTabs'); tb.innerHTML = '';
+  RTABS.forEach(([id, label]) => {
+    const b = el('button', label); if (id === rpTab) { b.className = 'on'; }
+    b.addEventListener('click', () => { rpTab = id; try { sessionStorage.setItem('rp_tab', id); } catch (e) { } drawRTabs(); drawReport(); });
+    tb.appendChild(b);
+  });
+}
+async function loadReport() {
+  drawPeriods(); drawRTabs();
+  const [f, t] = rpRange();
+  $('rpBody').innerHTML = '<div class="muted" style="padding:20px">Loading...</div>';
+  const r = await api('/api/studio/report?station=' + current + '&from=' + f + '&to=' + t);
+  if (!r.ok) { $('rpBody').innerHTML = ''; $('rpBody').appendChild(el('div', r.error, 'card error')); return; }
+  rpData = r.data; drawReport();
+}
+function mb(b) { b = Number(b || 0); return b >= 1073741824 ? (b / 1073741824).toFixed(2) + ' GB' : (b / 1048576).toFixed(1) + ' MB'; }
+function mins(m) { m = Number(m || 0); return m >= 120 ? (m / 60).toFixed(1) + ' hours' : m + ' minute' + (m === 1 ? '' : 's'); }
+function when(t) { return new Date(t).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); }
+function lasted(ms) { const s = Math.max(0, Math.round(ms / 1000)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return h ? h + 'h ' + String(m).padStart(2, '0') + 'm' : m + 'm ' + String(s % 60).padStart(2, '0') + 's'; }
+function metricTable(groups) {
+  const card = el('div', null, 'card'); card.style.marginBottom = '0';
+  const tbl = el('table', null, 'metric'); const head = el('tr'); head.appendChild(el('th', 'Metric')); head.appendChild(el('th')); head.appendChild(el('th', 'Value', 'num')); tbl.appendChild(head);
+  groups.forEach(([g, rows]) => rows.forEach(([k, v], i) => {
+    const tr = el('tr', null, i === 0 ? 'first' : ''); tr.appendChild(el('td', i === 0 ? g : '', 'g')); tr.appendChild(el('td', k)); tr.appendChild(el('td', v, 'v')); tbl.appendChild(tr);
+  }));
+  card.appendChild(tbl); return card;
+}
+function table(cols, rows, empty) {
+  const wrap = el('div'); wrap.style.overflowX = 'auto';
+  const tbl = el('table'); const head = el('tr');
+  cols.forEach(c => head.appendChild(el('th', c[0], c[1] ? 'num' : ''))); tbl.appendChild(head);
+  rows.forEach(r => { const tr = el('tr'); r.forEach((v, i) => { if (v instanceof Node) { const td = el('td', null, cols[i][1] ? 'num' : ''); td.appendChild(v); tr.appendChild(td); } else { tr.appendChild(el('td', v, cols[i][1] ? 'num' : '')); } }); tbl.appendChild(tr); });
+  if (!rows.length) { const tr = el('tr'); const td = el('td', empty || 'Nothing in this period.', 'muted'); td.colSpan = cols.length; tr.appendChild(td); tbl.appendChild(tr); }
+  wrap.appendChild(tbl); return wrap;
+}
+function shareBar(n, max) { const b = el('div', null, 'sbar'); const i = el('i'); i.style.width = (max ? Math.round(100 * n / max) : 0) + '%'; b.appendChild(i); return b; }
+function card(title, child, note) {
+  const c = el('div', null, 'card'); const h = el('div', null, 'row'); h.style.marginBottom = '8px';
+  h.appendChild(el('h2', title, 'grow')).style.margin = '0'; if (note) { h.appendChild(el('span', note, 'muted small')); }
+  c.appendChild(h); c.appendChild(child); return c;
+}
+/** A line chart of listeners over time (peak and average per hour or day). */
+function lineChart(points, opts) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'lchart'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', opts.label);
+  setTimeout(() => {
+    const W = svg.clientWidth || 800, H = 240, L = 40, B = 26, T = 12, R = 10;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    const vals = points.map(p => opts.value(p)), avg = opts.avg ? points.map(p => opts.avg(p)) : null;
+    const max = niceMax(Math.max(opts.min || 1, ...vals));
+    const pw = W - L - R, ph = H - B - T, n = Math.max(1, points.length - 1);
+    const x = (i) => L + pw * (points.length === 1 ? 0.5 : i / n), y = (v) => T + ph - ph * v / max;
+    for (let i = 0; i <= 4; i++) {
+      const yy = T + ph - ph * i / 4;
+      const ln = document.createElementNS(NS, 'line'); ln.setAttribute('x1', L); ln.setAttribute('x2', W - R); ln.setAttribute('y1', yy); ln.setAttribute('y2', yy);
+      ln.setAttribute('stroke', 'currentColor'); ln.setAttribute('opacity', '.12'); svg.appendChild(ln);
+      const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', L - 6); tx.setAttribute('y', yy + 4); tx.setAttribute('text-anchor', 'end');
+      tx.textContent = String(Math.round(max * i / 4 * 100) / 100); svg.appendChild(tx);
+    }
+    const path = (arr) => arr.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+    if (points.length) {
+      const area = document.createElementNS(NS, 'path');
+      area.setAttribute('d', path(vals) + ' L' + x(points.length - 1).toFixed(1) + ' ' + (T + ph) + ' L' + x(0).toFixed(1) + ' ' + (T + ph) + ' Z');
+      area.setAttribute('fill', 'var(--accent)'); area.setAttribute('opacity', '.14'); svg.appendChild(area);
+      const ln = document.createElementNS(NS, 'path'); ln.setAttribute('d', path(vals)); ln.setAttribute('fill', 'none'); ln.setAttribute('stroke', 'var(--accent)'); ln.setAttribute('stroke-width', '2'); svg.appendChild(ln);
+      if (avg) { const la = document.createElementNS(NS, 'path'); la.setAttribute('d', path(avg)); la.setAttribute('fill', 'none'); la.setAttribute('stroke', 'var(--warn)'); la.setAttribute('stroke-width', '1.5'); la.setAttribute('stroke-dasharray', '4 3'); svg.appendChild(la); }
+      const every = Math.max(1, Math.ceil(points.length / 8));
+      points.forEach((p, i) => {
+        if (i % every === 0) { const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', x(i)); tx.setAttribute('y', H - 7); tx.setAttribute('text-anchor', 'middle'); tx.textContent = opts.xLabel(p); svg.appendChild(tx); }
+        const hit = document.createElementNS(NS, 'rect'); hit.setAttribute('x', x(i) - pw / n / 2); hit.setAttribute('width', Math.max(4, pw / n)); hit.setAttribute('y', T); hit.setAttribute('height', ph); hit.setAttribute('fill', 'transparent');
+        hit.addEventListener('mousemove', (e) => { const tip = $('tip'); tip.hidden = false; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 10) + 'px'; tip.textContent = opts.tip(p); });
+        hit.addEventListener('mouseleave', () => { $('tip').hidden = true; });
+        svg.appendChild(hit);
+      });
+    }
+    svg.style.color = getComputedStyle(document.body).color;
+  }, 0);
+  return svg;
+}
+function drawReport() {
+  const box = $('rpBody'); box.innerHTML = ''; $('rpOld').hidden = true;
+  const d = rpData; if (!d) { return; }
+  const o = d.overview;
+  const hourly = d.hourly;
+  const xl = (p) => hourly ? new Date(p.t).toLocaleTimeString([], { hour: 'numeric' }) : new Date(p.t).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const chartTip = (p) => (hourly ? when(p.t) : new Date(p.t).toLocaleDateString()) + ': most ' + p.peak + ', average ' + p.avg + ' listening \u00b7 ' + p.sessions + ' sessions \u00b7 ' + p.tlh + ' h';
+  if (rpTab === 'activity') {
+    const g = el('div', null, 'mgrid');
+    g.appendChild(metricTable([
+      ['Listener minutes', [['Total', mins(o.listenerMinutes)], ['Total listening hours (TLH)', o.tlh], ['Average session length', o.avgSessionMin + ' minutes']]],
+      ['Listeners', [['Total sessions', fmt(o.sessions)], ['Different listeners', fmt(o.uniqueListeners)], ['Different countries', fmt(o.uniqueCountries)]]]]));
+    g.appendChild(metricTable([
+      ['Data sent', [['Total', mb(o.bytes)], ['Per session', mb(o.bytesPerSession)]]],
+      ['Songs', [['Total played', fmt(o.tracks)], ['Different songs', fmt(o.uniqueTracks)], ['Average per hour', o.tracksPerHour], ['Average length', fmtSec(o.avgTrackSec)]]],
+      ['Busiest moment', [['Listeners', fmt(o.peakListeners)], ['Song', o.peakTrack || '-'], ['Time', o.peakTime ? when(o.peakTime) : 'None yet']]]]));
+    box.appendChild(g);
+    box.appendChild(card('Listeners, ' + (hourly ? 'per hour' : 'per day'), lineChart(d.chart, { label: 'Listeners over time', value: p => p.peak, avg: p => Number(p.avg), xLabel: xl, tip: chartTip }),
+      'line = most at once \u00b7 dashes = average'));
+  } else if (rpTab === 'sessions') {
+    const maxL = Math.max(1, ...d.lengths.map(x => x.n));
+    box.appendChild(card('How long people listened', table([['Session length'], ['Sessions', 1], ['']], d.lengths.map(x => [x.label, fmt(x.n), shareBar(x.n, maxL)]))));
+    box.appendChild(card('Listening sessions', table([['Started'], ['Listened', 1], ['Address'], ['Country'], ['Player'], ['Data', 1]],
+      d.sessionsList.map(x => [when(x.start), lasted(x.end - x.start), x.ip, x.country || 'Unknown', x.player + (x.platform ? ' \u00b7 ' + x.platform : ''), mb(x.bytes)])),
+      d.sessionsTotal > d.sessionsList.length ? 'newest ' + d.sessionsList.length + ' of ' + fmt(d.sessionsTotal) + ' (all in Downloads)' : fmt(d.sessionsTotal) + ' sessions'));
+  } else if (rpTab === 'agents') {
+    const max = Math.max(1, ...d.agents.map(x => x.sessions));
+    box.appendChild(card('Players and apps', table([['Player'], ['Device / system'], ['Sessions', 1], ['Listening', 1], ['']],
+      d.agents.map(x => [x.player, x.platform || '-', fmt(x.sessions), mins(x.minutes), shareBar(x.sessions, max)]))));
+  } else if (rpTab === 'countries') {
+    const max = Math.max(1, ...d.countries.map(x => x.sessions));
+    const c = card('Countries', table([['Country'], ['Sessions', 1], ['Different listeners', 1], ['Listening', 1], ['']],
+      d.countries.map(x => [(flag(x.cc) + ' ' + (x.name || 'Unknown')).trim(), fmt(x.sessions), fmt(x.unique), mins(x.minutes), shareBar(x.sessions, max)])));
+    c.appendChild(el('div', d.geo ? d.credit : 'Countries show once the country list has downloaded (a few minutes after the server starts). ' + d.credit, 'muted small')).style.marginTop = '8px';
+    box.appendChild(c);
+  } else if (rpTab === 'tracks') {
+    box.appendChild(card('Songs played', table([['Song'], ['Artist'], ['Plays', 1], ['Listeners (average)', 1], ['Most listeners', 1], ['Last played']],
+      d.tracksList.map(x => [x.title, x.artist, fmt(x.plays), String(x.avgListeners), fmt(x.peakListeners), when(x.last)]))));
+    box.appendChild(card('Play history', table([['Time'], ['Song'], ['Listeners', 1], ['From']],
+      d.playsList.map(x => [when(x.time), (x.artist ? x.artist + ' - ' : '') + x.title, fmt(x.listeners), x.source === 'autodj' ? 'AutoDJ' : x.source]))));
+  } else if (rpTab === 'history') {
+    box.appendChild(card('Listening hours (TLH)', lineChart(d.chart, { label: 'Listening hours', value: p => Number(p.tlh), xLabel: xl, tip: chartTip, min: 0.1 })));
+    box.appendChild(card(hourly ? 'Hour by hour' : 'Day by day', table([[hourly ? 'Hour' : 'Day'], ['Most listeners', 1], ['Average', 1], ['Sessions', 1], ['Different listeners', 1], ['Listening hours', 1], ['Avg session (min)', 1], ['Data', 1], ['Songs', 1]],
+      d.chart.slice().reverse().map(p => [hourly ? when(p.t) : new Date(p.t).toLocaleDateString(), fmt(p.peak), String(p.avg), fmt(p.sessions), fmt(p.unique), String(p.tlh), String(p.avgMin), mb(p.bytes), fmt(p.plays)]))));
+    if (d.centova && d.centova.length) {
+      const c = card('Before Memoryq (from Centova Cast)', table([['Month'], ['Most listeners', 1], ['Listening hours', 1], ['Data', 1], ['Songs', 1], ['Days', 1]],
+        d.centova.map(m => [m.month, fmt(m.peak), String(m.hours), fmt(m.mb) + ' MB', fmt(m.songs), String(m.days)])));
+      c.appendChild(el('div', 'Copied from the old Centova Cast server when this station moved to Memoryq (monthly totals).', 'muted small')).style.marginTop = '8px';
+      box.appendChild(c);
+    }
+    $('rpOld').hidden = false; loadStats();
+  } else if (rpTab === 'downloads') {
+    const dl = el('div', null, 'dl');
+    [['sessions', 'Listening sessions', 'Every session: start, end, length, country, player, data'], ['plays', 'Songs played', 'Every song with the time and how many were listening'],
+      ['tracks', 'Song totals', 'Plays and listeners per song'], ['countries', 'Countries', 'Sessions and listening time per country'],
+      ['agents', 'Players', 'Sessions and listening time per player / app'], ['history', 'Historical', (hourly ? 'Hour' : 'Day') + ' by day totals']].forEach(([k, t, n]) => {
+      const a = el('a'); a.href = '#'; a.appendChild(el('b', t + ' (CSV)')); a.appendChild(el('span', n, 'muted small'));
+      a.addEventListener('click', (e) => { e.preventDefault(); downloadCsv(k); });
+      dl.appendChild(a);
+    });
+    box.appendChild(card('Download the numbers', dl, 'opens in Excel, Numbers or Google Sheets'));
+  }
+}
+function fmtSec(s) { s = Number(s || 0); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function flag(cc) { if (!cc || cc.length !== 2 || !/^[A-Z]{2}$/.test(cc)) { return ''; } return String.fromCodePoint(0x1F1E6 + cc.charCodeAt(0) - 65, 0x1F1E6 + cc.charCodeAt(1) - 65); }
+async function downloadCsv(kind) {
+  const [f, t] = rpRange();
+  try {
+    const r = await fetch('/api/studio/report.csv?station=' + current + '&kind=' + kind + '&from=' + f + '&to=' + t, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { let m = 'Could not download'; try { m = (await r.json()).error || m; } catch (e) { } toast(m); return; }
+    const cd = r.headers.get('Content-Disposition') || ''; const m = /filename="([^"]+)"/.exec(cd);
+    const a = el('a'); a.href = URL.createObjectURL(await r.blob()); a.download = m ? m[1] : kind + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { toast('Could not download'); }
+}
+
+// ---------- statistics: who is listening now ----------
+async function loadListeners() {
+  const r = await api('/api/studio/listeners?station=' + current);
+  const t = $('lnTable'); t.innerHTML = '';
+  if (!r.ok) { t.appendChild(el('tr')).appendChild(el('td', r.error, 'error')); return; }
+  const list = r.data.listeners || [], now = r.data.now || Date.now();
+  $('lnCount').textContent = list.length + ' listening \u00b7 updates every 10 seconds';
+  const head = el('tr'); ['Listening for', 'Since', 'Address', 'Country', 'Player', 'Device / system', 'Data'].forEach((h, i) => head.appendChild(el('th', h, i === 6 ? 'num' : ''))); t.appendChild(head);
+  list.slice().sort((a, b) => a.start - b.start).forEach(x => {
+    const tr = el('tr');
+    [lasted(now - x.start), new Date(x.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), x.ip, (flag(x.cc) + ' ' + (x.country || 'Unknown')).trim(), x.player, x.platform || '-'].forEach(v => tr.appendChild(el('td', v)));
+    tr.appendChild(el('td', mb(x.bytes), 'num'));
+    t.appendChild(tr);
+  });
+  if (!list.length) { const tr = el('tr'); const td = el('td', 'Nobody is listening right now.', 'muted'); td.colSpan = 7; tr.appendChild(td); t.appendChild(tr); }
+  $('lnNote').textContent = 'Addresses are shortened to protect listeners\' privacy. Listeners in the Memoryq app and website count too.';
+}
+
+// ---------- statistics: logs ----------
+$('lgKind').addEventListener('change', loadLogs);
+$('lgDays').addEventListener('change', loadLogs);
+$('lgCsv').addEventListener('click', async (e) => {
+  e.preventDefault();
+  const to = Date.now(), from = to - Number($('lgDays').value) * 86400000;
+  const r = await fetch('/api/studio/report.csv?station=' + current + '&kind=plays&from=' + from + '&to=' + to, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { toast('Could not download'); return; }
+  const a = el('a'); a.href = URL.createObjectURL(await r.blob()); a.download = 'songs-played.csv'; document.body.appendChild(a); a.click(); a.remove();
+});
+const LOG_ICON = { song: '\u266b', live: '\ud83c\udf99', server: '\u23fb', limit: '\u26a0', admin: '\u2605', dj: '\ud83c\udf99' };
+async function loadLogs() {
+  const to = Date.now(), from = to - Number($('lgDays').value) * 86400000;
+  const r = await api('/api/studio/logs?station=' + current + '&from=' + from + '&to=' + to + '&kind=' + $('lgKind').value);
+  const t = $('lgTable'); t.innerHTML = '';
+  if (!r.ok) { t.appendChild(el('tr')).appendChild(el('td', r.error, 'error')); return; }
+  const head = el('tr'); ['Time', '', 'What happened'].forEach(h => head.appendChild(el('th', h))); t.appendChild(head);
+  (r.data.rows || []).forEach(x => {
+    const tr = el('tr');
+    tr.appendChild(el('td', when(x.time), 'muted')); tr.appendChild(el('td', LOG_ICON[x.kind] || '\u2022')); tr.appendChild(el('td', x.text));
+    t.appendChild(tr);
+  });
+  if (!(r.data.rows || []).length) { const tr = el('tr'); const td = el('td', 'Nothing in this period.', 'muted'); td.colSpan = 3; tr.appendChild(td); t.appendChild(tr); }
+  else if (r.data.total > r.data.rows.length) { const tr = el('tr'); const td = el('td', 'Newest ' + r.data.rows.length + ' of ' + fmt(r.data.total) + ' - download the CSV for everything.', 'muted small'); td.colSpan = 3; tr.appendChild(td); t.appendChild(tr); }
+}
+
+// ---------- general: quick links ----------
+function drawQuick() {
+  const s = st(), base = location.origin, box = $('qlinks'); box.innerHTML = '';
+  const q = (title, note, value, extra) => {
+    const c = el('div', null, 'q'); c.appendChild(el('b', title)); c.appendChild(el('div', note, 'muted small'));
+    if (value) { c.appendChild(el('code', value)); const b = el('button', 'Copy'); b.addEventListener('click', () => copy(value)); c.appendChild(b); }
+    if (extra) { extra.forEach(x => { c.appendChild(document.createTextNode(' ')); c.appendChild(x); }); }
+    box.appendChild(c);
+  };
+  const go = (label, fn) => { const b = el('button', label); b.addEventListener('click', fn); return b; };
+  const open = (label, href) => { const a = el('a', label, 'btn'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
+  q('Listen link', 'Send it to listeners or put it on social media.', base + '/radio/' + s.id + '.mp3', [open('Open', base + '/radio/' + s.id + '.mp3')]);
+  q('Playlist file (.m3u)', 'For VLC, Winamp, iTunes, car and radio apps.', base + '/radio/' + s.id + '.m3u');
+  q('Website player', 'Your station\'s player page - more styles under Widgets.', base + '/radio/embed/' + s.id, [open('Open', base + '/radio/embed/' + s.id), go('Widgets', () => showTab('embed'))]);
+  q('Memoryq Radio', 'Listeners find you in the Memoryq app and website under Radio.', base + '/me', [open('Open', base + '/me')]);
+  q('Live DJ (Icecast)', 'For BUTT, Mixxx, VirtualDJ and other DJ software.', status.liveHost + ':' + s.livePort + '  mount /live  user source', [go('DJ logins', () => showTab('live'))]);
+  q('Live DJ Pro', 'Mix live in the browser - two decks, mic, camera.', base + '/djpro', [open('Open', base + '/djpro')]);
+  q('Statistics', 'Listeners, countries, players and songs.', null, [go('Report', () => showTab('report')), go('Listeners now', () => showTab('listeners')), go('Logs', () => showTab('logs'))]);
+  q('AutoDJ', 'What plays when: rotation, shows, jingles.', null, [go('Playlists', () => showTab('playlists')), go('Media', () => showTab('music'))]);
+}
+
+// ---------- statistics: all-time daily totals (under Historical) ----------
+
+$('range').addEventListener('change', loadStats);
+async function loadStats() {
+  const r = await api('/api/studio/stats?station=' + current + '&days=' + $('range').value);
+  if (!r.ok) { toast(r.error); return; }
+  const d = r.data, t = d.totals;
+  const tiles = $('statTiles'); tiles.innerHTML = '';
+  [[fmt(d.listenersNow), 'listening now'], [fmt(t.hours), 'listening hours'], [fmt(t.uniques), 'listeners (different per day)'],
+   [fmt(t.peak), 'most at once'], [fmt(t.plays), 'songs played'], [fmt(t.likes), 'likes'], [fmt(t.requests), 'requests'],
+   [fmt(t.taps), '"get this song" taps']].forEach(([n, l]) => tiles.appendChild(tile(n, l)));
+  drawChart(d.days);
+  const top = $('topSongs'); top.innerHTML = '';
+  const head = el('tr'); ['Song', 'Artist', 'Plays', 'Likes', 'Requests', 'Taps'].forEach((h, i) => head.appendChild(el('th', h, i >= 2 ? 'num' : ''))); top.appendChild(head);
+  if (!d.top.length) { const tr = el('tr'); const td = el('td', 'No songs yet.', 'muted'); td.colSpan = 6; tr.appendChild(td); top.appendChild(tr); }
+  d.top.forEach(x => {
+    const tr = el('tr'); tr.appendChild(el('td', x.title)); tr.appendChild(el('td', x.artist, 'muted'));
+    [x.plays, x.likes, x.requests, x.taps].forEach(v => tr.appendChild(el('td', fmt(v), 'num'))); top.appendChild(tr);
+  });
+}
+function drawChart(days) {
+  const svg = $('chart'); const W = svg.clientWidth || 800, H = 220, L = 34, B = 22, T = 10;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.innerHTML = '';
+  const NS = 'http://www.w3.org/2000/svg';
+  const max = Math.max(1, ...days.map(x => x.hours));
+  const nice = niceMax(max);
+  const plotW = W - L - 6, plotH = H - B - T;
+  for (let i = 0; i <= 4; i++) {
+    const y = T + plotH - plotH * i / 4;
+    const g = document.createElementNS(NS, 'line'); g.setAttribute('x1', L); g.setAttribute('x2', W - 6); g.setAttribute('y1', y); g.setAttribute('y2', y);
+    g.setAttribute('stroke', 'currentColor'); g.setAttribute('opacity', '.12'); svg.appendChild(g);
+    const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', L - 6); tx.setAttribute('y', y + 4); tx.setAttribute('text-anchor', 'end');
+    tx.textContent = (Math.round(nice * i / 4 * 100) / 100).toString(); svg.appendChild(tx);
+  }
+  const bw = plotW / days.length;
+  const tip = $('tip');
+  days.forEach((x, i) => {
+    const h = plotH * x.hours / nice;
+    const r = document.createElementNS(NS, 'rect');
+    r.setAttribute('x', L + i * bw + bw * 0.15); r.setAttribute('width', Math.max(1, bw * 0.7));
+    r.setAttribute('y', T + plotH - h); r.setAttribute('height', Math.max(x.hours > 0 ? 2 : 0, h));
+    r.setAttribute('rx', Math.min(3, bw * 0.2)); r.setAttribute('fill', 'var(--bar)');
+    r.addEventListener('mousemove', (e) => {
+      tip.hidden = false; tip.style.left = (e.clientX + 12) + 'px'; tip.style.top = (e.clientY - 10) + 'px';
+      tip.textContent = x.date + ': ' + x.hours + ' h listened, ' + x.uniques + ' listeners, peak ' + x.peak + (x.liveMinutes ? ', live ' + x.liveMinutes + ' min' : '');
+    });
+    r.addEventListener('mouseleave', () => { tip.hidden = true; });
+    svg.appendChild(r);
+    const every = Math.ceil(days.length / 8);
+    if (i % every === 0 || (i === days.length - 1 && i % every >= every / 2)) {
+      const tx = document.createElementNS(NS, 'text'); tx.setAttribute('x', L + i * bw + bw / 2); tx.setAttribute('y', H - 6);
+      tx.setAttribute('text-anchor', 'middle'); tx.textContent = x.date.slice(5); svg.appendChild(tx);
+    }
+  });
+  svg.style.color = getComputedStyle(document.body).color;
+}
+function niceMax(v) { const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * p; }
+
+// ---------- Live DJ Pro: the console keeps running while the Studio is open ----------
+// Inside the console (opened from its Studio button) we only need a way back; on its own, the console tells us it is open.
+const EMBED = window.self !== window.top && /[?&]embedded=1/.test(location.search);
+if (EMBED) { document.body.classList.add('embedded'); }
+let consoleSeen = 0, consoleText = '', consoleLive = false, consoleBusy = false, djChan = null;
+function consoleAlive() { return EMBED || Date.now() - consoleSeen < 4000; }
+function backToConsole() {
+  if (EMBED) { parent.postMessage({ djpro: 'back' }, location.origin); return; }
+  const w = window.open('', 'memoryq-djpro');
+  try { if (w && w.location.pathname === '/djpro') { w.focus(); return; } } catch (e) { }
+  try { if (w) { w.close(); } } catch (e) { }
+  alert('Live DJ Pro is open in another tab of this browser - switch to that tab.');
+}
+function drawDjBar() {
+  const show = !EMBED && consoleAlive();
+  $('djBar').hidden = !show;
+  if (show) { $('djBarText').textContent = consoleText; $('djBarDot').classList.toggle('live', consoleLive); $('djBarStop').disabled = !consoleBusy; }
+  $('djproOpen').textContent = consoleAlive() ? '\u2190 Return to the console' : 'Open Live DJ Pro';
+}
+$('djBarBack').addEventListener('click', backToConsole);
+$('djBarStop').addEventListener('click', () => {
+  if (!confirm('Stop Live DJ Pro?' + (consoleLive ? ' It goes off air (AutoDJ comes back),' : '') + ' the decks, mic and camera stop.')) { return; }
+  if (djChan) { djChan.postMessage({ t: 'stop' }); }
+});
+$('djproOpen').addEventListener('click', (e) => { if (consoleAlive()) { e.preventDefault(); backToConsole(); } });
+try {
+  const ch = new BroadcastChannel('memoryq-djpro'); djChan = ch;
+  ch.onmessage = (e) => { const d = e.data || {}; if (d.t === 'beat') { consoleSeen = Date.now(); consoleText = d.text || ''; consoleLive = !!d.onAir; consoleBusy = !!d.busy; } else if (d.t === 'bye') { consoleSeen = 0; } drawDjBar(); };
+} catch (e) { }
+setInterval(drawDjBar, 2000);
+drawDjBar();
+
+start();
+</script>
+<script src="/alma.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+# never in git: data, keys, builds
+*.jks
+*.keystore
+keystore.properties
+local.properties
+*.apk
+*.aab
+build/
+.gradle/
+.idea/
+*.log

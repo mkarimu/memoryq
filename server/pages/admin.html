@@ -1,0 +1,2886 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Memoryq Admin</title>
+<style>
+  :root {
+    --bg: #f3f5f8; --panel: #ffffff; --ink: #1b1f23; --muted: #6b7a88; --line: #e3e8ee;
+    --side: #1f2a33; --side-ink: #c9d4dd; --side-active: #2f6fed; --accent: #2f6fed; --good: #2e7d32; --bad: #c62828;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+  header { background: #16202a; color: #fff; padding: 10px 18px; display: flex; justify-content: space-between; align-items: center;
+           position: sticky; top: 0; z-index: 5; }
+  header .brand { font-weight: 700; letter-spacing: .3px; }
+  header .who { color: #9fb0bf; font-size: 13px; margin-right: 12px; }
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 46px); }
+  nav#side { background: var(--side); padding: 12px 8px; position: sticky; top: 46px; height: calc(100vh - 46px); overflow-y: auto; }
+  nav#side button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--side-ink);
+                    padding: 10px 12px; border-radius: 8px; font-size: 15px; text-align: left; cursor: pointer; margin: 2px 0; }
+  nav#side button:hover { background: rgba(255,255,255,.06); color: #fff; }
+  nav#side button.active { background: var(--side-active); color: #fff; }
+  nav#side .ico { width: 22px; text-align: center; }
+  .badge { margin-left: auto; background: var(--bad); color: #fff; border-radius: 10px; font-size: 12px; padding: 1px 7px; font-weight: 700; }
+  .content { padding: 18px 24px 40px; min-width: 0; }
+  .content h1 { font-size: 22px; margin: 2px 0 12px; }
+  #tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  #tabs button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 9px 14px; font-size: 14px; color: var(--muted);
+                 cursor: pointer; white-space: nowrap; margin: 0; display: flex; gap: 6px; align-items: center; }
+  #tabs button:hover { color: var(--ink); }
+  #tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .panel { overflow-x: auto; }
+  .panel h2 { margin: 0 0 8px; font-size: 17px; }
+  .panel h3 { margin: 18px 0 8px; font-size: 15px; }
+  .box { background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--line); margin: 8px 0; }
+  table { border-collapse: collapse; width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+  th { background: #eef2f6; font-weight: 600; }
+  button { cursor: pointer; padding: 5px 11px; margin: 2px 4px 2px 0; border: 1px solid #c8d1da; background: #fff; border-radius: 6px; font-size: 13px; }
+  button:hover { border-color: var(--accent); }
+  input, select { padding: 6px 8px; margin: 2px 6px 2px 0; border: 1px solid #c8d1da; border-radius: 6px; font-size: 14px; }
+  .card { background: #fff; padding: 22px; border-radius: 10px; max-width: 340px; margin: 80px auto; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+  .card input { display: block; width: 100%; margin: 6px 0 12px; }
+  .error { color: var(--bad); min-height: 1.2em; }
+  .ok { color: var(--good); }
+  .live { color: var(--good); font-weight: 600; }
+  .muted { color: var(--muted); }
+  .md h2 { font-size: 22px; margin: 6px 0 10px; } .md h3 { font-size: 18px; margin: 18px 0 6px; } .md h4 { font-size: 15px; margin: 14px 0 4px; }
+  .md ul { margin: 4px 0 8px; padding-left: 22px; } .md li { margin: 2px 0; line-height: 1.45; } .md p { margin: 6px 0; } .md hr { border: 0; border-top: 2px dashed var(--line); margin: 18px 0; }
+  #keybox { background: #fffde7; border: 1px solid #fbc02d; padding: 10px; margin: 0 0 12px; border-radius: 8px; }
+  #keybox input { width: 60%; font-family: monospace; }
+  #flash { min-height: 1.4em; margin: 0 0 8px; font-weight: 600; }
+  .fgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 14px; margin: 8px 0; }
+  .fgrid label { display: block; font-size: 12px; color: var(--muted); }
+  .fgrid label input, .fgrid label select { display: block; width: 100%; margin: 3px 0 6px; }
+  .pill { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; padding: 2px 7px; border-radius: 5px; color: #fff; background: #6b7a88; vertical-align: 1px; }
+  .pill.paid { background: #2e7d32; } .pill.trial { background: #b26a00; } .pill.unpaid { background: #c62828; }
+  .creds { background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; white-space: pre-wrap; }
+  /* Radio - Stations: accounts list */
+  .acchead { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 10px; }
+  .accsum { display: flex; gap: 18px; flex-wrap: wrap; }
+  .accsum div { text-align: right; } .accsum span { display: block; font-size: 12px; color: var(--muted); } .accsum b { font-size: 16px; }
+  .acctool { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .acctool .sep { width: 1px; height: 22px; background: var(--line); margin: 0 6px; }
+  .acctool .grow, .edfoot .grow { flex: 1; }
+  .acctool input[type=search] { width: 220px; margin: 0; }
+  button.pri { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.del { color: var(--bad); }
+  button:disabled { opacity: .45; cursor: default; }
+  table.acc td { vertical-align: middle; }
+  table.acc .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  table.acc td.warn { color: var(--bad); font-weight: 600; }
+  table.acc tr.sel td { background: rgba(47,111,237,.07); }
+  .small { font-size: 12px; }
+  .warn { color: var(--bad); }
+  .sdot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #9aa6b2; }
+  .sdot.on { background: #2e7d32; } .sdot.live { background: #e5484d; box-shadow: 0 0 0 3px rgba(229,72,77,.25); }
+  .sdot.pending { background: #e0a400; } .sdot.suspended { background: #c62828; } .sdot.off { background: #9aa6b2; }
+  .box.edit { border-color: var(--accent); }
+  .edhead { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; } .edhead h3 { margin: 0; }
+  .edtabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 10px 0 8px; overflow-x: auto; }
+  .edtabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 7px 12px; margin: 0; color: var(--muted); }
+  .edtabs button.on { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .fgrid .wide { grid-column: 1 / -1; }
+  .fgrid label input[type=checkbox] { display: inline-block; width: auto; margin: 6px 6px 6px 0; }
+  .edfoot { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 10px; margin-top: 6px; }
+  details.box summary { cursor: pointer; }
+  details.box[open] summary { margin-bottom: 6px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; cursor: pointer; text-align: left; margin: 0; }
+  .tile:hover { border-color: var(--accent); box-shadow: 0 2px 10px rgba(47,111,237,.12); }
+  .tile .num { font-size: 28px; font-weight: 700; display: block; margin: 4px 0 2px; }
+  .tile .lbl { color: var(--muted); font-size: 13px; }
+  .tile.alert .num { color: var(--bad); }
+  @media (max-width: 800px) {
+    .shell { grid-template-columns: 1fr; }
+    nav#side { position: static; height: auto; display: flex; overflow-x: auto; padding: 6px; }
+    nav#side button { width: auto; white-space: nowrap; }
+    .content { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="login" class="card">
+  <h2 style="margin-top:0">Memoryq admin</h2>
+  <form id="loginForm">
+    <label>Username<input id="u" autocomplete="username" required></label>
+    <label>Password<input id="p" type="password" autocomplete="current-password" required></label>
+    <button type="submit">Sign in</button>
+  </form>
+  <div id="loginError" class="error"></div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <span class="brand">Memoryq admin</span>
+    <span><span class="who" id="serverInfo"></span><button id="signOut">Sign out</button></span>
+  </header>
+  <div class="shell">
+    <nav id="side"></nav>
+    <section class="content">
+      <h1 id="pageTitle"></h1>
+      <div id="tabs"></div>
+      <div id="flash"></div>
+      <div id="keybox" hidden>
+        <div id="keyLabel"></div>
+        <input id="keyValue" readonly>
+        <button id="keyHide">Hide</button>
+        <div class="muted">Keep this private. It lets anyone broadcast on that channel.</div>
+      </div>
+
+      <div class="panel" id="panel-overview-summary" hidden>
+        <div class="tiles" id="tiles"></div>
+      </div>
+
+      <div class="panel" id="panel-users-all" hidden>
+        <table id="users"></table>
+      </div>
+
+      <div class="panel" id="panel-users-detail" hidden>
+        <div id="u360"></div>
+      </div>
+
+      <div class="panel" id="panel-server-assets" hidden>
+        <div id="agentBox"></div>
+      </div>
+
+      <div class="panel" id="panel-server-downloads" hidden>
+        <div id="dlBox"></div>
+      </div>
+
+      <div class="panel" id="panel-server-alma" hidden>
+        <div id="almaBox"></div>
+      </div>
+
+      <div class="panel" id="panel-videos-tv" hidden>
+        <div id="tvVideos"></div>
+      </div>
+
+      <div class="panel" id="panel-videos-all" hidden>
+        <div id="allVideos"></div>
+      </div>
+
+      <div class="panel" id="panel-videos-rec" hidden>
+        <div id="recBox"></div>
+      </div>
+
+      <div class="panel" id="panel-market-pending" hidden><div id="mkPending"></div></div>
+      <div class="panel" id="panel-market-reports" hidden><div id="mkReports"></div></div>
+      <div class="panel" id="panel-market-all" hidden><div id="mkAll"></div></div>
+
+      <div class="panel" id="panel-videos-streamers" hidden>
+        <div id="streamersBox"></div>
+        <div id="streamSessions"></div>
+      </div>
+
+      <div class="panel" id="panel-server-disks" hidden>
+        <div id="disksBox"></div>
+      </div>
+
+      <div class="panel" id="panel-users-create" hidden>
+        <div class="box">
+          <form id="createForm">
+            <input id="newName" placeholder="username" required>
+            <input id="newPass" type="password" placeholder="password (8+ characters)" required>
+            <select id="newRole">
+              <option value="BROADCASTER">Broadcaster (gets a channel and a key)</option>
+              <option value="CHATTER">Registered (chat + may broadcast)</option>
+              <option value="GUEST">Guest (chat only)</option>
+            </select>
+            <button type="submit">Create</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-users-suspended" hidden>
+        <div class="box">
+          <input id="susName" placeholder="username">
+          <input id="susHours" type="number" min="0" max="8760" value="24" style="width:70px"> hours (0 = until you reinstate)
+          <input id="susNotice" placeholder="message the person sees when they sign in" style="width:320px" maxlength="200">
+          <button id="susBtn">Suspend</button>
+          <button id="susDelete">Delete account</button>
+        </div>
+        <table id="suspensions"></table>
+        <h3>Moderation log</h3>
+        <table id="auditLog"></table>
+      </div>
+
+      <div class="panel" id="panel-users-deletion" hidden>
+        <h2>Account deletion requests <span id="delInfo" class="muted"></span></h2>
+        <table id="delRequests"></table>
+      </div>
+
+      <div class="panel" id="panel-users-photos" hidden>
+        <div class="muted" style="margin-bottom:8px">Newest first - remove any that break the rules (the person's drawn picture comes back).</div>
+        <div id="photoList" style="display:flex; flex-wrap:wrap; gap:10px"></div>
+      </div>
+
+      <div class="panel" id="panel-streaming-live" hidden>
+        <table id="channels"></table>
+      </div>
+
+      <div class="panel" id="panel-streaming-pool" hidden>
+        <h2>Channel pool <span id="poolInfo" class="muted"></span></h2>
+        <table id="pool"></table>
+        <div class="box" id="qsBox">
+          <b>Vstream testers: go live without an account</b> <span id="qsState" class="muted small"></span>
+          <div class="muted small" style="margin:4px 0 8px">For the Play Store's 14-day closed test: the Vstream sign-in screen shows
+            "Try Vstream now - no account needed". Each phone gets its own tester login (tester_123456) and goes live at once.
+            It switches itself off on the end date. At most 3 new testers per address an hour and 200 a day.</div>
+          <label>Keep it on for <input id="qsDays" type="number" min="1" max="90" value="21" style="width:60px"> days</label>
+          <button id="qsOn" class="pri">Switch on</button> <button id="qsOff">Switch off</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-chat-rooms" hidden>
+        <div class="box">
+          <select id="chatRoom"></select>
+          <button id="chatLoad">Load</button>
+          <button id="chatClear">Clear room</button>
+        </div>
+        <table id="chatMessages"></table>
+        <h3>Muted people</h3>
+        <div class="box">
+          <input id="muteName" placeholder="username to mute">
+          <input id="muteHours" type="number" min="0" max="8760" value="24" style="width:70px"> hours (0 = until unmuted)
+          <button id="muteBtn">Mute</button>
+        </div>
+        <table id="muted"></table>
+      </div>
+
+      <div class="panel" id="panel-chat-reports" hidden>
+        <div class="muted" style="margin-bottom:8px">You see only the reported message and a few before it.</div>
+        <div class="box">
+          Show: <select id="reportFilter">
+            <option value="open">Open</option>
+            <option value="handled">Handled</option>
+            <option value="dismissed">Dismissed</option>
+          </select>
+        </div>
+        <table id="reports"></table>
+      </div>
+
+      <div class="panel" id="panel-chat-groups" hidden>
+        <div class="muted" style="margin-bottom:8px">Group admins can read their own groups only. You can see who they are, rename or delete a group, and send them a private message.</div>
+        <table id="groupAdmins"></table>
+        <div id="mailBox" style="display:none;margin:10px 0">
+          <h3 id="mailTitle"></h3>
+          <table id="mailThread"></table>
+          <input id="mailText" placeholder="private message to this group admin" style="width:380px" maxlength="500">
+          <button id="mailSend">Send</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-wall-posts" hidden>
+        <h2>Wall posts <span id="wallInfo" class="muted"></span></h2>
+        <div class="box">
+          Show a random public post in the news after every <input id="wallEvery" type="number" min="0" max="50" style="width:60px">
+          stories <span class="muted">(0 = never)</span> &nbsp;
+          <label><input type="checkbox" id="wallTest"> Test people post now and then</label>
+          <button id="wallSave">Save</button>
+        </div>
+        <h3>Reported posts</h3>
+        <table id="wallReports"></table>
+      </div>
+
+      <div class="panel" id="panel-news-feed" hidden>
+        <h2>News <span id="newsInfo" class="muted"></span></h2>
+        <div class="muted" id="newsNote"></div>
+        <div class="box">
+          <button id="newsPause">Pause news</button>
+          <button id="newsRefresh">Refresh now</button>
+        </div>
+        <table id="newsSources"></table>
+        <div class="box">
+          <input id="srcName" placeholder="source name">
+          <input id="srcUrl" placeholder="RSS address (https://...)" style="width:340px">
+          <button id="srcAdd">Add source</button>
+        </div>
+        <table id="newsItems"></table>
+      </div>
+
+      <div class="panel" id="panel-ads-settings" hidden>
+        <h2>News slider <span id="adsInfo" class="muted"></span></h2>
+        <div class="muted">Every few news stories the app shows a slider with 4 random people and one ad card.
+          Your paid ads come first; when none is running, a Google ad (AdMob) fills the card.</div>
+        <div class="box">
+          <label><input type="checkbox" id="setSlider"> Show the slider</label>
+          &nbsp; after every <input id="setEvery" type="number" min="5" max="100" style="width:60px"> stories
+          &nbsp; <label><input type="checkbox" id="setAdCard"> with an ad card</label>
+          &nbsp; <label><input type="checkbox" id="setGoogle"> Google ads fill gaps</label><br>
+          AdMob ad unit ID: <input id="setUnit" style="width:330px" placeholder="ca-app-pub-.../...">
+          <span id="unitNote" class="muted"></span>
+          <button id="setSave">Save slider settings</button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-ads-paid" hidden>
+        <div class="box">
+          <b>Add a paid ad</b><br>
+          <input id="adAdvertiser" placeholder="Advertiser" maxlength="60">
+          <input id="adHeadline" placeholder="Headline" maxlength="80" style="width:220px">
+          <input id="adText" placeholder="Short text (optional)" maxlength="200" style="width:260px"><br>
+          <input id="adLink" placeholder="https://link-when-tapped" style="width:260px">
+          from <input id="adStart" type="date"> to <input id="adEnd" type="date">
+          <span class="muted">(dates optional)</span><br>
+          Picture (PNG or JPEG, up to 1 MB, wide pictures look best): <input id="adImage" type="file" accept="image/png,image/jpeg">
+          <button id="adAdd">Add ad</button>
+        </div>
+        <table id="adsTable"></table>
+      </div>
+
+      <div class="panel" id="panel-calls-calls" hidden>
+        <h2>Calls add-on <span id="callsInfo" class="muted"></span></h2>
+        <div class="muted" id="callsNote"></div>
+        <div class="box"><button id="callsToggle">Turn calls on</button></div>
+        <table id="callsActive"></table>
+      </div>
+
+      <div class="panel" id="panel-profiler-people" hidden>
+        <h2>Profiler <span id="profInfo" class="muted"></span></h2>
+        <div class="muted">Test people for trying out the app: real accounts, marked as test, with invented profiles
+          and drawn pictures. Use the username and password below to sign in as one of them on a phone.</div>
+        <div class="box" id="tpBox">
+          <b>Test people:</b> <span id="tpState"></span>
+          <button id="tpSwitch" style="margin-left:8px"></button>
+          <div class="muted" style="margin-top:6px">OFF suspends them all: they disappear from people lists, walls and
+            searches, cannot sign in, and stop posting - nothing is deleted. ON brings them back exactly as they were.</div>
+        </div>
+        <div class="box">
+          <button id="profToggle">Pause</button>
+          <button id="profAdd">Add one now</button>
+        </div>
+        <table id="profPeople"></table>
+      </div>
+
+      <div class="panel" id="panel-radio-onair" hidden>
+        <div class="muted" id="radioNote" style="margin-bottom:4px"></div>
+        <div class="muted" id="radioTalkNote" style="margin-bottom:8px"></div>
+        <div class="box" id="voiceTestBox" hidden>
+          <b>DJ voice test</b> <span class="muted">(a private preview in this browser only - listeners do not hear it)</span><br><span id="voiceTestResult"></span>
+          <audio id="voiceTestAudio" controls style="width:100%;margin-top:6px" hidden></audio>
+        </div>
+        <div class="box" id="radioPlayerBox" hidden>
+          <b id="radioPlayerTitle"></b>
+          <audio id="radioPlayer" controls style="width:100%;margin-top:6px"></audio>
+        </div>
+        <div id="radioLive"></div>
+      </div>
+
+      <div class="panel" id="panel-radio-stations" hidden>
+        <div class="acchead">
+          <div><h2 style="margin:0">Stations</h2><span class="muted">Clients and their radio stations</span></div>
+          <div class="accsum" id="accSum"></div>
+        </div>
+        <div class="acctool" id="accTool">
+          <button id="accNew" class="pri">+ New station</button>
+          <span class="sep"></span>
+          <button data-act="start" title="Put the ticked stations on air">&#9654; Start</button>
+          <button data-act="stop" title="Take the ticked stations off air">&#9632; Stop</button>
+          <button data-act="suspend" title="Pause the ticked stations (owners cannot switch them back on)">Suspend</button>
+          <button data-act="unsuspend">Unsuspend</button>
+          <button data-act="delete" class="del">Delete</button>
+          <span class="muted" id="accCount"></span>
+          <span class="grow"></span>
+          <input id="accSearch" type="search" placeholder="Search stations..." aria-label="Search stations">
+        </div>
+        <div class="box" id="newBox" hidden>
+          <b>New station</b>
+          <div class="fgrid">
+            <label>Station name<input id="rsName" maxlength="40" placeholder="e.g. Afrobeats FM"></label>
+            <label>Slogan<input id="rsDesc" maxlength="160"></label>
+            <label>Website<input id="rsWeb" maxlength="200" placeholder="https://..."></label>
+            <label>Live port<select id="rsPort"></select></label>
+            <label>Stream password<input id="rsPass" maxlength="40"></label>
+            <label>Login user (usually the station name)<input id="rsUser" maxlength="20" placeholder="afrobeatsfm"></label>
+            <label>Login password<input id="rsLoginPass" maxlength="60"></label>
+            <label>Owner's email (optional)<input id="rsEmail" type="email" maxlength="120"></label>
+            <label>Plan<select id="rsPlan"></select></label>
+            <label>Payment<select id="rsBill"><option value="paid">Paid</option><option value="trial">Trial</option><option value="unpaid">Not paid yet (owner pays online)</option></select></label>
+            <label>Paid / trial until (empty = no end)<input id="rsUntil" type="date"></label>
+          </div>
+          <button id="rsCreate">Create station and login</button> <button id="rsNewPass">New passwords</button>
+          <div class="muted" style="margin-top:6px">Leave the login user empty for a Memoryq-run station. If the login user already exists, the station
+            is added to that account (its password is not changed). People can also sign up and pay themselves at
+            <a href="/studio" target="_blank">memoryq.com/studio</a>.</div>
+          <div id="rsDone"></div>
+        </div>
+        <div id="radioStations"></div>
+        <div class="box edit" id="accEdit" hidden></div>
+        <div class="box" id="trBox">
+          <b>Try the Studio (trial station)</b> <span id="trState" class="muted small"></span>
+          <div class="muted small" style="margin:4px 0 8px">One station any visitor can run with a shared login, shown on
+            memoryq.com/studio and on the home page. Every <span id="trEvery">2 hours</span> it goes back to the starting point
+            (songs, playlists, stories, settings) and everyone trying it is signed out. The trial login cannot change its password
+            or email, buy, see DJ logins or the live DJ password, rename the station, go live with video, chat or post.</div>
+          <div class="fgrid">
+            <label>Station<select id="trStation"></select></label>
+            <label>Station name while it is the trial<input id="trName" maxlength="40" placeholder="e.g. Try Memoryq Radio"></label>
+            <label>Login user (shown to everyone)<input id="trUser" maxlength="24" value="trial"></label>
+            <label>Password (shown to everyone, 8+ letters)<input id="trPass" maxlength="40" value="tryradio"></label>
+          </div>
+          <label class="small"><input type="checkbox" id="trListed"> Also show it in the public list of stations (off: only people trying it hear it)</label>
+          <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            <button id="trStart" class="pri">Start the trial</button>
+            <button id="trSave" hidden>Save login and list setting</button>
+            <button id="trSnap" hidden title="Take what the station has now as the starting point">Use the station as it is now as the starting point</button>
+            <button id="trReset" hidden>Fresh start now</button>
+            <button id="trStop" class="del" hidden>Switch the trial off</button>
+          </div>
+          <div class="muted small" id="trInfo" style="margin-top:6px"></div>
+        </div>
+        <h3>Settings</h3>
+        <details class="box">
+          <summary><b>Online payment (Stripe)</b></summary>
+          <div class="fgrid">
+            <label>Currency (usd, eur, gbp, kes...)<input id="bCur" maxlength="3"></label>
+            <label>Free trial for new sign-ups (days, 0 = none)<input id="bTrial" type="number" min="0" max="90"></label>
+            <label>Stripe secret key <span id="bKeyHint"></span><input id="bKey" type="password" autocomplete="off" placeholder="sk_live_... (empty = keep the current one)"></label>
+          </div>
+          <button id="bSave">Save</button> <button id="bKeyRemove">Remove the Stripe key</button> <span id="bState" class="muted"></span>
+          <div class="muted" style="margin-top:6px;font-size:13px">The key is in your Stripe dashboard: Developers - API keys - Secret key (start with a
+            <b>sk_test_</b> key to try it out with the card 4242 4242 4242 4242). Also open Settings - Billing - Customer portal in Stripe and press
+            Save once, so station owners can change their card or cancel. Without a key, sign-ups wait as "not paid" and you activate them here.</div>
+        </details>
+        <details class="box">
+          <summary><b>Live DJ Pro - Dropbox</b></summary> <span class="muted">- lets DJs pick songs from their own Dropbox in the console library.</span>
+          <div class="fgrid">
+            <label>Dropbox app key<input id="dbxKey" autocomplete="off" placeholder="e.g. a1b2c3d4e5f6g7h (empty = Dropbox off)"></label>
+          </div>
+          <button id="dbxSave">Save</button> <span id="dbxState" class="muted"></span>
+          <div class="muted" style="margin-top:6px;font-size:13px">Make the key once: dropbox.com/developers - Create app - Scoped access - Full Dropbox -
+            any name. In the app's Settings, under "Chooser / Saver / Embedder domains", add <b>memoryq.com</b>. Copy the
+            <b>App key</b> (not the secret) here.</div>
+        </details>
+        <details class="box">
+          <summary><b>Plans</b></summary> <span class="muted">- what each station may use. Empty / 0 = no limit. Stations on a plan get its stream quality.</span>
+          <div style="overflow-x:auto"><table id="planTable" style="margin-top:8px"></table></div>
+          <button id="planAdd" style="margin-top:8px">Add a plan</button>
+        </details>
+      </div>
+
+      <div class="panel" id="panel-radio-import" hidden>
+        <div class="box">
+          <b>1. On the Centova server</b>
+          <div class="muted" style="margin:4px 0 8px">Make an import code, then paste the command in a terminal on the Centova server
+            (Bitvise: "New terminal console", logged in as root or with sudo). It only READS Centova and sends a copy of the accounts,
+            playlists and songs here. Running it again sends only what is missing.</div>
+          <button id="imCode">Make an import code</button> <span id="imCodeNote" class="muted"></span>
+          <div id="imCmdBox" hidden>
+            <div class="creds" id="imCmd"></div>
+            <button id="imCopy">Copy the command</button>
+            <div class="muted small" style="margin-top:6px">If it stops with "certificates are too old" (old CentOS), run it with
+              <b>INSECURE=1</b> in front of <b>bash</b>: <code>sudo INSECURE=1 bash mq-export.sh CODE</code></div>
+          </div>
+        </div>
+        <div class="box">
+          <b>2. What arrived</b> <span id="imArrived" class="muted"></span>
+          <div style="overflow-x:auto;margin-top:8px"><table id="imTable"></table></div>
+          <div class="warn small" id="imMissing" style="margin-top:6px"></div>
+          <div style="margin-top:10px">
+            <label>Free trial (days) <input id="imTrial" type="number" min="1" max="365" value="7" style="width:70px"></label>
+            <label><input type="checkbox" id="imMail" checked> E-mail each new owner their login</label>
+          </div>
+          <div style="margin-top:6px"><button id="imRun" class="pri">Import the ticked stations</button> <span id="imProg" class="muted"></span></div>
+          <div class="muted small" style="margin-top:6px">Every station gets a new live DJ port (8010-8099) and keeps its DJ password, its songs,
+            playlists (rotation, interval, scheduled shows, immediate), time zone and listener / quality limits. Owners log in at
+            memoryq.com/studio with the login user shown.</div>
+        </div>
+        <div class="box" id="imResultBox" hidden>
+          <b>3. Imported</b> <span id="imResAt" class="muted"></span>
+          <div style="overflow-x:auto;margin-top:8px"><table id="imResult"></table></div>
+          <div style="margin-top:8px"><button id="imCopyAll">Copy all logins</button> <button id="imClear">Delete the copied files from the import folder</button></div>
+          <div class="muted small" style="margin-top:10px"><b>4. Old links (when the stations play well here):</b> on the Centova server run
+            <code id="imRedirect"></code> - it switches the Centova streams off and sends everyone who opens an old link
+            (http://old-server:port/...) to the station's Memoryq link. To undo it: <code>sudo bash mq-export.sh redirect-off</code>.
+            DJs still have to put the new server, port and password into their DJ software.</div>
+        </div>
+        <div class="box" id="olBox">
+          <b>Old listening links</b> <span id="olIp" class="muted small"></span>
+          <div class="muted small" style="margin:4px 0 8px">Players, Radio.garden, TuneIn and websites keep their old links: Memoryq plays the
+            station on them. Centova links (http://old-address:PORT/stream) work once the old address is on this server (oldlinks.sh).
+            Imported stations are added by themselves.</div>
+          <div style="overflow-x:auto"><table id="olTable"></table></div>
+          <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+            <select id="olKind" style="width:auto" hidden><option value="port">Centova port</option></select>
+            <span class="small">Old port</span> <input id="olKey" placeholder="e.g. 8005" style="width:90px">
+            <select id="olStation" style="width:auto"></select>
+            <button id="olAdd">Add / change</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-radio-music" hidden>
+        <div class="box">
+          Station: <select id="rmStation"></select>
+          <label style="margin-left:8px">Add songs: <input type="file" id="rmFiles" multiple accept=".mp3,.m4a,.aac,.ogg,.opus,.flac,.wav,audio/*">
+          </label>
+          <span id="rmProgress" class="muted"></span>
+          <div class="muted" style="margin-top:6px">MP3, M4A, AAC, OGG, OPUS, FLAC or WAV, up to 60 MB each. Title and artist come from the
+            song's tags (or a file name like "Artist - Title.mp3"); fix them below if needed. Only add music you have the right to broadcast.</div>
+        </div>
+        <table id="rmTracks"></table>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+let token = null;
+let timer = null;
+let keyTimer = null;
+
+function $(id) { return document.getElementById(id); }
+function el(tag, text) {
+  const e = document.createElement(tag);
+  if (text !== undefined && text !== null) { e.textContent = text; }
+  return e;
+}
+
+async function api(path, form) {
+  const opts = { headers: {} };
+  if (token) { opts.headers['Authorization'] = 'Bearer ' + token; }
+  if (form) {
+    opts.method = 'POST';
+    opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+    opts.body = new URLSearchParams(form).toString();
+  }
+  const r = await fetch(path, opts);
+  let data = {};
+  try { data = await r.json(); } catch (e) { }
+  if (r.status === 401 && token) { signOut('Your session ended. Sign in again.'); }
+  return { ok: r.ok, status: r.status, data: data };
+}
+
+function flash(text, good) {
+  const f = $('flash');
+  f.textContent = text;
+  f.className = good ? 'ok' : 'error';
+}
+
+function signOut(message) {
+  if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
+  token = null;
+  clearInterval(timer);
+  hideKey();
+  $('app').hidden = true;
+  $('login').hidden = false;
+  $('loginError').textContent = message || '';
+}
+
+$('signOut').addEventListener('click', () => signOut(''));
+
+$('loginForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  $('loginError').textContent = '';
+  const r = await api('/api/login', { username: $('u').value, password: $('p').value });
+  if (!r.ok) { $('loginError').textContent = r.data.error || 'Sign in failed'; return; }
+  if (r.data.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; }
+  token = r.data.token;
+  $('p').value = '';
+  $('login').hidden = true;
+  $('app').hidden = false;
+  $('serverInfo').textContent = 'signed in as admin';
+  startDashboard();
+});
+
+
+// ---------- Radio ----------
+let radioStatus = null;
+function fmtTime(ms) {
+  const s = Math.round((ms || 0) / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+async function radioFetch() {
+  const r = await api('/api/admin/radio/status');
+  if (r.ok) { radioStatus = r.data; }
+  const n = $('radioNote');
+  if (n && radioStatus) {
+    n.textContent = radioStatus.note + (radioStatus.ai ? ' \u00b7 AI writer: OpenAI' : ' \u00b7 AI writer: built-in (set OPENAI_API_KEY for AI news analysis)');
+    n.className = radioStatus.ready ? 'muted' : 'error';
+    const t = $('radioTalkNote');
+    t.textContent = 'The DJ can talk about: ' + radioStatus.newsAvailable + ' news stories' +
+      (radioStatus.shoutAvailable ? ' and a chat post for a shout-out.' : ' (no public chat posts in the last 12 hours for a shout-out).') +
+      (radioStatus.voiceError ? '  Last voice problem: ' + radioStatus.voiceError : '');
+    t.className = radioStatus.voiceError ? 'error' : 'muted';
+  }
+  return radioStatus;
+}
+async function loadRadioLive() {
+  const st = await radioFetch();
+  const box = $('radioLive');
+  box.textContent = '';
+  if (!st) { return; }
+  if (!st.ready) {
+    box.appendChild(el('div', 'FFmpeg is not installed on the server - run the radio install script, then press "Look again".'));
+    box.appendChild(button('Look again', async () => { await api('/api/admin/radio/detect', {}); loadRadioLive(); }));
+    return;
+  }
+  if (st.stations.length === 0) { box.appendChild(el('div', 'No stations yet - create one in the Stations tab.')); return; }
+  st.stations.forEach(s => {
+    const c = el('div'); c.className = 'box';
+    const h = el('div');
+    h.appendChild(el('b', s.name));
+    const state = !s.enabled ? 'off' : (s.live ? 'ON AIR' : (s.songs === 0 ? 'no music yet' : 'starting...'));
+    const tag = el('span', '  ' + state + (s.live ? ' \u00b7 ' + s.listeners + ' listening' : '')); tag.className = s.live ? 'live' : 'muted';
+    h.appendChild(tag);
+    c.appendChild(h);
+    if (s.now) {
+      const played = Date.now() - s.now.startedAt;
+      c.appendChild(el('div', '\u266a Now: ' + s.now.label + '  (' + fmtTime(played) + ' / ' + fmtTime(s.now.durationMs) + ')'));
+    }
+    if (s.talk) { const t = el('div', '\ud83c\udf99 ' + s.djName + ' is talking: ' + s.talk.text); t.className = 'muted'; c.appendChild(t); }
+    if (s.next) { c.appendChild(el('div', 'Up next: ' + s.next + (s.nextRequestedBy ? '  (requested by ' + s.nextRequestedBy + ')' : ''))); }
+    if (s.requests && s.requests.length) {
+      const rq = el('div', 'Requests waiting: ' + s.requests.map(x => x.song + ' (' + x.by + ')').join(', ')); rq.className = 'muted'; c.appendChild(rq);
+    }
+    if (s.now) { const lk = el('div', '\u2764 ' + (s.now.likes || 0) + ' likes for this song' + (s.now.hasLink ? '' : ' \u00b7 no "Get this song" link yet (add it in Music library)')); lk.className = 'muted'; c.appendChild(lk); }
+    const row = el('div'); row.style.margin = '8px 0';
+    if (s.live) {
+      row.appendChild(button('\u25b6 Listen', () => {
+        $('radioPlayerBox').hidden = false;
+        $('radioPlayerTitle').textContent = 'Listening to ' + s.name;
+        const a = $('radioPlayer'); a.src = s.stream + '?t=' + Date.now(); a.play().catch(() => {});
+      }));
+      row.appendChild(button('Skip song', async () => { await run('/api/admin/radio/skip', { station: s.id }, 'Skipping...'); }));
+      row.appendChild(button('DJ talks now', async () => { await run('/api/admin/radio/talk', { station: s.id }, 'The DJ is getting ready - the song fades out in a few seconds and the DJ talks'); }));
+    }
+    row.appendChild(button('Test DJ voice', async () => {
+      $('voiceTestBox').hidden = false;
+      $('voiceTestAudio').hidden = true;
+      $('voiceTestResult').textContent = 'speaking... (the first time can take 10-20 seconds)';
+      $('voiceTestResult').className = 'muted';
+      const r = await api('/api/admin/radio/testvoice', { station: s.id });
+      if (r.ok && r.data.ok) {
+        $('voiceTestResult').textContent = 'works (' + r.data.engine + ' voice) - press play to hear it';
+        $('voiceTestResult').className = 'ok';
+        const a = $('voiceTestAudio'); a.src = r.data.wav; a.hidden = false; a.play().catch(() => {});
+      } else {
+        $('voiceTestResult').textContent = 'FAILED (' + ((r.data && r.data.engine) || '?') + '): ' + ((r.data && r.data.error) || 'no answer');
+        $('voiceTestResult').className = 'error';
+      }
+    }));
+    c.appendChild(row);
+    if (s.recent && s.recent.length) {
+      const t = el('table');
+      headerRow(t, ['Time', '', 'What played / what the DJ said']);
+      s.recent.slice(0, 10).forEach(e => {
+        const tr = el('tr');
+        tr.appendChild(el('td', new Date(e.time).toLocaleTimeString()));
+        tr.appendChild(el('td', ({ song: '\u266a song', news: '\ud83d\udcf0 news', shout: '\ud83d\udce3 shout-out', intro: '\ud83c\udf99 intro', story: '\ud83d\udcd6 story', id: '\ud83d\udcfb over a song', note: '\u26a0 note' })[e.kind] || e.kind));
+        tr.appendChild(el('td', e.text));
+        t.appendChild(tr);
+      });
+      c.appendChild(t);
+    }
+    box.appendChild(c);
+  });
+}
+function chk(label, on) {
+  const l = el('label'); const i = el('input'); i.type = 'checkbox'; i.checked = !!on;
+  l.appendChild(i); l.appendChild(document.createTextNode(' ' + label + '  '));
+  return { label: l, input: i };
+}
+// ---------- Radio - Stations: Try the Studio (trial station) ----------
+let trData = null;
+async function loadDemo() {
+  const r = await api('/api/admin/demo/status');
+  if (r.ok) { drawDemo(r.data); }
+}
+function drawDemo(d) {
+  trData = d;
+  const sel = $('trStation'); const keep = sel.value; sel.innerHTML = '';
+  d.stations.forEach(x => { const o = el('option', x.name + (x.owner ? ' (' + x.owner + ')' : ' (Memoryq)')); o.value = x.id; sel.appendChild(o); });
+  if (d.on) { sel.value = String(d.station); } else if (keep) { sel.value = keep; }
+  if (d.on) {
+    $('trUser').value = d.user; $('trPass').value = d.password; $('trListed').checked = d.listed;
+    const st = d.stations.find(x => x.id === d.station);
+    $('trName').value = st ? st.name : '';
+  }
+  $('trEvery').textContent = d.periodMin % 60 === 0 ? (d.periodMin / 60) + ' hours' : d.periodMin + ' minutes';
+  $('trState').textContent = d.on ? '\u00b7 on' : '\u00b7 off';
+  $('trState').className = 'small ' + (d.on ? 'ok' : 'muted');
+  $('trStart').textContent = d.on ? 'Start again with these settings' : 'Start the trial';
+  ['trSave', 'trSnap', 'trReset', 'trStop'].forEach(id => { $(id).hidden = !d.on; });
+  const t = (ms) => ms ? new Date(ms).toLocaleString() : '-';
+  $('trInfo').textContent = d.on ? 'Starting point saved ' + t(d.savedAt) + ' (' + gbOf(d.savedBytes) + ' of songs; visitors can add about '
+    + d.extraMb + ' MB more). Last fresh start ' + t(d.lastReset) + (d.lastResult ? ' (' + d.lastResult + ')' : '') + '. Next: ' + t(d.nextReset) + '.'
+    : 'Pick a station (e.g. your test station) - what it has when you start becomes the starting point. The station gets the trial login as its owner.';
+}
+async function demoDo(op, form, ask) {
+  if (ask && !confirm(ask)) { return; }
+  const r = await api('/api/admin/demo/' + op, form || {});
+  if (r.ok) { drawDemo(r.data); flash(r.data.note || 'Done', true); loadRadioStations(); } else { flash(r.data.error || 'Could not do it', false); }
+}
+$('trStart').addEventListener('click', () => demoDo('setup', { station: $('trStation').value, name: $('trName').value.trim(), user: $('trUser').value.trim(),
+  password: $('trPass').value, listed: $('trListed').checked ? '1' : '0' },
+  (trData && trData.on ? 'Start again? ' : '') + 'The station as it is now becomes the starting point, and "' + $('trUser').value.trim()
+  + '" with this password becomes a public login for it.'));
+$('trSave').addEventListener('click', () => demoDo('settings', { password: $('trPass').value, listed: $('trListed').checked ? '1' : '0' }));
+$('trSnap').addEventListener('click', () => demoDo('save-start', {}, 'Use what the station has right now (including anything visitors added) as the new starting point?'));
+$('trReset').addEventListener('click', () => demoDo('reset', {}, 'Put the trial station back to its starting point now? Everyone trying it is signed out.'));
+$('trStop').addEventListener('click', () => demoDo('stop', {}, 'Switch the trial off? Its login stops working; the station stays as it is.'));
+
+// ---------- Radio - Import: old listening links ----------
+async function loadOldLinks() {
+  const r = await api('/api/admin/old-links/list');
+  if (r.ok) { drawOldLinks(r.data); }
+}
+function drawOldLinks(d) {
+  $('olIp').textContent = d.ipHere ? '\u00b7 old address ' + d.ip + ' is on this server' : '\u00b7 old address ' + d.ip + ' is not on this server yet';
+  const t = $('olTable'); t.innerHTML = '';
+  headerRow(t, ['Old link', 'Plays', 'State', '']);
+  if (!d.rules.some(x => x.kind === 'port')) { const tr = el('tr'); const td = el('td', 'Nothing yet - import the Centova stations first, or add a link below.'); td.colSpan = 4; td.className = 'muted'; tr.appendChild(td); t.appendChild(tr); }
+  d.rules.filter(x => x.kind === 'port').forEach(x => {
+    const tr = el('tr');
+    tr.appendChild(el('td', x.kind === 'port' ? 'http://' + d.ip + ':' + x.key + '/stream' : 'https://mkarimu.com/listen/' + x.key + '/...')).style.fontFamily = 'ui-monospace, monospace';
+    tr.appendChild(el('td', x.stationName || '(off)'));
+    const st = el('td', x.status + (x.auto ? '' : ' \u00b7 set by hand')); st.className = 'small ' + (x.status === 'listening' || x.status === 'ready' ? 'ok' : 'muted'); tr.appendChild(st);
+    const td = el('td'); const b = el('button', x.auto && x.station ? 'Switch off' : 'Remove');
+    b.addEventListener('click', async () => { const q = await api('/api/admin/old-links/delete', { kind: x.kind, key: x.key }); if (q.ok) { drawOldLinks(q.data); } else { flash(q.data.error || 'Could not change it', false); } });
+    td.appendChild(b); tr.appendChild(td); t.appendChild(tr);
+  });
+  const sel = $('olStation'); const keep = sel.value; sel.innerHTML = '';
+  d.stations.forEach(x => { const o = el('option', x.name + ' (station ' + x.id + ')'); o.value = x.id; sel.appendChild(o); });
+  if (keep) { sel.value = keep; }
+}
+$('olAdd').addEventListener('click', async () => {
+  const r = await api('/api/admin/old-links/save', { kind: $('olKind').value, key: $('olKey').value.trim(), station: $('olStation').value });
+  if (r.ok) { $('olKey').value = ''; drawOldLinks(r.data); flash('Old link saved', true); } else { flash(r.data.error || 'Could not save', false); }
+});
+
+// ---------- Radio - Import: moving Centova Cast stations to Memoryq ----------
+let imData = null, imTimer = null, imPicked = null;
+// per account: what happens if it is a station already (skip / overwrite / new) and the edited name and login
+const imChoice = {}, imEdit = {};
+const IM_PARTS = [['songs', 'Songs (new ones added, changed files replaced)'], ['playlists', 'Playlists from Centova (the owner\'s own stay)'],
+  ['settings', 'Settings (contact, time zone, limits)'], ['history', 'Listening history']];
+async function loadImport() {
+  const r = await api('/api/admin/radio-import/status');
+  if (!r.ok) { flash(r.data.error || 'Could not load the import', false); return; }
+  imData = r.data; drawImport(); loadOldLinks();
+  clearInterval(imTimer);
+  imTimer = setInterval(async () => {
+    if (current.tab !== 'import' || document.hidden) { return; }
+    const x = await api('/api/admin/radio-import/status');
+    if (x.ok) { const busy = imData && imData.running; imData = x.data; drawImport(busy && !imData.running); }
+  }, 3000);
+}
+function drawImport(justFinished) {
+  const d = imData;
+  $('imCmdBox').hidden = !d.code;
+  $('imCmd').textContent = d.command || '';
+  $('imCodeNote').textContent = d.code ? 'Code ready - it works until ' + new Date(d.codeUntil).toLocaleString() : 'No code yet';
+  $('imArrived').textContent = d.exportedAt ? 'Last export: ' + new Date(d.exportedAt).toLocaleString() + (d.counts ? ' (' + d.counts + ')' : '')
+    : (d.accounts.length ? 'The export is still running...' : 'Nothing has arrived yet');
+  const t = $('imTable'); const keepFocus = document.activeElement && t.contains(document.activeElement);
+  if (!keepFocus) {
+    t.innerHTML = '';
+    const head = el('tr'); ['', 'Centova account', 'Station name on Memoryq', 'Login user', 'Songs here', 'Playlists', 'Listeners / quality', 'Live DJ'].forEach(h => head.appendChild(el('th', h))); t.appendChild(head);
+    if (imPicked === null) { imPicked = new Set(d.accounts.map(a => a.id)); }
+    d.accounts.forEach(a => {
+      const tr = el('tr');
+      const cb = el('input'); cb.type = 'checkbox'; cb.checked = imPicked.has(a.id);
+      cb.addEventListener('change', () => { if (cb.checked) { imPicked.add(a.id); } else { imPicked.delete(a.id); } });
+      const td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
+      const tc = el('td'); tc.appendChild(el('b', a.username)); tc.appendChild(el('div', (a.title || '') + (a.oldPort ? ' \u00b7 port ' + a.oldPort : ''))).className = 'muted small';
+      if (a.centovaStatus && a.centovaStatus !== 'enabled') { tc.appendChild(el('div', a.centovaStatus === 'suspended' ? 'suspended in Centova - stays suspended' : 'off in Centova - stays off')).className = 'small warn'; }
+      if (a.warnings && a.warnings.length) { const w = el('div', '\u26a0 ' + a.warnings.length + ' difference(s)'); w.className = 'small warn'; w.title = a.warnings.join('\n'); w.style.cursor = 'help'; tc.appendChild(w); }
+      tr.appendChild(tc);
+      if (a.imported) {
+        const ch = imChoice[a.id] || (imChoice[a.id] = { mode: 'skip', parts: new Set() });
+        const box = el('div'); box.className = 'small'; box.style.cssText = 'margin-top:6px;padding:6px;border:1px solid #e0a800;border-radius:6px;background:rgba(224,168,0,.08)';
+        box.appendChild(el('div', '\u26a0 Already on Memoryq: ' + a.imported.name + ' (station ' + a.imported.station + ', ' + a.imported.songs + ' songs, imported '
+          + new Date(a.imported.at).toLocaleDateString() + ')'));
+        const md = el('select'); md.style.cssText = 'width:auto;margin:4px 0';
+        [['skip', 'Skip - leave the station as it is'], ['overwrite', 'Overwrite parts of the station...'], ['new', 'Import as a new, separate station']].forEach(([v, t]) => { const o = el('option', t); o.value = v; md.appendChild(o); });
+        md.value = ch.mode; box.appendChild(md);
+        const pw = el('div'); pw.hidden = ch.mode !== 'overwrite';
+        IM_PARTS.forEach(([k, t]) => {
+          const l = el('label'); l.style.display = 'block'; const c = el('input'); c.type = 'checkbox'; c.checked = ch.parts.has(k); c.dataset.part = k;
+          c.addEventListener('change', () => { if (c.checked) { ch.parts.add(k); } else { ch.parts.delete(k); } });
+          l.appendChild(c); l.appendChild(document.createTextNode(' ' + t)); pw.appendChild(l);
+        });
+        pw.appendChild(el('div', 'Never changed: the login and its password, the live DJ port and password, the plan, the station name.', 'muted'));
+        box.appendChild(pw);
+        md.addEventListener('change', () => { ch.mode = md.value; pw.hidden = md.value !== 'overwrite'; tr.querySelectorAll('input[data-k]').forEach(i => { i.disabled = md.value !== 'new'; }); });
+        tc.appendChild(box);
+      } else if (a.importedGone) {
+        tc.appendChild(el('div', 'imported before, but that station was deleted - it is imported again')).className = 'small muted';
+      }
+      const nm = el('input'); nm.value = imEdit['name' + a.id] !== undefined ? imEdit['name' + a.id] : a.name; nm.maxLength = 40; nm.dataset.k = 'name' + a.id; nm.style.width = '190px';
+      nm.addEventListener('input', () => { imEdit['name' + a.id] = nm.value; });
+      const tn = el('td'); tn.appendChild(nm); if (a.nameTaken) { tn.appendChild(el('div', 'a station has this name - change it')).className = 'small warn'; } tr.appendChild(tn);
+      const lg = el('input'); lg.value = imEdit['login' + a.id] !== undefined ? imEdit['login' + a.id] : a.login; lg.maxLength = 24; lg.dataset.k = 'login' + a.id; lg.style.width = '130px';
+      lg.addEventListener('input', () => { imEdit['login' + a.id] = lg.value; });
+      if (a.imported && (imChoice[a.id] || {}).mode !== 'new') { nm.disabled = lg.disabled = true; }
+      const tl = el('td'); tl.appendChild(lg);
+      tl.appendChild(el('div', a.loginIsAdmin ? 'that is an admin - change it' : (a.loginExists ? 'exists (same e-mail) - the station is added to it' : 'new account (a password is made)'))).className = 'small ' + (a.loginIsAdmin ? 'warn' : 'muted');
+      if (a.loginNote) { tl.appendChild(el('div', a.loginNote)).className = 'small warn'; }
+      tr.appendChild(tl);
+      const ts = el('td', a.files + ' of ' + a.songs); ts.title = gbOf(a.bytes); if (a.files < a.songs) { ts.className = 'warn'; } tr.appendChild(ts);
+      const tp = el('td', String(a.playlists.length));
+      tp.title = a.playlists.map(p => p.title + ': ' + p.rule + ' (' + p.songs + ' songs' + (p.enabled ? '' : ', off') + ')').join('\n');
+      tr.appendChild(tp);
+      tr.appendChild(el('td', (a.listeners || 'no limit') + ' / ' + (a.kbps ? Math.min(320, a.kbps) + ' kbps' : 'plan')));
+      tr.appendChild(el('td', 'new port' + (a.djPass ? ', same password' : ', new password')));
+      t.appendChild(tr);
+    });
+    if (!d.accounts.length) { const tr = el('tr'); const td = el('td', 'Run the command above on the Centova server - the accounts show up here as they arrive.'); td.colSpan = 8; td.className = 'muted'; tr.appendChild(td); t.appendChild(tr); }
+  }
+  $('imRun').disabled = d.running || !d.accounts.length;
+  $('imProg').textContent = d.running ? 'Importing... ' + d.progress : (d.progress || '');
+  $('imMissing').textContent = d.missing ? d.missing + ' song file(s) could not be found on the Centova server.' : '';
+  const res = d.result;
+  $('imResultBox').hidden = !res;
+  if (res) {
+    const rt = $('imResult'); rt.innerHTML = '';
+    const head = el('tr'); ['Station', 'Login user', 'Password', 'Live DJ port / password', 'Songs', 'Playlists', 'Notes'].forEach(h => head.appendChild(el('th', h))); rt.appendChild(head);
+    res.stations.forEach(s => {
+      const tr = el('tr');
+      tr.appendChild(el('td', s.error ? s.centova : s.name + ' (station ' + s.station + ')' + ({ overwrite: ' - OVERWRITTEN', skip: ' - skipped' }[s.mode] || '')));
+      tr.appendChild(el('td', s.login));
+      tr.appendChild(el('td', s.error ? '' : (s.newAccount ? s.password : (s.mode === 'new' || !s.mode ? '(their own)' : '(unchanged)')))).style.fontFamily = 'ui-monospace, monospace';
+      tr.appendChild(el('td', s.error ? '' : s.port + ' / ' + s.livePass)).style.fontFamily = 'ui-monospace, monospace';
+      tr.appendChild(el('td', s.error ? '' : String(s.songs)));
+      tr.appendChild(el('td', s.error ? '' : String(s.playlists)));
+      const nt = el('td', s.error ? 'NOT IMPORTED: ' + s.error : s.notes.join(' \u00b7 ')); nt.className = s.error ? 'warn' : 'muted small'; tr.appendChild(nt);
+      rt.appendChild(tr);
+    });
+    $('imResAt').textContent = 'Imported ' + new Date(res.at).toLocaleString();
+    $('imRedirect').textContent = d.code ? 'cd /usr/local/centovacast && sudo bash mq-export.sh redirect ' + d.code : '(make an import code first)';
+  }
+  if (justFinished) { flash('Import finished - see the logins below', true); loadRadioStations(); loadOldLinks(); }
+}
+function imText() {
+  const host = (radioStatus && radioStatus.liveHost) || location.host;
+  return (imData.result ? imData.result.stations : []).filter(s => !s.error && (!s.mode || s.mode === 'new')).map(s => [s.name,
+    '  Studio:      ' + location.origin + '/studio', '  Login user:  ' + s.login, '  Password:    ' + (s.newAccount ? s.password : '(their existing password)'),
+    '  Listen:      ' + location.origin + '/radio/' + s.station + '.mp3', '  Live DJs:    ' + host + '  port ' + s.port + '  mount /live  user source  password ' + s.livePass].join('\n')).join('\n\n');
+}
+$('imCode').addEventListener('click', async () => {
+  if (imData && imData.code && !confirm('Make a new code? The old one stops working.')) { return; }
+  const r = await api('/api/admin/radio-import/code', {});
+  if (r.ok) { imData = r.data; drawImport(); flash('Import code made - copy the command', true); } else { flash(r.data.error || 'Could not make a code', false); }
+});
+$('imCopy').addEventListener('click', () => navigator.clipboard.writeText($('imCmd').textContent).then(() => flash('Command copied', true)));
+$('imRun').addEventListener('click', async () => {
+  const ids = Array.from(imPicked || []);
+  if (!ids.length) { flash('Tick at least one station', false); return; }
+  const form = { accounts: ids.join(','), trialDays: $('imTrial').value || 7, email: $('imMail').checked };
+  document.querySelectorAll('#imTable input[data-k]').forEach(i => { if (!i.disabled) { form[i.dataset.k] = i.value.trim(); } });
+  const fresh = [], over = [], copies = [], skips = [];
+  for (const id of ids) {
+    const a = imData.accounts.find(x => x.id === id); if (!a) { continue; }
+    if (!a.imported) { fresh.push(a.username); continue; }
+    const ch = imChoice[id] || { mode: 'skip', parts: new Set() };
+    form['mode' + id] = ch.mode;
+    if (ch.mode === 'overwrite') {
+      if (!ch.parts.size) { flash(a.username + ': tick what to overwrite, or choose Skip', false); return; }
+      form['parts' + id] = Array.from(ch.parts).join(',');
+      over.push('  ' + a.imported.name + ' (station ' + a.imported.station + '): ' + Array.from(ch.parts).join(', '));
+    } else if (ch.mode === 'new') { copies.push(a.username); } else { skips.push(a.imported.name); }
+  }
+  let msg = '';
+  if (fresh.length) { msg += 'NEW stations (' + form.trialDays + '-day free trial): ' + fresh.join(', ') + '\n\n'; }
+  if (over.length) { msg += 'OVERWRITE these existing stations - this cannot be undone:\n' + over.join('\n') + '\n\n'; }
+  if (copies.length) { msg += 'Second copy (the existing station stays too): ' + copies.join(', ') + '\n\n'; }
+  if (skips.length) { msg += 'Left as they are: ' + skips.join(', ') + '\n\n'; }
+  if (!fresh.length && !over.length && !copies.length) { flash('Nothing to do - every ticked station is set to Skip', false); return; }
+  if (!confirm(msg + 'Go ahead?')) { return; }
+  const r = await api('/api/admin/radio-import/run', form);
+  if (!r.ok) { flash(r.data.error || 'Could not start', false); return; }
+  flash('Importing... this takes a minute or two', true);
+  imData.running = true; drawImport();
+});
+$('imCopyAll').addEventListener('click', () => navigator.clipboard.writeText(imText()).then(() => flash('Logins copied', true)));
+$('imClear').addEventListener('click', async () => {
+  if (!confirm('Delete the copied Centova files from the import folder? (The imported stations keep their songs.)')) { return; }
+  const r = await api('/api/admin/radio-import/clear', {});
+  flash(r.ok ? 'Import folder cleared' : (r.data.error || 'Could not clear'), r.ok); imPicked = null; loadImport();
+});
+
+// ---------- Radio - Stations: the accounts list ----------
+// One row per station: owner login, port, listeners (now / most allowed), quality, data this month, disk space.
+// Tick stations for Start / Stop / Suspend / Unsuspend / Delete; Edit opens the station's tabs; Studio opens the owner's Studio.
+let accChecked = new Set(), accEditId = 0, accEditTab = 'stream', accList = [];
+const gbOf = (b) => b >= 1073741824 ? (b / 1073741824).toFixed(1) + ' GB' : Math.round(b / 1048576) + ' MB';
+async function loadRadioStations() {
+  const st = await radioFetch();
+  if (!st) { return; }
+  fillNewStation(st);
+  await loadBilling();
+  accList = st.stations.slice().sort((a, b) => a.id - b.id);
+  drawAccounts();
+  if (accEditId && accList.some(s => s.id === accEditId)) { drawAccEdit(); } else { accEditId = 0; $('accEdit').hidden = true; }
+  loadDemo();
+}
+function drawAccounts() {
+  const st = radioStatus; const list = accList;
+  // totals, top right
+  let slots = 0, unlimited = 0, month = 0, disk = 0, onAir = 0, now = 0;
+  list.forEach(s => { const pl = s.plan || {}, u = s.usage || {}; if (pl.listeners) { slots += pl.listeners; } else { unlimited++; }
+    month += u.monthBytes || 0; disk += u.storageBytes || 0; if (s.onAir) { onAir++; } now += u.listeners || 0; });
+  const sum = $('accSum'); sum.innerHTML = '';
+  [['Stations', list.length + ' (' + onAir + ' on air)'], ['Listening now', String(now)], ['Listener slots', slots + (unlimited ? ' + ' + unlimited + ' unlimited' : '')],
+    ['Data this month', gbOf(month)], ['Disk space', gbOf(disk)]].forEach(([k, v]) => { const d = el('div'); d.appendChild(el('span', k)); d.appendChild(el('b', v)); sum.appendChild(d); });
+  const q = $('accSearch').value.trim().toLowerCase();
+  const shown = list.filter(s => !q || [s.name, s.owner, s.description, String(s.livePort), s.status, s.email || '', s.company || ''].join(' ').toLowerCase().includes(q));
+  const box = $('radioStations'); box.textContent = '';
+  const t = el('table'); t.className = 'acc';
+  const head = el('tr');
+  const all = el('input'); all.type = 'checkbox'; all.title = 'Tick all shown'; all.checked = shown.length > 0 && shown.every(s => accChecked.has(s.id));
+  all.addEventListener('change', () => { shown.forEach(s => { if (all.checked) { accChecked.add(s.id); } else { accChecked.delete(s.id); } }); drawAccounts(); });
+  const th0 = el('th'); th0.appendChild(all); head.appendChild(th0);
+  ['', 'Login user', 'Station', 'Port', 'Plan', 'Listeners', 'Quality', 'Data (month)', 'Disk space', 'AI', 'Payment', ''].forEach((h, i) => { const th = el('th', h); if (i >= 5 && i <= 8) { th.className = 'num'; } head.appendChild(th); });
+  t.appendChild(head);
+  if (!shown.length) { const tr = el('tr'); const td = el('td', list.length ? 'No station matches "' + q + '".' : 'No stations yet - press New station.'); td.colSpan = 13; td.className = 'muted'; tr.appendChild(td); t.appendChild(tr); }
+  shown.forEach(s => {
+    const pl = s.plan || {}, u = s.usage || {};
+    const tr = el('tr'); if (s.id === accEditId) { tr.className = 'sel'; }
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = accChecked.has(s.id);
+    cb.addEventListener('change', () => { if (cb.checked) { accChecked.add(s.id); } else { accChecked.delete(s.id); } drawTool(); });
+    const td0 = el('td'); td0.appendChild(cb); tr.appendChild(td0);
+    const state = s.status === 'suspended' ? ['suspended', 'Suspended'] : (s.status === 'pending' ? ['pending', 'Waiting for approval'] : (s.onAir ? (s.liveOn ? ['live', 'Live DJ on air'] : ['on', 'On air']) : ['off', s.enabled ? 'Starting / waiting for payment' : 'Stopped']));
+    const dot = el('span'); dot.className = 'sdot ' + state[0]; dot.title = state[1]; const td1 = el('td'); td1.appendChild(dot); tr.appendChild(td1);
+    tr.appendChild(el('td', s.owner || '(Memoryq)')).style.fontWeight = '600';
+    const tn = el('td'); tn.appendChild(el('div', s.name)); tn.appendChild(el('div', state[1] + (s.liveOn && s.liveDj ? ': ' + s.liveDj : ''))).className = 'muted small'; tr.appendChild(tn);
+    tr.appendChild(el('td', String(s.livePort)));
+    tr.appendChild(el('td', pl.name || '-'));
+    const n = (v, cls) => { const td = el('td', v); td.className = 'num' + (cls ? ' ' + cls : ''); tr.appendChild(td); };
+    n((u.listeners || 0) + ' / ' + (pl.listeners || 'UNL'));
+    n((s.kbpsNow || pl.kbps || 128) + ' kbps');
+    n(gbOf(u.monthBytes || 0) + ' (' + (pl.transferGb ? pl.transferGb + ' GB' : 'UNL') + ')', pl.transferGb && u.monthBytes >= pl.transferGb * 1073741824 * 0.9 ? 'warn' : '');
+    n(gbOf(u.storageBytes || 0) + ' (' + (pl.storageMb ? gbOf(pl.storageMb * 1048576) : 'UNL') + ')', pl.storageMb && u.storageBytes >= pl.storageMb * 1048576 * 0.9 ? 'warn' : '');
+    // AI presenter (Alma) for the whole station
+    const aiTd = el('td'); const ai = el('input'); ai.type = 'checkbox'; ai.checked = s.aiOn !== false;
+    ai.title = ai.checked ? 'Alma (AI presenter) is on - untick to switch her off on this station' : 'Alma is off on this station - tick to switch her on';
+    ai.addEventListener('change', async () => {
+      const r = await api('/api/admin/radio/station/admin', { id: s.id, aiOn: ai.checked ? '1' : '0' });
+      flash(r.ok ? 'AI presenter ' + (ai.checked ? 'on' : 'off') + ' for ' + s.name : (r.data.error || 'Could not change it'), r.ok);
+      if (!r.ok) { ai.checked = !ai.checked; } else { s.aiOn = ai.checked; }
+    });
+    aiTd.appendChild(ai); aiTd.appendChild(document.createTextNode(ai.checked ? ' on' : ' off')); tr.appendChild(aiTd);
+    ai.addEventListener('change', () => { aiTd.lastChild.textContent = ai.checked ? ' on' : ' off'; });
+    const pay = el('td'); const pill = el('span', s.billing === 'paid' ? 'paid' : (s.billing === 'trial' ? 'trial' : 'not paid')); pill.className = 'pill ' + s.billing; pay.appendChild(pill);
+    if (s.paidUntil) { pay.appendChild(el('div', 'to ' + new Date(s.paidUntil).toISOString().slice(0, 10))).className = 'muted small'; }
+    tr.appendChild(pay);
+    const act = el('td'); act.style.whiteSpace = 'nowrap';
+    act.appendChild(button('Edit', () => { accEditId = s.id; accEditTab = 'stream'; drawAccounts(); drawAccEdit(); $('accEdit').scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+    act.appendChild(button('Studio', () => loginAs(s)));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+  box.appendChild(t);
+  drawTool();
+}
+function drawTool() {
+  const n = accChecked.size;
+  document.querySelectorAll('#accTool button[data-act]').forEach(b => { b.disabled = n === 0; });
+  $('accCount').textContent = n ? n + ' ticked' : '';
+}
+$('accSearch').addEventListener('input', drawAccounts);
+$('accNew').addEventListener('click', () => { const b = $('newBox'); b.hidden = !b.hidden; if (!b.hidden) { $('rsName').focus(); } });
+document.querySelectorAll('#accTool button[data-act]').forEach(b => b.addEventListener('click', () => bulk(b.dataset.act)));
+async function bulk(act) {
+  const picked = accList.filter(s => accChecked.has(s.id));
+  if (!picked.length) { return; }
+  const names = picked.map(s => s.name).join(', ');
+  const ask = { start: 'Start (put on air)', stop: 'Stop (take off air)', suspend: 'Suspend', unsuspend: 'Unsuspend', delete: 'DELETE with all their songs' }[act];
+  if (!confirm(ask + ': ' + names + '?')) { return; }
+  let ok = 0; const bad = [];
+  for (const s of picked) {
+    let r;
+    if (act === 'start' || act === 'stop') { r = await api('/api/admin/radio/station/save', { id: s.id, enabled: act === 'start' }); }
+    else if (act === 'suspend' || act === 'unsuspend') { r = await api('/api/admin/radio/station/admin', { id: s.id, status: act === 'suspend' ? 'suspended' : 'active' }); }
+    else { r = await api('/api/admin/radio/station/delete', { id: s.id }); }
+    if (r.ok) { ok++; } else { bad.push(s.name + ': ' + (r.data.error || 'failed')); }
+  }
+  if (act === 'delete') { accChecked.clear(); }
+  flash(ok + ' done' + (bad.length ? ' - not done: ' + bad.join('; ') : ''), !bad.length);
+  loadRadioStations();
+}
+async function loginAs(s) {
+  const r = await api('/api/admin/radio/station/login-as', { id: s.id });
+  if (!r.ok) { flash(r.data.error || 'Could not open the Studio', false); return; }
+  window.open('/studio?station=' + s.id + '#as=' + r.data.token, '_blank', 'noopener');
+}
+// the edit panel: Stream, Limits, AutoDJ, Billing, Links, Advanced
+const ACC_TABS = [['stream', 'Stream'], ['limits', 'Limits'], ['autodj', 'AutoDJ'], ['billing', 'Billing'], ['links', 'Links'], ['staff', 'Staff'], ['advanced', 'Advanced']];
+function drawAccEdit() {
+  const s = accList.find(x => x.id === accEditId); const box = $('accEdit');
+  if (!s) { box.hidden = true; return; }
+  box.hidden = false; box.innerHTML = '';
+  const st = radioStatus;
+  const h = el('div'); h.className = 'edhead';
+  h.appendChild(el('h3', 'Edit ' + s.name)); h.appendChild(el('span', 'station ' + s.id + (s.owner ? ' \u00b7 account ' + s.owner : ' \u00b7 run by Memoryq'))).className = 'muted';
+  box.appendChild(h);
+  const tabs = el('div'); tabs.className = 'edtabs';
+  ACC_TABS.forEach(([id, label]) => { const b = el('button', label); if (id === accEditTab) { b.className = 'on'; } b.addEventListener('click', () => { accEditTab = id; drawAccEdit(); }); tabs.appendChild(b); });
+  box.appendChild(tabs);
+  const body = el('div'); body.className = 'fgrid'; box.appendChild(body);
+  const f = {};   // fields that are saved with Update
+  const field = (key, label, value, opts) => {
+    opts = opts || {};
+    const l = el('label', label);
+    let i;
+    if (opts.options) { i = el('select'); opts.options.forEach(([v, t]) => { const o = el('option', t); o.value = v; if (String(v) === String(value)) { o.selected = true; } i.appendChild(o); }); }
+    else if (opts.check) { i = el('input'); i.type = 'checkbox'; i.checked = !!value; i.style.width = 'auto'; }
+    else { i = el('input'); i.value = value == null ? '' : value; if (opts.type) { i.type = opts.type; } if (opts.ph) { i.placeholder = opts.ph; } if (opts.max) { i.maxLength = opts.max; } }
+    l.appendChild(i); if (opts.note) { l.appendChild(el('span', opts.note)).className = 'muted small'; }
+    body.appendChild(l); f[key] = i; return i;
+  };
+  const pl = s.plan || {}, u = s.usage || {}, lim = s.limits || [0, 0, 0, 0, 0];
+  if (accEditTab === 'stream') {
+    field('name', 'Stream title (station name)', s.name, { max: 40 });
+    field('description', 'Slogan', s.description, { max: 160 });
+    field('website', 'Website URL', s.website, { ph: 'https://...' });
+    field('company', 'Company / organisation', s.company, { max: 80 });
+    field('email', 'E-mail address', s.email, { type: 'email', max: 120 });
+    field('timezone', 'Time zone', s.timezone || 'UTC', { options: timeZones(s.timezone).map(z => [z, z.replace(/_/g, ' ')]) });
+    field('livePort', 'Live DJ port', s.livePort, { type: 'number', note: 'between ' + st.livePortMin + ' and ' + st.livePortMax });
+    field('livePass', 'Source (stream) password', s.livePass, { max: 40 });
+    field('ownerPassword', 'Owner\'s login password', '', { type: 'password', ph: s.owner ? '(empty = keep it)' : '(no owner account)', note: s.owner ? 'sets a new password for ' + s.owner : '' });
+    body.appendChild(el('div', 'Live DJs (BUTT, Mixxx): ' + st.liveHost + ':' + s.livePort + ' \u00b7 mount /live \u00b7 user source' + (s.liveProblem ? ' \u00b7 ' + s.liveProblem : ''))).className = 'muted small wide';
+  } else if (accEditTab === 'limits') {
+    field('plan', 'Plan', s.planId || 0, { options: [[0, '(no plan - no limits)']].concat(adminPlans.map(p => [p.id, p.name])) });
+    const base = adminPlans.find(p => p.id === s.planId) || {};
+    const hint = (v, unit) => 'plan: ' + (v ? v + unit : 'no limit') + ' \u00b7 empty = plan, 0 = no limit';
+    const own = (v) => v > 0 ? v : (v === -1 ? 0 : '');
+    field('limListeners', 'Most listeners at once', own(lim[0]), { type: 'number', note: hint(base.listeners, '') + ' \u00b7 now ' + (u.listeners || 0) });
+    field('limKbps', 'Stream quality', lim[1] || 0, { options: [[0, '(the plan\'s: ' + (base.kbps || 128) + ' kbps)']].concat([32, 48, 64, 96, 128, 160, 192, 256, 320].map(k => [k, k + ' kbps'])) });
+    field('limStorage', 'Disk space (MB)', own(lim[2]), { type: 'number', note: hint(base.storageMb, ' MB') + ' \u00b7 used ' + gbOf(u.storageBytes || 0) });
+    field('limTransfer', 'Data per month (GB)', own(lim[3]), { type: 'number', note: hint(base.transferGb, ' GB') + ' \u00b7 used ' + gbOf(u.monthBytes || 0) });
+    field('limDjs', 'Remote DJs', lim[4] === -1 ? 'none' : (lim[4] || ''), { options: [['', '(the plan\'s: ' + (base.djs == null ? 3 : base.djs) + ')'], ['none', 'none'], [1, '1'], [2, '2'], [3, '3']], note: (u.djs || 0) + ' set up' });
+  } else if (accEditTab === 'autodj') {
+    field('enabled', 'On air (AutoDJ running)', s.enabled, { check: true });
+    field('djName', 'DJ name', s.djName, { max: 40 });
+    field('voice', 'DJ voice', s.voice, { options: (st.voices.length ? st.voices : ['']).map(v => [v, v || '(default voice)']) });
+    field('talkEvery', 'The DJ talks every ... songs (0 = never)', s.talkEvery, { type: 'number' });
+    field('newsOn', 'News', s.newsOn, { check: true });
+    field('shoutOn', 'Chat shout-outs', s.shoutOn, { check: true });
+    field('introsOn', 'Song intros', s.introsOn, { check: true });
+    field('sayArtist', 'Say artists\' names in intros (off = song titles only)', s.sayArtist, { check: true });
+    field('idEvery', 'Says the station name over a song every ... songs (0 = never)', s.idEvery, { type: 'number' });
+    field('storyEvery', 'Reads a story part every ... songs (0 = no stories; books in the Studio)', s.storyEvery, { type: 'number' });
+    field('promo', 'Promo line', s.promo, { max: 200 });
+    const b = el('div'); b.className = 'wide';
+    b.appendChild(button('Music library (' + s.songs + ' songs)', () => { radioMusicStation = s.id; show('radio', 'music'); }));
+    b.appendChild(button('Playlists in the Studio', () => loginAs(s)));
+    body.appendChild(b);
+  } else if (accEditTab === 'billing') {
+    field('status', 'Account status', s.status, { options: [['active', 'Active'], ['pending', 'Waiting for approval'], ['suspended', 'Suspended']] });
+    field('billing', 'Payment', s.billing, { options: [['paid', 'Paid'], ['trial', 'Trial'], ['unpaid', 'Not paid']] });
+    field('until', 'Paid / trial until (empty = no end)', s.paidUntil ? new Date(s.paidUntil).toISOString().slice(0, 10) : '', { type: 'date' });
+    body.appendChild(el('div', s.paidOnline ? 'Pays by card (' + (s.plan && s.plan.name || 'online') + ')' : 'Not paying online')).className = 'muted small wide';
+    const plusDays = (d) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+    const b = el('div'); b.className = 'wide';
+    b.appendChild(button('Activate: paid 1 month', async () => { await saveAdmin(s, { status: 'active', billing: 'paid', until: plusDays(31) }); }));
+    b.appendChild(button('Activate: 14-day trial', async () => { await saveAdmin(s, { status: 'active', billing: 'trial', until: plusDays(14) }); }));
+    body.appendChild(b);
+  } else if (accEditTab === 'links') {
+    const o = location.origin;
+    [['Listen', o + '/radio/' + s.id + '.mp3'], ['Playlist file', o + '/radio/' + s.id + '.m3u'], ['Website player', o + '/radio/embed/' + s.id],
+      ['Live DJ (Icecast)', st.liveHost + ':' + s.livePort + ' /live  user source'], ['Studio', o + '/studio'], ['Live DJ Pro', o + '/djpro']].forEach(([k, v]) => {
+      const l = el('label', k); const c = el('input'); c.value = v; c.readOnly = true; l.appendChild(c);
+      l.appendChild(button('Copy', () => navigator.clipboard.writeText(v).then(() => flash('Copied', true))));
+      body.appendChild(l);
+    });
+  } else if (accEditTab === 'staff') {
+    drawStaff(s, body);
+  } else if (accEditTab === 'advanced') {
+    field('owner', 'Login user (account that owns the station)', s.owner, { max: 40, ph: '(Memoryq\u2019s own)', note: 'change it to move the station to another account' });
+    const b = el('div'); b.className = 'wide';
+    b.appendChild(button('Delete this station', async () => {
+      if (!confirm('Delete ' + s.name + ' and all its ' + s.songs + ' songs? This cannot be undone.')) { return; }
+      const r = await api('/api/admin/radio/station/delete', { id: s.id });
+      flash(r.ok ? 'Deleted ' + s.name : (r.data.error || 'Could not delete'), r.ok); accEditId = 0; loadRadioStations();
+    }));
+    body.appendChild(b);
+  }
+  const foot = el('div'); foot.className = 'edfoot';
+  const upd = button('Update', async () => { await saveEdit(s, f); }); upd.className = 'pri';
+  upd.hidden = accEditTab === 'staff';   // staff changes are saved straight away
+  foot.appendChild(upd);
+  foot.appendChild(button('Cancel', () => { accEditId = 0; box.hidden = true; drawAccounts(); }));
+  foot.appendChild(el('span')).className = 'grow';
+  foot.appendChild(button('Login to this account', () => loginAs(s)));
+  box.appendChild(foot);
+}
+// Station staff: members (signed up on Memoryq) who work on this station with their own login at /studio.
+// Only the super-admin gives or takes away these roles.
+const STAFF_ROLES = [['coadmin', 'Co-admin - the whole Studio except payment and plans'], ['presenter', 'Presenter - music, playlists, stories, Live DJ Pro']];
+async function drawStaff(s, body) {
+  body.innerHTML = '';
+  body.appendChild(el('div', 'Members who work on ' + s.name + ' with their OWN Memoryq login at ' + location.origin + '/studio (they sign up first). '
+    + 'Owner: ' + (s.owner || '(Memoryq)') + '. Only you (super-admin) can add or remove staff.')).className = 'muted small wide';
+  const list = el('div'); list.className = 'wide'; body.appendChild(list);
+  const draw = (staff) => {
+    list.innerHTML = '';
+    if (!staff.length) { list.appendChild(el('div', 'No staff yet.')).className = 'muted'; return; }
+    const t = el('table'); t.className = 'tbl';
+    const hr = el('tr'); ['Member', 'Role', 'Since', ''].forEach(x => hr.appendChild(el('th', x))); t.appendChild(hr);
+    staff.forEach(m => {
+      const tr = el('tr');
+      const who = el('td', m.user); who.style.fontWeight = '600';
+      if (!m.accountOk) { who.appendChild(el('span', ' (account missing or switched off)')).className = 'muted small'; }
+      tr.appendChild(who);
+      const rc = el('td'); const sel = el('select');
+      STAFF_ROLES.forEach(([v, label]) => { const o = el('option', label); o.value = v; if (v === m.role) { o.selected = true; } sel.appendChild(o); });
+      sel.addEventListener('change', async () => {
+        const r = await api('/api/admin/radio/staff/save', { station: s.id, user: m.user, role: sel.value });
+        flash(r.ok ? m.user + ' is now ' + (sel.value === 'coadmin' ? 'co-admin' : 'presenter') : (r.data.error || 'Could not save'), r.ok);
+        if (r.ok) { draw(r.data.staff); }
+      });
+      rc.appendChild(sel); tr.appendChild(rc);
+      tr.appendChild(el('td', m.added ? new Date(m.added).toLocaleDateString() : ''));
+      const ac = el('td');
+      ac.appendChild(button('Remove', async () => {
+        if (!confirm('Take ' + m.user + ' off ' + s.name + '? They can no longer open it in the Studio.')) { return; }
+        const r = await api('/api/admin/radio/staff/delete', { station: s.id, user: m.user });
+        flash(r.ok ? m.user + ' removed from ' + s.name : (r.data.error || 'Could not remove'), r.ok);
+        if (r.ok) { draw(r.data.staff); }
+      }));
+      tr.appendChild(ac); t.appendChild(tr);
+    });
+    list.appendChild(t);
+  };
+  const add = el('div'); add.className = 'wide'; add.style.marginTop = '10px';
+  const ul = el('label', 'Member username'); const ui = el('input'); ui.maxLength = 40; ui.placeholder = 'their Memoryq username'; ul.appendChild(ui);
+  const rl = el('label', 'Role'); const rs = el('select');
+  STAFF_ROLES.forEach(([v, label]) => { const o = el('option', label); o.value = v; rs.appendChild(o); });
+  rs.value = 'presenter'; rl.appendChild(rs);
+  ul.style.display = rl.style.display = 'inline-block'; ul.style.marginRight = '10px'; ul.style.minWidth = '220px';
+  add.appendChild(ul); add.appendChild(rl);
+  add.appendChild(button('Add to this station', async () => {
+    const u = ui.value.trim(); if (!u) { flash('Type the member\'s username', false); return; }
+    const r = await api('/api/admin/radio/staff/save', { station: s.id, user: u, role: rs.value });
+    flash(r.ok ? u + ' can now open ' + s.name + ' at /studio with their own login' : (r.data.error || 'Could not add'), r.ok);
+    if (r.ok) { ui.value = ''; draw(r.data.staff); }
+  }));
+  body.appendChild(add);
+  const r = await fetch('/api/admin/radio/staff?station=' + s.id, { headers: { 'Authorization': 'Bearer ' + token } });
+  let d = {}; try { d = await r.json(); } catch (e) { }
+  if (!r.ok) { list.appendChild(el('div', d.error || 'Could not load the staff')).className = 'error'; return; }
+  draw(d.staff || []);
+}
+function timeZones(cur) {
+  let z = []; try { z = Intl.supportedValuesOf('timeZone'); } catch (e) { }
+  if (!z.includes('UTC')) { z.unshift('UTC'); } if (cur && !z.includes(cur)) { z.unshift(cur); } return z;
+}
+async function saveAdmin(s, form) {
+  const r = await api('/api/admin/radio/station/admin', Object.assign({ id: s.id }, form));
+  flash(r.ok ? 'Saved ' + s.name : (r.data.error || 'Could not save'), r.ok);
+  if (r.ok) { loadRadioStations(); }
+  return r.ok;
+}
+async function saveEdit(s, f) {
+  const v = (k) => f[k] ? (f[k].type === 'checkbox' ? f[k].checked : f[k].value.trim()) : undefined;
+  const adminForm = {}, saveForm = {};
+  ['website', 'company', 'email', 'livePort', 'livePass', 'ownerPassword', 'plan', 'status', 'billing', 'until', 'owner'].forEach(k => { if (f[k] !== undefined) { adminForm[k] = v(k); } });
+  if (adminForm.ownerPassword === '') { delete adminForm.ownerPassword; }
+  if (f.limListeners) {
+    const num = (k) => { const x = v(k); return x === '' ? 0 : (Number(x) === 0 ? -1 : Number(x)); };
+    const djs = v('limDjs');
+    adminForm.limits = [num('limListeners'), Number(v('limKbps')), num('limStorage'), num('limTransfer'), djs === '' ? 0 : (djs === 'none' ? -1 : Number(djs))].join(',');
+  }
+  ['name', 'description', 'timezone', 'enabled', 'djName', 'voice', 'talkEvery', 'newsOn', 'shoutOn', 'introsOn', 'sayArtist', 'idEvery', 'storyEvery', 'promo'].forEach(k => { if (f[k] !== undefined) { saveForm[k] = v(k); } });
+  let ok = true;
+  if (Object.keys(adminForm).length) { const r = await api('/api/admin/radio/station/admin', Object.assign({ id: s.id }, adminForm)); if (!r.ok) { flash(r.data.error || 'Could not save', false); ok = false; } }
+  if (ok && Object.keys(saveForm).length) { const r = await api('/api/admin/radio/station/save', Object.assign({ id: s.id }, saveForm)); if (!r.ok) { flash(r.data.error || 'Could not save', false); ok = false; } }
+  if (ok) { flash('Updated ' + s.name, true); loadRadioStations(); }
+}
+function adminPass(n) {
+  const abc = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const r = new Uint32Array(n); crypto.getRandomValues(r);
+  return Array.from(r, x => abc[x % abc.length]).join('');
+}
+function fillNewStation(st) {
+  const sel = $('rsPort'); const keep = sel.value; sel.innerHTML = '';
+  (st.freePorts || []).forEach(p => { const o = el('option', String(p)); o.value = p; sel.appendChild(o); });
+  if (keep && (st.freePorts || []).includes(Number(keep))) { sel.value = keep; }
+  if (!$('rsPass').value) { $('rsPass').value = adminPass(12); }
+  if (!$('rsLoginPass').value) { $('rsLoginPass').value = adminPass(10); }
+  if (!$('rsUntil').value) { $('rsUntil').value = new Date(Date.now() + 31 * 86400000).toISOString().slice(0, 10); }
+}
+$('rsName').addEventListener('input', () => {
+  const u = $('rsUser');
+  if (!u.dataset.touched) { u.value = $('rsName').value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20); }
+});
+$('rsUser').addEventListener('input', () => { $('rsUser').dataset.touched = '1'; });
+$('rsBill').addEventListener('change', () => {
+  const d = $('rsBill').value === 'trial' ? 14 : 31;
+  $('rsUntil').value = $('rsBill').value === 'unpaid' ? '' : new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+});
+$('rsNewPass').addEventListener('click', () => { $('rsPass').value = adminPass(12); $('rsLoginPass').value = adminPass(10); });
+$('rsCreate').addEventListener('click', async () => {
+  const f = { name: $('rsName').value.trim(), description: $('rsDesc').value.trim(), website: $('rsWeb').value.trim(),
+    livePort: $('rsPort').value, livePass: $('rsPass').value.trim(), loginUser: $('rsUser').value.trim(),
+    loginPassword: $('rsLoginPass').value, email: $('rsEmail').value.trim(), billing: $('rsBill').value, plan: $('rsPlan').value,
+    until: $('rsBill').value === 'unpaid' ? '' : $('rsUntil').value };
+  const r = await api('/api/admin/radio/station/create', f);
+  if (!r.ok) { flash(r.data.error || 'Could not create the station', false); return; }
+  flash('Station created' + (r.data.note ? ' - ' + r.data.note : ''), !r.data.note);
+  const host = (radioStatus && radioStatus.liveHost) || location.host;
+  const lines = ['Station:          ' + f.name, 'Studio:           ' + location.origin + '/studio'];
+  if (r.data.owner) {
+    lines.push('Login user:       ' + r.data.owner);
+    lines.push('Login password:   ' + (r.data.newAccount ? f.loginPassword : '(their existing password)'));
+  }
+  lines.push('Listen:           ' + location.origin + '/radio/' + r.data.id + '.mp3');
+  lines.push('Website player:   ' + location.origin + '/radio/embed/' + r.data.id);
+  lines.push('Live (Icecast):   ' + host + '  port ' + r.data.livePort + '  mount /live  user source  password ' + r.data.livePass);
+  const box = $('rsDone'); box.innerHTML = '';
+  const pre = el('div', lines.join('\n')); pre.className = 'creds'; box.appendChild(pre);
+  box.appendChild(button('Copy these details', () => { navigator.clipboard.writeText(lines.join('\n')).then(() => flash('Copied', true)); }));
+  ['rsName', 'rsDesc', 'rsWeb', 'rsUser', 'rsEmail', 'rsPass', 'rsLoginPass'].forEach(id => { $(id).value = ''; });
+  delete $('rsUser').dataset.touched;
+  radioMusicStation = r.data.id;
+  loadRadioStations();
+});
+let adminPlans = [];
+const KBPS = [64, 96, 128, 192, 256, 320];
+function drawPlans(addNew) {
+  const t = $('planTable'); t.innerHTML = '';
+  const head = el('tr');
+  ['Plan', 'Month', 'Year', 'Listeners', 'Quality', 'Storage MB', 'Data GB/mo', 'DJs', 'DJ Pro', 'Sign-up', ''].forEach(h => head.appendChild(el('th', h)));
+  t.appendChild(head);
+  const rows = adminPlans.slice();
+  if (addNew) { rows.push({ id: 0, name: '', month: '', year: '', listeners: 0, kbps: 128, storageMb: 0, transferGb: 0, djs: 3, djPro: true, signup: true }); }
+  rows.forEach(p => {
+    const tr = el('tr');
+    const inp = (v, w, type) => { const i = el('input'); i.value = v; i.style.width = w; if (type) { i.type = type; i.min = 0; } const td = el('td'); td.appendChild(i); tr.appendChild(td); return i; };
+    const name = inp(p.name, '96px');
+    const month = inp(Number(p.month) > 0 ? p.month : '', '58px');
+    const year = inp(Number(p.year) > 0 ? p.year : '', '58px');
+    const lis = inp(p.listeners || '', '74px', 'number');
+    const kb = el('select'); KBPS.forEach(k => { const o = el('option', k + ' kbps'); o.value = k; if (k === p.kbps) { o.selected = true; } kb.appendChild(o); });
+    const tdk = el('td'); tdk.appendChild(kb); tr.appendChild(tdk);
+    const sto = inp(p.storageMb || '', '74px', 'number');
+    const xfer = inp(p.transferGb || '', '56px', 'number');
+    const djs = el('select'); [0, 1, 2, 3].forEach(k => { const o = el('option', String(k)); o.value = k; if (k === p.djs) { o.selected = true; } djs.appendChild(o); });
+    const tdd = el('td'); tdd.appendChild(djs); tr.appendChild(tdd);
+    const pro = el('input'); pro.type = 'checkbox'; pro.checked = p.djPro; const tdp = el('td'); tdp.appendChild(pro); tr.appendChild(tdp);
+    const su = el('input'); su.type = 'checkbox'; su.checked = p.signup; const tds = el('td'); tds.appendChild(su); tr.appendChild(tds);
+    const act = el('td');
+    act.appendChild(button(p.id ? 'Save' : 'Create', async () => {
+      const r = await api('/api/admin/radio/plan/save', { id: p.id, name: name.value.trim(), month: month.value.trim(), year: year.value.trim(),
+        listeners: lis.value || 0, kbps: kb.value, storageMb: sto.value || 0, transferGb: xfer.value || 0, djs: djs.value,
+        djPro: pro.checked, signup: su.checked });
+      flash(r.ok ? 'Plan saved' : (r.data.error || 'Could not save the plan'), r.ok);
+      if (r.ok) { loadBilling(); }
+    }));
+    if (p.id) {
+      act.appendChild(button('Delete', async () => {
+        if (!confirm('Delete the plan ' + p.name + '?')) { return; }
+        const r = await api('/api/admin/radio/plan/delete', { id: p.id });
+        flash(r.ok ? 'Plan deleted' : (r.data.error || 'Could not delete'), r.ok);
+        if (r.ok) { loadBilling(); }
+      }));
+    } else {
+      act.appendChild(button('Cancel', () => drawPlans()));
+    }
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+  if (!rows.length) { const tr = el('tr'); const td = el('td', 'No plans yet - add one (e.g. Starter, Pro, Club).'); td.colSpan = 11; tr.appendChild(td); t.appendChild(tr); }
+}
+$('planAdd').addEventListener('click', () => drawPlans(true));
+async function loadBilling() {
+  loadDropbox();
+  const r = await api('/api/admin/radio/billing');
+  if (!r.ok) { return; }
+  const b = r.data;
+  if (document.activeElement && document.activeElement.closest && document.activeElement.closest('#bSave') === null
+      && ['bCur', 'bMonth', 'bYear', 'bTrial', 'bKey'].includes(document.activeElement.id)) { return; }
+  $('bCur').value = b.currency;
+  $('bTrial').value = b.trialDays; $('bKey').value = '';
+  adminPlans = b.plans || [];
+  drawPlans();
+  const rp = $('rsPlan'); const keep = rp.value; rp.innerHTML = '';
+  const none = el('option', '(no plan - no limits)'); none.value = '0'; rp.appendChild(none);
+  adminPlans.forEach(p => { const o = el('option', p.name); o.value = p.id; rp.appendChild(o); });
+  if (keep && [...rp.options].some(o => o.value === keep)) { rp.value = keep; } else if (adminPlans.length) { rp.value = String(adminPlans[0].id); }
+  $('bKeyHint').textContent = b.keyHint ? '(now: ' + b.keyHint + (b.testMode ? ', TEST mode' : '') + ')' : '(none yet)';
+  $('bState').textContent = b.online ? 'Online payment is ON' + (b.testMode ? ' (test mode)' : '') : 'Online payment is off';
+  $('bState').className = b.online ? 'ok' : 'muted';
+}
+async function loadDropbox() {
+  const r = await api('/api/djpro/settings');
+  if (!r.ok) { return; }
+  if (document.activeElement !== $('dbxKey')) { $('dbxKey').value = r.data.dropboxKey || ''; }
+  $('dbxState').textContent = r.data.dropboxKey ? 'Dropbox is ON in the DJ console' : 'Dropbox is off';
+  $('dbxState').className = r.data.dropboxKey ? 'ok' : 'muted';
+}
+$('dbxSave').addEventListener('click', async () => {
+  const r = await api('/api/djpro/settings', { dropboxKey: $('dbxKey').value.trim() });
+  flash(r.ok ? 'Dropbox key saved' : (r.data.error || 'Could not save'), r.ok);
+  loadDropbox();
+});
+$('bSave').addEventListener('click', async () => {
+  const r = await api('/api/admin/radio/billing/save', { currency: $('bCur').value.trim(),
+    trialDays: $('bTrial').value.trim(), stripeKey: $('bKey').value.trim() });
+  flash(r.ok ? 'Saved' : (r.data.error || 'Could not save'), r.ok);
+  if (r.ok) { $('bKey').value = ''; loadBilling(); }
+});
+$('bKeyRemove').addEventListener('click', async () => {
+  if (!confirm('Remove the Stripe key? Online payment stops (existing subscriptions are not cancelled).')) { return; }
+  const r = await api('/api/admin/radio/billing/save', { stripeKey: '-' });
+  flash(r.ok ? 'Stripe key removed' : (r.data.error || 'Could not remove'), r.ok);
+  loadBilling();
+});
+let radioMusicStation = 0;
+async function loadRadioMusic() {
+  const st = await radioFetch();
+  const sel = $('rmStation');
+  sel.textContent = '';
+  if (!st || st.stations.length === 0) {
+    const o = el('option', 'Create a station first'); o.value = ''; sel.appendChild(o);
+    $('rmTracks').textContent = '';
+    return;
+  }
+  if (!st.stations.some(s => s.id === radioMusicStation)) { radioMusicStation = st.stations[0].id; }
+  st.stations.forEach(s => { const o = el('option', s.name + ' (' + s.songs + ' songs)'); o.value = s.id; if (s.id === radioMusicStation) { o.selected = true; } sel.appendChild(o); });
+  await loadRadioTracks();
+}
+$('rmStation').addEventListener('change', () => { radioMusicStation = Number($('rmStation').value); loadRadioTracks(); });
+async function loadRadioTracks() {
+  const r = await api('/api/admin/radio/tracks?station=' + radioMusicStation);
+  const t = $('rmTracks');
+  headerRow(t, ['Title', 'Artist', 'Link ("Get this song")', 'Length', 'Plays', '\u2764 Likes', 'Taps', 'Requests', '']);
+  const list = r.ok ? r.data.tracks : [];
+  list.forEach(x => {
+    const tr = el('tr');
+    const ti = el('input'); ti.value = x.title; ti.maxLength = 120; ti.style.width = '240px';
+    const ar = el('input'); ar.value = x.artist; ar.maxLength = 80; ar.style.width = '180px';
+    const td1 = el('td'); td1.appendChild(ti); tr.appendChild(td1);
+    const td2 = el('td'); td2.appendChild(ar); tr.appendChild(td2);
+    const ln = el('input'); ln.value = x.link || ''; ln.maxLength = 300; ln.style.width = '220px'; ln.placeholder = 'https://open.spotify.com/...';
+    const td3 = el('td'); td3.appendChild(ln); tr.appendChild(td3);
+    tr.appendChild(el('td', fmtTime(x.durationMs)));
+    tr.appendChild(el('td', String(x.plays)));
+    tr.appendChild(el('td', String(x.likes || 0)));
+    tr.appendChild(el('td', String(x.taps || 0)));
+    tr.appendChild(el('td', String(x.requests || 0)));
+    const td = el('td');
+    td.appendChild(button('Save', async () => {
+      const s = await api('/api/admin/radio/track/save', { id: x.id, title: ti.value, artist: ar.value, link: ln.value.trim() });
+      flash(s.ok ? 'Saved' : (s.data.error || 'Could not save'), s.ok);
+    }));
+    td.appendChild(button('Delete', async () => {
+      if (!confirm('Delete ' + x.title + '?')) { return; }
+      const s = await api('/api/admin/radio/track/delete', { id: x.id });
+      flash(s.ok ? 'Deleted' : (s.data.error || 'Could not delete'), s.ok);
+      loadRadioTracks();
+    }));
+    tr.appendChild(td);
+    t.appendChild(tr);
+  });
+  if (list.length === 0) { const tr = el('tr'); tr.appendChild(el('td', 'No songs yet - choose files above to add music.')); t.appendChild(tr); }
+}
+function uploadOne(file, station, onProgress) {
+  return new Promise((resolve) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/admin/radio/upload?station=' + station + '&name=' + encodeURIComponent(file.name));
+    x.setRequestHeader('Authorization', 'Bearer ' + token);
+    x.upload.onprogress = (e) => { if (e.lengthComputable) { onProgress(Math.round(100 * e.loaded / e.total)); } };
+    x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { } resolve({ ok: x.status === 200, data: d }); };
+    x.onerror = () => resolve({ ok: false, data: { error: 'upload failed' } });
+    x.send(file);
+  });
+}
+$('rmFiles').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  e.target.value = '';
+  if (!files.length || !radioMusicStation) { return; }
+  let ok = 0; const errors = [];
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    const r = await uploadOne(f, radioMusicStation, (p) => { $('rmProgress').textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + ': ' + f.name + ' ' + p + '%'; });
+    if (r.ok) { ok++; } else { errors.push(f.name + ': ' + (r.data.error || 'failed')); }
+  }
+  $('rmProgress').textContent = '';
+  flash(ok + ' song(s) added' + (errors.length ? '. Not added: ' + errors.join('; ') : ''), errors.length === 0);
+  loadRadioMusic();
+});
+
+// ---- Dashboard: categories on the left, their parts as tabs on top ----
+
+async function loadUsers() {
+  const u = await api('/api/admin/users');
+  if (u.ok) { renderUsers(u.data.users || []); }
+}
+async function loadChannels() {
+  try { const c = await (await fetch('/channels')).json(); renderChannels(c.channels || []); } catch (e) { }
+}
+async function loadQuick(r) {
+  if (!r) { r = await api('/api/admin/vstream-quick'); }
+  if (!r.ok) { return; }
+  const d = r.data;
+  $('qsState').textContent = d.on ? '\u00b7 ON until ' + new Date(d.until).toLocaleString() : '\u00b7 off';
+  $('qsState').className = 'small ' + (d.on ? 'ok' : 'muted');
+}
+$('qsOn').addEventListener('click', async () => { const r = await api('/api/admin/vstream-quick', { on: '1', days: $('qsDays').value }); loadQuick(r); flash(r.ok ? 'Testers can go live without an account' : 'Could not switch it on', r.ok); });
+$('qsOff').addEventListener('click', async () => { const r = await api('/api/admin/vstream-quick', { on: '0' }); loadQuick(r); flash(r.ok ? 'Switched off - an account is needed again' : 'Could not switch it off', r.ok); });
+async function loadPool() {
+  loadQuick();
+  const pl = await api('/api/admin/pool');
+  if (pl.ok) { renderPool(pl.data); }
+}
+
+const NAV = [
+  { id: 'overview', label: 'Overview', icon: '\u25CE', tabs: [
+    { id: 'summary', label: 'Summary', load: loadSummary } ] },
+  { id: 'users', label: 'Users', icon: '\uD83D\uDC64', tabs: [
+    { id: 'all', label: 'All users', load: loadUsers },
+    { id: 'create', label: 'Create user' },
+    { id: 'suspended', label: 'Suspended', load: async () => { await loadSuspensions(); await loadAudit(); } },
+    { id: 'deletion', label: 'Deletion requests', load: loadProfiler, badge: 'deletions' },
+    { id: 'photos', label: 'Profile photos', load: loadPhotos },
+    { id: 'detail', label: 'Account details', load: loadUserDetail, noAuto: true } ] },
+  { id: 'server', label: 'Server', icon: '\uD83E\uDD16', tabs: [
+    { id: 'assets', label: 'SERVERASSETS (SuperAgent)', load: loadAgent, noAuto: true },
+    { id: 'downloads', label: 'Downloads', load: loadDownloads, noAuto: true },
+    { id: 'alma', label: 'Alma questions', load: loadAlma, noAuto: true },
+    { id: 'disks', label: 'Disks and backups', load: loadDisks, noAuto: true } ] },
+  { id: 'videos', label: 'Videos', icon: '\uD83C\uDFAC', tabs: [
+    { id: 'tv', label: 'Memoryq TV', load: loadTvVideos, noAuto: true },
+    { id: 'all', label: 'All videos', load: loadAllVideos, noAuto: true },
+    { id: 'rec', label: 'Live recordings', load: loadRecordings, noAuto: true },
+    { id: 'streamers', label: 'Streamers', load: loadStreamers, noAuto: true } ] },
+  { id: 'streaming', label: 'Streaming', icon: '\uD83D\uDCE1', tabs: [
+    { id: 'live', label: 'Live channels', load: loadChannels },
+    { id: 'pool', label: 'Channel pool', load: loadPool } ] },
+  { id: 'chat', label: 'Chat', icon: '\uD83D\uDCAC', tabs: [
+    { id: 'rooms', label: 'Rooms', load: loadChat },
+    { id: 'reports', label: 'Reports', load: loadReports, badge: 'chatReports' },
+    { id: 'groups', label: 'Group admins', load: loadGroupAdmins } ] },
+  { id: 'wall', label: 'Wall', icon: '\uD83E\uDDF1', tabs: [
+    { id: 'posts', label: 'Posts and reports', load: loadWall, badge: 'wallReports' } ] },
+  { id: 'news', label: 'News', icon: '\uD83D\uDCF0', tabs: [
+    { id: 'feed', label: 'Sources and stories', load: loadNews } ] },
+  { id: 'ads', label: 'Ads', icon: '\uD83D\uDCB0', tabs: [
+    { id: 'settings', label: 'Slider settings', load: loadAds },
+    { id: 'paid', label: 'Paid ads', load: loadAds } ] },
+  { id: 'calls', label: 'Calls', icon: '\uD83D\uDCDE', tabs: [
+    { id: 'calls', label: 'Calls add-on', load: loadCalls } ] },
+  { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
+    { id: 'people', label: 'Test people', load: loadProfiler } ] },
+  { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
+    { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
+    { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
+    { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
+  { id: 'radio', label: 'Radio', icon: '\uD83D\uDCFB', tabs: [
+    { id: 'onair', label: 'On air', load: loadRadioLive },
+    { id: 'stations', label: 'Stations', load: loadRadioStations, noAuto: true },
+    { id: 'music', label: 'Music library', load: loadRadioMusic, noAuto: true },
+    { id: 'import', label: 'Import (Centova)', load: loadImport, noAuto: true } ] },
+];
+
+let current = { cat: 'overview', tab: 'summary' };
+let badges = {};
+let tick = 0;
+
+function findTab(cat, tab) {
+  const c = NAV.find(x => x.id === cat) || NAV[0];
+  const t = c.tabs.find(x => x.id === tab) || c.tabs[0];
+  return { c: c, t: t };
+}
+
+function badgeFor(names) {
+  let n = 0;
+  names.forEach(k => { n += badges[k] || 0; });
+  return n;
+}
+
+function drawNav() {
+  const side = $('side');
+  side.textContent = '';
+  NAV.forEach(c => {
+    const b = el('button');
+    b.className = c.id === current.cat ? 'active' : '';
+    const ico = el('span', c.icon); ico.className = 'ico';
+    b.appendChild(ico);
+    b.appendChild(el('span', c.label));
+    const n = badgeFor(c.tabs.filter(t => t.badge).map(t => t.badge));
+    if (n > 0) { const s = el('span', String(n)); s.className = 'badge'; b.appendChild(s); }
+    b.addEventListener('click', () => show(c.id, c.tabs[0].id));
+    side.appendChild(b);
+  });
+  const ft = findTab(current.cat, current.tab);
+  $('pageTitle').textContent = ft.c.label;
+  const tabs = $('tabs');
+  tabs.textContent = '';
+  ft.c.tabs.forEach(t => {
+    const b = el('button', t.label);
+    b.className = t.id === ft.t.id ? 'active' : '';
+    if (t.badge && badges[t.badge] > 0) { const s = el('span', String(badges[t.badge])); s.className = 'badge'; b.appendChild(s); }
+    b.addEventListener('click', () => show(ft.c.id, t.id));
+    tabs.appendChild(b);
+  });
+}
+
+async function show(cat, tab) {
+  const ft = findTab(cat, tab);
+  current = { cat: ft.c.id, tab: ft.t.id };
+  try { history.replaceState(null, '', '#' + current.cat + '/' + current.tab); } catch (e) { }
+  document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'panel-' + current.cat + '-' + current.tab; });
+  $('flash').textContent = '';
+  drawNav();
+  if (ft.t.load) { await ft.t.load(); }
+}
+
+async function updateBadges() {
+  const [rep, prof, wall, mk] = await Promise.all([
+    api('/api/admin/chat/reports?status=open'), api('/api/admin/profiler/status'), api('/api/admin/wall/status'), api('/api/admin/market/list?status=pending')]);
+  badges.marketPending = mk.ok ? (mk.data.pending || 0) : 0;
+  badges.marketReports = mk.ok ? (mk.data.reports || 0) : 0;
+  badges.chatReports = rep.ok ? (rep.data.reports || []).length : 0;
+  badges.deletions = prof.ok ? (prof.data.pendingDeletions || 0) : 0;
+  badges.wallReports = wall.ok ? (wall.data.reported || []).length : 0;
+  drawNav();
+}
+
+async function loadSummary() {
+  const get = async (path) => { const r = await api(path); return r.ok ? r.data : null; };
+  let live = null;
+  try { live = await (await fetch('/channels')).json(); } catch (e) { }
+  const [users, prof, wall, rep, ads, calls] = await Promise.all([
+    get('/api/admin/users'), get('/api/admin/profiler/status'), get('/api/admin/wall/status'),
+    get('/api/admin/chat/reports?status=open'), get('/api/admin/ads/list'), get('/api/admin/calls/status')]);
+  const tiles = [
+    { n: live ? live.count : '-', l: 'Live channels now', go: ['streaming', 'live'] },
+    { n: users ? (users.users || []).length : '-', l: 'Accounts', go: ['users', 'all'] },
+    { n: prof ? prof.count + ' / ' + prof.max : '-', l: 'Test people' + (prof && prof.testPeopleOn === false ? ' (OFF)' : (prof && !prof.enabled ? ' (paused)' : '')), go: ['profiler', 'people'] },
+    { n: wall ? wall.posts : '-', l: 'Wall posts', go: ['wall', 'posts'] },
+    { n: rep ? (rep.reports || []).length : '-', l: 'Open chat reports', go: ['chat', 'reports'], alert: true },
+    { n: wall ? (wall.reported || []).length : '-', l: 'Reported posts', go: ['wall', 'posts'], alert: true },
+    { n: prof ? prof.pendingDeletions : '-', l: 'Deletion requests', go: ['users', 'deletion'], alert: true },
+    { n: ads ? (ads.ads || []).filter(a => a.running).length : '-', l: 'Paid ads running', go: ['ads', 'paid'] },
+    { n: calls ? calls.callsToday : '-', l: 'Calls today' + (calls && !calls.enabled ? ' (calls off)' : ''), go: ['calls', 'calls'] },
+  ];
+  const box = $('tiles');
+  box.textContent = '';
+  tiles.forEach(t => {
+    const b = el('button');
+    b.className = 'tile' + (t.alert && Number(t.n) > 0 ? ' alert' : '');
+    const lbl = el('span', t.l); lbl.className = 'lbl';
+    const num = el('span', String(t.n)); num.className = 'num';
+    b.appendChild(lbl); b.appendChild(num);
+    b.addEventListener('click', () => show(t.go[0], t.go[1]));
+    box.appendChild(b);
+  });
+}
+
+async function refresh() {
+  const ft = findTab(current.cat, current.tab);
+  if (ft.t.load && !ft.t.noAuto) { await ft.t.load(); }
+  if (tick++ % 3 === 0) { await updateBadges(); }
+}
+
+function startDashboard() {
+  const h = (location.hash || '').replace('#', '').split('/');
+  show(h[0] || 'overview', h[1] || 'summary');
+  updateBadges();
+  clearInterval(timer);
+  timer = setInterval(refresh, 5000);
+}
+
+function renderPool(data) {
+  $('poolInfo').textContent = '(unused channels return to the pool after ' + data.ttlHours + ' hours)';
+  const t = $('pool');
+  headerRow(t, ['Channel', 'Held by', 'Status', 'Idle', 'Time left', '']);
+  (data.pool || []).forEach(p => {
+    const tr = el('tr');
+    tr.appendChild(el('td', p.channelId));
+    tr.appendChild(el('td', p.holder || 'free'));
+    const st = el('td', p.live ? 'LIVE' : (p.holder ? 'Idle' : '-'));
+    if (p.live) { st.className = 'live'; }
+    tr.appendChild(st);
+    tr.appendChild(el('td', p.holder ? p.idleHours + ' h' : ''));
+    tr.appendChild(el('td', p.holder ? p.hoursLeft + ' h' : ''));
+    const act = el('td');
+    if (p.holder) { act.appendChild(button('Release', () => releasePool(p.channelId))); }
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+async function releasePool(channel) {
+  if (!confirm('Take ' + channel + ' back from its holder? Their key stops working.')) { return; }
+  await run('/api/admin/pool/release', { channel: channel }, channel + ' released');
+}
+
+function headerRow(table, names) {
+  table.textContent = '';
+  const tr = el('tr');
+  names.forEach(n => tr.appendChild(el('th', n)));
+  table.appendChild(tr);
+}
+
+function button(label, handler) {
+  const b = el('button', label);
+  b.addEventListener('click', handler);
+  return b;
+}
+
+function renderChannels(list) {
+  const t = $('channels');
+  headerRow(t, ['Channel', 'Title', 'Broadcaster', 'Watching', '']);
+  if (list.length === 0) {
+    const tr = el('tr');
+    const td = el('td', 'No live channels');
+    td.colSpan = 5;
+    td.className = 'muted';
+    tr.appendChild(td);
+    t.appendChild(tr);
+    return;
+  }
+  list.forEach(ch => {
+    const tr = el('tr');
+    tr.appendChild(el('td', ch.channelId));
+    tr.appendChild(el('td', ch.title || ''));
+    tr.appendChild(el('td', ch.broadcasterId));
+    tr.appendChild(el('td', String(ch.viewers)));
+    const act = el('td');
+    act.appendChild(button('Kick', () => kick(ch.channelId)));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+function renderUsers(list) {
+  const t = $('users');
+  headerRow(t, ['Username', 'Role', 'Email', 'Channel', 'Status', 'Actions']);
+  list.forEach(u => {
+    const tr = el('tr');
+    const nameCell = el('td');
+    nameCell.appendChild(userLink(u.username));
+    tr.appendChild(nameCell);
+    tr.appendChild(el('td', u.role));
+    const em = el('td', u.email ? u.email + (u.emailVerified ? ' \u2713' : ' (not confirmed)') : '-');
+    if (!u.email || !u.emailVerified) { em.className = 'muted'; }
+    tr.appendChild(em);
+    tr.appendChild(el('td', u.channelId || '-'));
+    const status = el('td');
+    if (u.disabled) { status.textContent = 'Disabled'; status.className = 'muted'; }
+    else if (u.live) { status.textContent = 'LIVE'; status.className = 'live'; }
+    else if (!u.hasPassword) { status.textContent = 'No password yet'; status.className = 'muted'; }
+    else { status.textContent = 'Active'; }
+    tr.appendChild(status);
+    const act = el('td');
+    if (u.role !== 'ADMIN') { act.appendChild(button('Everything \u2192', () => openUser(u.username))); }
+    act.appendChild(button('Password', () => setPassword(u.username)));
+    if (u.role !== 'ADMIN') {
+      act.appendChild(button(u.disabled ? 'Enable' : 'Disable', () => setDisabled(u.username, !u.disabled)));
+    }
+    if (u.role === 'BROADCASTER') {
+      act.appendChild(button('Show key', () => showKey(u.username)));
+      act.appendChild(button('Rotate key', () => rotateKey(u.username)));
+      act.appendChild(button('Kick', () => kick(u.channelId)));
+    }
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+async function run(path, form, successText) {
+  const r = await api(path, form);
+  if (r.ok) { flash(successText, true); refresh(); }
+  else { flash(r.data.error || 'Something went wrong', false); }
+  return r;
+}
+
+async function setPassword(name) {
+  const pw = prompt('New password for ' + name + ' (at least 8 characters):');
+  if (!pw) { return; }
+  await run('/api/admin/users/password', { username: name, password: pw }, 'Password changed for ' + name);
+}
+
+async function setDisabled(name, disabled) {
+  await run('/api/admin/users/disable', { username: name, disabled: String(disabled) },
+    name + (disabled ? ' disabled' : ' enabled'));
+}
+
+async function kick(channel) {
+  if (!confirm('Disconnect the broadcaster on ' + channel + '?')) { return; }
+  await run('/api/admin/kick', { channel: channel }, channel + ' kicked');
+}
+
+function hideKey() {
+  clearTimeout(keyTimer);
+  $('keyValue').value = '';
+  $('keybox').hidden = true;
+}
+
+function revealKey(name, key) {
+  $('keyLabel').textContent = 'Stream key for ' + name + ':';
+  $('keyValue').value = key;
+  $('keybox').hidden = false;
+  $('keyValue').focus();
+  $('keyValue').select();
+  clearTimeout(keyTimer);
+  keyTimer = setTimeout(hideKey, 60000);
+}
+
+$('keyHide').addEventListener('click', hideKey);
+
+async function showKey(name) {
+  const r = await api('/api/admin/users/key', { username: name });
+  if (r.ok) { revealKey(name, r.data.streamKey); }
+  else { flash(r.data.error || 'No key', false); }
+}
+
+async function rotateKey(name) {
+  if (!confirm('Make a new key for ' + name + '? The old key stops working and the current broadcast is disconnected.')) { return; }
+  const r = await api('/api/admin/users/rotate', { username: name });
+  if (r.ok) { flash('New key made for ' + name, true); revealKey(name, r.data.streamKey); refresh(); }
+  else { flash(r.data.error || 'Something went wrong', false); }
+}
+
+async function loadNews() {
+  const s = await api('/api/admin/news/status');
+  if (!s.ok) { return; }
+  const d = s.data;
+  $('newsInfo').textContent = (d.keyFound ? '(AI key found, model ' + d.model + ')' : '(built-in summarizer - no AI key)')
+    + '  Summaries today: ' + d.usageCalls + ' / ' + d.dailyCap;
+  const last = d.lastRun ? 'Last run: ' + new Date(d.lastRun).toLocaleString() : 'Not run yet';
+  $('newsNote').textContent = last + (d.lastRunError ? ' - ' + d.lastRunError : '') + (d.paused ? ' - PAUSED' : '') + (d.engineNote ? ' - ' + d.engineNote : '');
+  $('newsPause').textContent = d.paused ? 'Resume news' : 'Pause news';
+  $('newsPause').dataset.paused = d.paused ? '1' : '0';
+
+  const t = $('newsSources');
+  headerRow(t, ['Source', 'Address', 'Stories', 'Last read', 'Status', '']);
+  (d.sources || []).forEach(src => {
+    const tr = el('tr');
+    tr.appendChild(el('td', src.name));
+    tr.appendChild(el('td', src.url));
+    tr.appendChild(el('td', String(src.items)));
+    tr.appendChild(el('td', src.lastFetch ? new Date(src.lastFetch).toLocaleTimeString() : '-'));
+    const st = el('td', !src.enabled ? 'Disabled' : (src.lastError ? src.lastError : 'OK'));
+    if (src.lastError && src.enabled) { st.className = 'error'; }
+    tr.appendChild(st);
+    const act = el('td');
+    act.appendChild(button(src.enabled ? 'Disable' : 'Enable', () => run('/api/admin/news/sources/toggle',
+      { id: String(src.id), enabled: String(!src.enabled) }, src.name + (src.enabled ? ' disabled' : ' enabled'))));
+    act.appendChild(button('Remove', () => {
+      if (confirm('Remove ' + src.name + ' and its stories?')) {
+        run('/api/admin/news/sources/remove', { id: String(src.id) }, src.name + ' removed');
+      }
+    }));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+
+  const it = await api('/api/admin/news/items?limit=40');
+  const t2 = $('newsItems');
+  headerRow(t2, ['Time', 'Source', 'Headline', 'Topic', '']);
+  if (it.ok) {
+    (it.data.items || []).forEach(item => {
+      const tr = el('tr');
+      tr.appendChild(el('td', new Date(item.created).toLocaleString()));
+      tr.appendChild(el('td', item.source));
+      tr.appendChild(el('td', item.hidden ? '(hidden) ' + item.headline : item.headline));
+      tr.appendChild(el('td', item.topic));
+      const act = el('td');
+      act.appendChild(button(item.hidden ? 'Show' : 'Hide', () => run('/api/admin/news/items/hide',
+        { id: String(item.id), hidden: String(!item.hidden) }, item.hidden ? 'Story shown' : 'Story hidden')));
+      tr.appendChild(act);
+      t2.appendChild(tr);
+    });
+  }
+}
+
+$('newsPause').addEventListener('click', async () => {
+  const pause = $('newsPause').dataset.paused !== '1';
+  await run('/api/admin/news/pause', { paused: String(pause) }, pause ? 'News paused' : 'News resumed');
+});
+$('newsRefresh').addEventListener('click', async () => {
+  const r = await api('/api/admin/news/refresh', {});
+  const started = r.ok && r.data.started;
+  flash(started ? 'Refresh started - stories appear as they are summarised'
+                : ((r.data && (r.data.reason || r.data.error)) || 'Could not start'), started);
+});
+$('srcAdd').addEventListener('click', async () => {
+  const r = await run('/api/admin/news/sources/add', { name: $('srcName').value, url: $('srcUrl').value }, 'Source added');
+  if (r.ok) { $('srcName').value = ''; $('srcUrl').value = ''; }
+});
+
+async function loadCalls() {
+  const s = await api('/api/admin/calls/status');
+  if (!s.ok) { return; }
+  const d = s.data;
+  $('callsInfo').textContent = d.enabled ? '(ON)' : '(OFF)';
+  $('callsNote').textContent = 'Voice and video calls between people who share a private group. Media server WebRTC port '
+    + d.webrtcPort + ': ' + (d.webrtcReachable ? 'answering' : 'not answering (calls need MediaMTX running with WebRTC on)')
+    + '. Calls today: ' + d.callsToday + '.';
+  $('callsToggle').textContent = d.enabled ? 'Turn calls off' : 'Turn calls on';
+  $('callsToggle').dataset.on = d.enabled ? '1' : '0';
+  const t = $('callsActive');
+  headerRow(t, ['Call', 'Type', 'Started by', 'People', 'Since', '']);
+  const a = await api('/api/admin/calls/active');
+  if (a.ok) {
+    (a.data.calls || []).forEach(c => {
+      const tr = el('tr');
+      tr.appendChild(el('td', c.id));
+      tr.appendChild(el('td', (c.video ? 'video' : 'voice') + (c.group ? ' (group)' : '')));
+      tr.appendChild(el('td', c.initiator));
+      tr.appendChild(el('td', c.joined + ' in the call, ' + c.total + ' invited or joined'));
+      tr.appendChild(el('td', new Date(c.created).toLocaleTimeString()));
+      const act = el('td');
+      act.appendChild(button('End call', () => run('/api/admin/calls/end', { id: c.id }, 'Call ended')));
+      tr.appendChild(act);
+      t.appendChild(tr);
+    });
+  }
+}
+
+$('callsToggle').addEventListener('click', async () => {
+  const on = $('callsToggle').dataset.on !== '1';
+  if (!on && !confirm('Turn calls off? Calls in progress will end.')) { return; }
+  await run('/api/admin/calls/enable', { enabled: String(on) }, on ? 'Calls are on' : 'Calls are off');
+});
+
+async function loadProfiler() {
+  const s = await api('/api/admin/profiler/status');
+  if (!s.ok) { return; }
+  const d = s.data;
+  let when = '';
+  if (!d.enabled) { when = 'paused'; }
+  else if (d.count >= d.max) { when = 'limit reached'; }
+  else { when = 'next person in about ' + Math.max(1, d.nextInMinutes) + ' min'; }
+  $('profInfo').textContent = '(' + (d.enabled ? 'ON' : 'PAUSED') + ' - ' + d.count + ' of ' + d.max
+    + ' test people, one every ' + d.everyMinutes + ' min - ' + when + ')';
+  const tpOn = d.testPeopleOn !== false;
+  $('tpState').textContent = tpOn ? 'ON' : 'OFF (suspended, hidden - nothing deleted)';
+  $('tpState').style.fontWeight = '700';
+  $('tpState').style.color = tpOn ? 'var(--good, #2e7d32)' : 'var(--bad, #c62828)';
+  $('tpSwitch').textContent = tpOn ? 'Switch OFF' : 'Switch ON';
+  $('tpSwitch').dataset.on = tpOn ? '1' : '0';
+  $('profToggle').disabled = !tpOn; $('profAdd').disabled = !tpOn;
+  if (!tpOn) { $('profInfo').textContent = '(OFF - ' + d.count + ' test people suspended)'; }
+  $('profToggle').textContent = d.enabled ? 'Pause' : 'Resume';
+  $('profToggle').dataset.on = d.enabled ? '1' : '0';
+  const t = $('profPeople');
+  headerRow(t, ['', 'Name', 'Stage name', 'From', 'Username', 'Password', 'Friends', 'Created']);
+  (d.people || []).slice().reverse().forEach(p => {
+    const tr = el('tr');
+    const pic = el('td');
+    const img = el('img');
+    img.src = '/api/profiles/avatar?u=' + encodeURIComponent(p.username);
+    img.width = 32; img.height = 32; img.alt = '';
+    pic.appendChild(img);
+    tr.appendChild(pic);
+    tr.appendChild(el('td', p.name));
+    tr.appendChild(el('td', p.stageName));
+    tr.appendChild(el('td', p.place));
+    tr.appendChild(el('td', p.username));
+    const pw = el('td', p.password);
+    pw.style.fontFamily = 'monospace';
+    tr.appendChild(pw);
+    tr.appendChild(el('td', String(p.friends)));
+    tr.appendChild(el('td', new Date(p.created).toLocaleString()));
+    t.appendChild(tr);
+  });
+  const r = await api('/api/admin/profiler/requests');
+  const q = $('delRequests');
+  headerRow(q, ['Username', 'Asked', 'Reason', '']);
+  const list = r.ok ? (r.data.requests || []) : [];
+  $('delInfo').textContent = list.length ? '(' + list.length + ' waiting)' : '(none)';
+  list.forEach(x => {
+    const tr = el('tr');
+    tr.appendChild(el('td', x.username + (x.test ? ' (test)' : '')));
+    tr.appendChild(el('td', new Date(x.at).toLocaleString()));
+    tr.appendChild(el('td', x.reason || '-'));
+    const act = el('td');
+    act.appendChild(button('Delete account', async () => {
+      if (!confirm('Delete ' + x.username + ' for good? Their account, groups and messages are removed.')) { return; }
+      await run('/api/admin/profiler/approve', { u: x.username }, x.username + ' deleted');
+    }));
+    act.appendChild(button('Decline', async () => {
+      const note = prompt('Note for ' + x.username + ' (optional):', '');
+      if (note === null) { return; }
+      await run('/api/admin/profiler/decline', { u: x.username, note: note }, 'Request declined');
+    }));
+    tr.appendChild(act);
+    q.appendChild(tr);
+  });
+}
+
+$('profToggle').addEventListener('click', async () => {
+  const on = $('profToggle').dataset.on !== '1';
+  await run('/api/admin/profiler/enable', { enabled: String(on) }, on ? 'Profiler resumed' : 'Profiler paused');
+});
+$('tpSwitch').addEventListener('click', async () => {
+  const on = $('tpSwitch').dataset.on !== '1';
+  if (!on && !confirm('Switch test people OFF? They are hidden everywhere and cannot sign in until you switch them ON again. Nothing is deleted.')) { return; }
+  await run('/api/admin/profiler/testpeople', { on: String(on) }, on ? 'Test people are back ON' : 'Test people are OFF (suspended)');
+});
+$('profAdd').addEventListener('click', async () => {
+  await run('/api/admin/profiler/generate', {}, 'A new test person was added');
+});
+
+async function loadPhotos() {
+  const r = await api('/api/admin/profiler/photos');
+  const box = $('photoList');
+  box.textContent = '';
+  const list = r.ok ? (r.data.photos || []) : [];
+  if (!list.length) { box.appendChild(el('div', 'Nobody has uploaded a photo yet.')).className = 'muted'; return; }
+  list.forEach(p => {
+    const card = el('div');
+    card.style.cssText = 'background:#fff; padding:6px; border-radius:6px; text-align:center; width:110px';
+    const img = el('img');
+    img.src = '/api/profiles/avatar?u=' + encodeURIComponent(p.username) + '&t=' + p.at;
+    img.width = 96; img.height = 96; img.alt = '';
+    card.appendChild(img);
+    card.appendChild(el('div', p.username));
+    card.appendChild(button('Remove', async () => {
+      if (!confirm('Remove the photo of ' + p.username + '? Their drawn picture comes back.')) { return; }
+      await run('/api/admin/profiler/removephoto', { u: p.username }, 'Photo removed');
+    }));
+    box.appendChild(card);
+  });
+}
+
+let wallSettingsShown = false;
+async function loadWall() {
+  const r = await api('/api/admin/wall/status');
+  if (!r.ok) { return; }
+  const d = r.data;
+  if (!wallSettingsShown) {
+    $('wallEvery').value = d.feedEvery;
+    $('wallTest').checked = d.testPostsOn;
+    wallSettingsShown = true;
+  }
+  const rep = d.reported || [];
+  $('wallInfo').textContent = '(' + d.posts + ' posts, ' + (d.feedEvery > 0 ? 'one in the news every ' + d.feedEvery + ' stories' : 'not shown in the news')
+    + ', ' + rep.length + ' reported)';
+  const t = $('wallReports');
+  headerRow(t, ['Picture', 'By', 'Post', 'Reports', '']);
+  if (!rep.length) {
+    const tr = el('tr'); const td = el('td', 'No reported posts.'); td.colSpan = 5; td.className = 'muted';
+    tr.appendChild(td); t.appendChild(tr);
+  }
+  rep.forEach(p => {
+    const tr = el('tr');
+    const pic = el('td');
+    if (p.imageUrl) {
+      const img = el('img'); img.src = p.imageUrl; img.style.maxWidth = '90px'; img.style.maxHeight = '60px'; img.alt = '';
+      pic.appendChild(img);
+    }
+    tr.appendChild(pic);
+    tr.appendChild(el('td', p.author + (p.test ? ' (test)' : '')));
+    tr.appendChild(el('td', p.text.length > 160 ? p.text.slice(0, 160) + '...' : p.text));
+    tr.appendChild(el('td', p.reports + ' - ' + p.reasons));
+    const act = el('td');
+    act.appendChild(button('Remove post', async () => {
+      if (!confirm('Remove this post by ' + p.author + '?')) { return; }
+      await run('/api/admin/wall/remove', { id: String(p.id) }, 'Post removed');
+    }));
+    act.appendChild(button('Keep it', () => run('/api/admin/wall/dismiss', { id: String(p.id) }, 'Report dismissed')));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+$('wallSave').addEventListener('click', async () => {
+  const r = await run('/api/admin/wall/settings', { feedEvery: $('wallEvery').value, testPostsOn: String($('wallTest').checked) }, 'Wall settings saved');
+  if (r.ok) { wallSettingsShown = false; }
+});
+
+let adsSettingsShown = false;
+function day(ms, end) {
+  if (!ms) { return ''; }
+  const d = new Date(end ? ms - 1 : ms);
+  return d.toLocaleDateString();
+}
+async function loadAds() {
+  const r = await api('/api/admin/ads/list');
+  if (!r.ok) { return; }
+  const st = r.data.settings;
+  if (!adsSettingsShown) {
+    $('setSlider').checked = st.sliderOn;
+    $('setEvery').value = st.every;
+    $('setAdCard').checked = st.adCardOn;
+    $('setGoogle').checked = st.googleOn;
+    $('setUnit').value = st.googleUnit;
+    adsSettingsShown = true;
+  }
+  $('unitNote').textContent = st.googleTest ? '(Google test ads - put your own unit ID here when your AdMob account is ready)' : '';
+  const list = r.data.ads || [];
+  const running = list.filter(a => a.running).length;
+  $('adsInfo').textContent = '(' + (st.sliderOn ? 'slider ON every ' + st.every + ' stories' : 'slider OFF')
+    + ' - ' + running + ' paid ad' + (running === 1 ? '' : 's') + ' running)';
+  const t = $('adsTable');
+  headerRow(t, ['', 'Ad', 'Link', 'Dates', 'Status', 'Views', 'Taps', 'Tap rate', '']);
+  list.slice().reverse().forEach(a => {
+    const tr = el('tr');
+    const pic = el('td');
+    const img = el('img');
+    img.src = '/api/feed/ad/image?id=' + a.id;
+    img.style.maxWidth = '90px'; img.style.maxHeight = '50px'; img.alt = '';
+    pic.appendChild(img);
+    tr.appendChild(pic);
+    const what = el('td');
+    what.appendChild(el('b', a.headline));
+    what.appendChild(el('div', a.advertiser + (a.text ? ' - ' + a.text : '')));
+    tr.appendChild(what);
+    tr.appendChild(el('td', a.link));
+    tr.appendChild(el('td', (a.start ? day(a.start) : 'now') + ' - ' + (a.end ? day(a.end, true) : 'no end')));
+    const s = el('td', a.running ? 'RUNNING' : (a.active ? 'scheduled / ended' : 'paused'));
+    if (a.running) { s.className = 'live'; }
+    tr.appendChild(s);
+    tr.appendChild(el('td', String(a.views)));
+    tr.appendChild(el('td', String(a.clicks)));
+    tr.appendChild(el('td', a.views ? (100 * a.clicks / a.views).toFixed(1) + '%' : '-'));
+    const act = el('td');
+    act.appendChild(button(a.active ? 'Pause' : 'Resume',
+      () => run('/api/admin/ads/active', { id: String(a.id), active: String(!a.active) }, a.active ? 'Ad paused' : 'Ad resumed')));
+    act.appendChild(button('Delete', async () => {
+      if (!confirm('Delete the ad "' + a.headline + '"? Its counts are lost.')) { return; }
+      await run('/api/admin/ads/delete', { id: String(a.id) }, 'Ad deleted');
+    }));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+$('setSave').addEventListener('click', async () => {
+  const r = await run('/api/admin/ads/settings', {
+    sliderOn: String($('setSlider').checked), every: $('setEvery').value, adCardOn: String($('setAdCard').checked),
+    googleOn: String($('setGoogle').checked), googleUnit: $('setUnit').value }, 'Slider settings saved');
+  if (r.ok) { adsSettingsShown = false; }
+});
+
+$('adAdd').addEventListener('click', async () => {
+  const f = $('adImage').files[0];
+  if (!f) { flash('Choose a picture for the ad', false); return; }
+  if (f.size > 1024 * 1024) { flash('The picture is too big (1 MB at most)', false); return; }
+  const data = await new Promise((ok, fail) => {
+    const rd = new FileReader();
+    rd.onload = () => ok(rd.result);
+    rd.onerror = () => fail(rd.error);
+    rd.readAsDataURL(f);
+  });
+  const r = await run('/api/admin/ads/create', {
+    advertiser: $('adAdvertiser').value, headline: $('adHeadline').value, text: $('adText').value,
+    link: $('adLink').value, start: $('adStart').value, end: $('adEnd').value, image: data }, 'Ad added');
+  if (r.ok) {
+    ['adAdvertiser', 'adHeadline', 'adText', 'adLink', 'adStart', 'adEnd'].forEach(id => { $(id).value = ''; });
+    $('adImage').value = '';
+  }
+});
+
+async function loadReports() {
+  const f = $('reportFilter').value || 'open';
+  const r = await api('/api/admin/chat/reports?status=' + encodeURIComponent(f));
+  const t = $('reports');
+  headerRow(t, ['Time', 'Reporter', 'Reason', 'About', 'What was reported', '']);
+  if (!r.ok) { return; }
+  (r.data.reports || []).forEach(rp => {
+    const tr = el('tr');
+    tr.appendChild(el('td', new Date(rp.time).toLocaleString()));
+    tr.appendChild(el('td', rp.reporter));
+    tr.appendChild(el('td', rp.reason + (rp.note ? ': ' + rp.note : '')));
+    tr.appendChild(el('td', rp.type + ' - ' + rp.target + (rp.targetExists ? '' : ' (account deleted)')
+      + ' in ' + rp.roomTitle + (rp.private ? ' [private]' : '')));
+    const ctx = el('td');
+    (rp.context || []).forEach(c => ctx.appendChild(el('div', c.user + ': ' + c.text)));
+    tr.appendChild(ctx);
+    const act = el('td');
+    if (rp.status !== 'open') { act.appendChild(el('div', rp.status + (rp.actions ? ': ' + rp.actions : ''))); }
+    if (rp.status !== 'dismissed') {
+      act.appendChild(button('Dismiss', () => run('/api/admin/chat/reports/dismiss', { id: String(rp.id) }, 'Report dismissed')));
+      act.appendChild(button('Warn group admin', () => {
+        const text = prompt('Private message to the group admin of this group:');
+        if (text) { run('/api/admin/chat/reports/warn', { id: String(rp.id), text: text }, 'Warning sent'); }
+      }));
+      if (rp.type === 'message') {
+        act.appendChild(button('Delete message', () => {
+          if (confirm('Delete the reported message?')) { run('/api/admin/chat/reports/deletemessage', { id: String(rp.id) }, 'Message deleted'); }
+        }));
+      }
+      if (rp.targetExists) {
+        act.appendChild(button('Suspend', () => {
+          const hours = prompt('Suspend ' + rp.target + ' for how many hours? (0 = until you reinstate)', '24');
+          if (hours === null) { return; }
+          const notice = prompt('Message the person sees when they try to sign in (optional):', '');
+          if (notice === null) { return; }
+          const why = prompt('Your private note on why (only you see it):', rp.reason);
+          if (why === null) { return; }
+          run('/api/admin/chat/reports/suspend', { id: String(rp.id), hours: hours, notice: notice, reason: why }, rp.target + ' suspended');
+        }));
+        if (rp.targetRole !== 'BROADCASTER' && rp.targetRole !== 'ADMIN') {
+          act.appendChild(button('Delete account', () => {
+            if (confirm('Delete the account ' + rp.target + ' for good? Their groups are deleted too; their old messages stay.')) {
+              run('/api/admin/chat/reports/deleteaccount', { id: String(rp.id) }, rp.target + ' deleted');
+            }
+          }));
+        }
+      }
+    }
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+async function loadSuspensions() {
+  const r = await api('/api/admin/chat/suspensions');
+  const t = $('suspensions');
+  headerRow(t, ['Account', 'Since', 'Until', 'Message shown to them', 'Your private note', '']);
+  if (r.ok) {
+    (r.data.suspensions || []).forEach(s => {
+      const tr = el('tr');
+      tr.appendChild(el('td', s.username));
+      tr.appendChild(el('td', new Date(s.since).toLocaleString()));
+      tr.appendChild(el('td', s.hoursLeft === null ? 'until you reinstate' : 'in about ' + s.hoursLeft + ' h'));
+      tr.appendChild(el('td', s.notice));
+      tr.appendChild(el('td', s.reason));
+      const act = el('td');
+      act.appendChild(button('Reinstate', () => run('/api/admin/chat/accounts/lift', { username: s.username }, s.username + ' reinstated')));
+      tr.appendChild(act);
+      t.appendChild(tr);
+    });
+  }
+}
+
+async function loadAudit() {
+  const r = await api('/api/admin/chat/audit?limit=30');
+  const t = $('auditLog');
+  headerRow(t, ['Time', 'By', 'Action', 'About', 'Details']);
+  if (r.ok) {
+    (r.data.audit || []).forEach(a => {
+      const tr = el('tr');
+      tr.appendChild(el('td', new Date(a.time).toLocaleString()));
+      tr.appendChild(el('td', a.actor));
+      tr.appendChild(el('td', a.action));
+      tr.appendChild(el('td', a.target));
+      tr.appendChild(el('td', a.detail));
+      t.appendChild(tr);
+    });
+  }
+}
+
+$('reportFilter').addEventListener('change', loadReports);
+$('susBtn').addEventListener('click', async () => {
+  const name = $('susName').value.trim();
+  if (!name) { return; }
+  const why = prompt('Your private note on why (only you see it):', '');
+  if (why === null) { return; }
+  const r = await run('/api/admin/chat/accounts/suspend',
+    { username: name, hours: $('susHours').value || '24', notice: $('susNotice').value, reason: why }, name + ' suspended');
+  if (r.ok) { $('susName').value = ''; $('susNotice').value = ''; }
+});
+$('susDelete').addEventListener('click', async () => {
+  const name = $('susName').value.trim();
+  if (!name) { return; }
+  if (!confirm('Delete the account ' + name + ' for good? Their groups are deleted too; their old messages stay.')) { return; }
+  const r = await run('/api/admin/chat/accounts/delete', { username: name }, name + ' deleted');
+  if (r.ok) { $('susName').value = ''; }
+});
+
+let mailUser = '';
+async function loadGroupAdmins() {
+  const r = await api('/api/admin/chat/groupadmins');
+  if (!r.ok) { return; }
+  const t = $('groupAdmins');
+  headerRow(t, ['Person', 'Label', 'Groups', 'Messages', '']);
+  (r.data.admins || []).forEach(a => {
+    const tr = el('tr');
+    tr.appendChild(el('td', a.name + (a.online ? ' (online)' : '')));
+    tr.appendChild(el('td', a.label));
+    const g = el('td');
+    (a.groups || []).forEach(gr => {
+      const line = el('div', gr.title + ' [' + (gr.private ? 'private, ' + gr.members + ' members' : 'public') + '] ');
+      line.appendChild(button('Rename', () => {
+        const n = prompt('New name for ' + gr.title, gr.title);
+        if (n) { run('/api/chat/groups/rename', { room: gr.id, title: n }, 'Group renamed'); }
+      }));
+      line.appendChild(button('Delete', () => {
+        if (confirm('Delete the group ' + gr.title + ' and all its messages?')) {
+          run('/api/chat/groups/delete', { room: gr.id }, 'Group deleted');
+        }
+      }));
+      g.appendChild(line);
+    });
+    tr.appendChild(g);
+    tr.appendChild(el('td', a.unreadMail > 0 ? a.unreadMail + ' new reply' : ''));
+    const act = el('td');
+    act.appendChild(button('Message', () => openMail(a.name)));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+  if (mailUser) { await loadMail(); }
+}
+
+async function openMail(name) {
+  mailUser = name;
+  $('mailBox').style.display = 'block';
+  await loadMail();
+}
+
+async function loadMail() {
+  const r = await api('/api/admin/chat/mail/thread?username=' + encodeURIComponent(mailUser));
+  if (!r.ok) { return; }
+  $('mailTitle').textContent = 'Private messages with ' + mailUser + ' (group admin)';
+  const t = $('mailThread');
+  headerRow(t, ['Time', 'From', 'Message', 'Seen']);
+  (r.data.messages || []).forEach(m => {
+    const tr = el('tr');
+    tr.appendChild(el('td', new Date(m.time).toLocaleString()));
+    tr.appendChild(el('td', m.fromAdmin ? 'You (super-admin)' : mailUser));
+    tr.appendChild(el('td', m.text));
+    tr.appendChild(el('td', m.read ? 'seen' : ''));
+    t.appendChild(tr);
+  });
+}
+
+$('mailSend').addEventListener('click', async () => {
+  const text = $('mailText').value.trim();
+  if (!mailUser || !text) { return; }
+  const r = await run('/api/admin/chat/mail/send', { username: mailUser, text: text }, 'Message sent');
+  if (r.ok) { $('mailText').value = ''; }
+});
+
+function renderMuted(list) {
+  const t = $('muted');
+  headerRow(t, ['Muted user', 'Time left', '']);
+  list.forEach(m => {
+    const tr = el('tr');
+    tr.appendChild(el('td', m.username));
+    tr.appendChild(el('td', m.hoursLeft === null ? 'until unmuted' : m.hoursLeft + ' h'));
+    const act = el('td');
+    act.appendChild(button('Unmute', () => run('/api/admin/chat/unmute', { username: m.username }, m.username + ' unmuted')));
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+async function loadChat() {
+  let rooms = [];
+  try { rooms = (await (await fetch('/api/chat/rooms')).json()).rooms || []; } catch (e) { }
+  const sel = $('chatRoom');
+  const sig = rooms.map(r => r.id).join(',');
+  if (sel.dataset.sig !== sig) {
+    const current = sel.value;
+    sel.textContent = '';
+    rooms.forEach(rm => {
+      const o = el('option', rm.title + ' (' + rm.id + ')');
+      o.value = rm.id;
+      sel.appendChild(o);
+    });
+    if (current) { sel.value = current; }
+    sel.dataset.sig = sig;
+  }
+  await loadChatMessages();
+  const m = await api('/api/admin/chat/muted');
+  if (m.ok) { renderMuted(m.data.muted || []); }
+}
+
+async function loadChatMessages() {
+  const t = $('chatMessages');
+  headerRow(t, ['Time', 'User', 'Message', '']);
+  const room = $('chatRoom').value;
+  if (!room) { return; }
+  let data = {};
+  try { data = await (await fetch('/api/chat/messages?room=' + encodeURIComponent(room) + '&limit=50')).json(); } catch (e) { }
+  (data.messages || []).slice().reverse().forEach(msg => {
+    const tr = el('tr');
+    tr.appendChild(el('td', new Date(msg.time).toLocaleTimeString()));
+    tr.appendChild(el('td', msg.user + (msg.role === 'GUEST' ? ' (guest)' : '')));
+    tr.appendChild(el('td', msg.deleted ? '(deleted)' : msg.text));
+    const act = el('td');
+    if (!msg.deleted) {
+      act.appendChild(button('Delete', () => run('/api/chat/delete', { room: room, id: String(msg.id) }, 'Message deleted')));
+    }
+    tr.appendChild(act);
+    t.appendChild(tr);
+  });
+}
+
+$('chatRoom').addEventListener('change', loadChatMessages);
+$('chatLoad').addEventListener('click', loadChatMessages);
+$('chatClear').addEventListener('click', async () => {
+  const room = $('chatRoom').value;
+  if (room && confirm('Delete every message in ' + room + '?')) {
+    await run('/api/admin/chat/clear', { room: room }, 'Room cleared');
+  }
+});
+$('muteBtn').addEventListener('click', async () => {
+  const name = $('muteName').value.trim();
+  if (!name) { return; }
+  const r = await run('/api/admin/chat/mute', { username: name, hours: $('muteHours').value || '24' }, name + ' muted');
+  if (r.ok) { $('muteName').value = ''; }
+});
+
+$('createForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const r = await run('/api/admin/users/create',
+    { username: $('newName').value, password: $('newPass').value, role: $('newRole').value },
+    'User created');
+  if (r.ok) { $('newName').value = ''; $('newPass').value = ''; }
+});
+
+// ================= Videos (Memoryq TV playlist, every video) and one account's everything =================
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'on') { Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn)); }
+    else if (k === 'style') { e.style.cssText = v; }
+    else if (v !== null && v !== undefined && v !== false) { e.setAttribute(k, v === true ? '' : v); }
+  });
+  kids.flat().forEach(c => { if (c !== null && c !== undefined && c !== false) { e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c); } });
+  return e;
+}
+function when(t) { return t ? new Date(t).toLocaleString() : '-'; }
+function mins(ms) { const s = Math.round((ms || 0) / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function videoStatus(v) {
+  if (v.status === 'processing') { return 'Preparing...'; }
+  if (v.status === 'failed') { return 'Failed' + (v.error ? ': ' + v.error : ''); }
+  if (v.paused === 'admin') { return 'Paused by you'; }
+  if (v.paused === 'owner') { return 'Paused by its owner'; }
+  return 'Showing';
+}
+function videoThumb(v, w) {
+  return v.thumb ? h('img', { src: v.thumb, alt: '', style: 'width:' + w + 'px;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:#111;display:block' })
+    : h('div', { style: 'width:' + w + 'px;aspect-ratio:16/9;border-radius:6px;background:#26313e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px' }, v.kind === 'youtube' ? 'YouTube' : 'Video');
+}
+function videoLink(v) {
+  return v.kind === 'youtube' ? 'https://youtu.be/' + v.youtubeId : (v.src || '');
+}
+async function vAct(path, form, msg) {
+  const r = await api(path, form);
+  flash(r.ok ? msg : (r.data.error || 'Something went wrong'), r.ok);
+  return r.ok;
+}
+
+let videoReload = null;
+function addVideoForms(box, reload) {
+  const url = h('input', { placeholder: 'Paste a YouTube link (youtube.com/watch?v=... or youtu.be/...)', style: 'flex:1;min-width:260px' });
+  const ytTitle = h('input', { placeholder: 'Title (optional - taken from YouTube)', style: 'flex:1;min-width:180px' });
+  const add = h('button', { on: { click: async () => {
+    if (!url.value.trim()) { flash('Paste a YouTube link first', false); return; }
+    if (await vAct('/api/videos/youtube', { url: url.value.trim(), title: ytTitle.value.trim() }, 'Added - it is on Memoryq TV now')) { url.value = ''; ytTitle.value = ''; reload(); }
+  } } }, 'Add YouTube video');
+  const file = h('input', { type: 'file', accept: 'video/*' });
+  const upTitle = h('input', { placeholder: 'Title (optional - the file name)', style: 'flex:1;min-width:180px' });
+  const bar = h('progress', { max: 100, value: 0, style: 'width:200px', hidden: true });
+  const note = h('span', { class: 'muted' });
+  const up = h('button', { on: { click: () => {
+    const f = file.files[0];
+    if (!f) { flash('Choose a video file first', false); return; }
+    const x = new XMLHttpRequest();
+    x.open('POST', '/api/videos/upload?name=' + encodeURIComponent(f.name) + '&title=' + encodeURIComponent(upTitle.value.trim()));
+    x.setRequestHeader('Authorization', 'Bearer ' + token);
+    x.upload.onprogress = e => { if (e.lengthComputable) { bar.value = Math.round(e.loaded * 100 / e.total); note.textContent = bar.value + '%'; } };
+    x.onload = () => {
+      bar.hidden = true; up.disabled = false;
+      let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { }
+      if (x.status === 200) { note.textContent = 'Uploaded - preparing it for every browser (this can take a few minutes for long videos)'; file.value = ''; upTitle.value = ''; reload(); }
+      else { note.textContent = ''; flash(d.error || ('Upload failed (' + x.status + ')'), false); }
+    };
+    x.onerror = () => { bar.hidden = true; up.disabled = false; note.textContent = ''; flash('The upload stopped - check the connection and try again', false); };
+    bar.hidden = false; bar.value = 0; up.disabled = true; note.textContent = '0%';
+    x.send(f);
+  } } }, 'Upload');
+  box.appendChild(h('div', { class: 'box' },
+    h('b', {}, 'Add a video to Memoryq TV'),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' }, url, ytTitle, add),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center' }, file, upTitle, up, bar, note),
+    h('div', { class: 'muted', style: 'margin-top:6px;font-size:13px' }, 'Videos you add go on Memoryq TV straight away. Uploads are converted so they play in every browser and phone. Only add videos you have the rights to.')));
+}
+
+async function loadTvVideos() {
+  const root = $('tvVideos');
+  root.textContent = '';
+  addVideoForms(root, loadTvVideos);
+  const r = await api('/api/videos?scope=tv');
+  const list = (r.ok && r.data.videos) || [];
+  root.appendChild(h('h3', { style: 'margin:18px 0 6px' }, 'Playing on Memoryq TV (' + list.length + ')'));
+  root.appendChild(h('div', { class: 'muted', style: 'font-size:13px;margin-bottom:8px' }, 'Live streams always come first on https://memoryq.com/tv. When nobody is live, these play one after another in this order.'));
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No videos on TV yet - add a YouTube link or upload one above.')); return; }
+  const t = h('table');
+  headerRow(t, ['#', '', 'Video', 'Length', 'Views', '']);
+  list.forEach((v, i) => {
+    t.appendChild(h('tr', {},
+      h('td', {}, String(i + 1)),
+      h('td', {}, videoThumb(v, 120)),
+      h('td', {}, h('b', {}, v.title), h('br'), h('a', { href: videoLink(v), target: '_blank', rel: 'noopener' }, v.kind === 'youtube' ? 'YouTube' : 'file'), ' \u00B7 by ', userLink(v.owner)),
+      h('td', {}, v.durationMs ? mins(v.durationMs) : '-'),
+      h('td', {}, String(v.views)),
+      h('td', {},
+        h('button', { disabled: i === 0, on: { click: async () => { await vAct('/api/videos/move', { id: v.id, dir: 'up' }, 'Moved up'); loadTvVideos(); } } }, '\u2191'),
+        h('button', { disabled: i === list.length - 1, on: { click: async () => { await vAct('/api/videos/move', { id: v.id, dir: 'down' }, 'Moved down'); loadTvVideos(); } } }, '\u2193'),
+        h('button', { on: { click: async () => { await vAct('/api/videos/feature', { id: v.id, on: 'false' }, 'Taken off TV (the video itself is kept)'); loadTvVideos(); } } }, 'Remove from TV'),
+        h('button', { on: { click: async () => { if (confirm('Delete "' + v.title + '" for good?')) { await vAct('/api/videos/delete', { id: v.id }, 'Deleted'); loadTvVideos(); } } } }, 'Delete'))));
+  });
+  root.appendChild(t);
+}
+
+let allVideosQ = '';
+async function loadAllVideos() {
+  const root = $('allVideos');
+  root.textContent = '';
+  const q = h('input', { placeholder: 'Search title, description or owner', value: allVideosQ, style: 'width:320px' });
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') { allVideosQ = q.value.trim(); loadAllVideos(); } });
+  root.appendChild(h('div', { style: 'margin-bottom:8px' }, q, h('button', { on: { click: () => { allVideosQ = q.value.trim(); loadAllVideos(); } } }, 'Search')));
+  const r = await api('/api/videos?scope=admin&q=' + encodeURIComponent(allVideosQ));
+  const list = (r.ok && r.data.videos) || [];
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, allVideosQ ? 'No video matches.' : 'Nobody has added a video yet.')); return; }
+  const t = h('table');
+  headerRow(t, ['', 'Video', 'Owner', 'Added', 'Status', 'Views / comments', 'On TV', '']);
+  list.forEach(v => {
+    const paused = !!v.paused;
+    t.appendChild(h('tr', {},
+      h('td', {}, videoThumb(v, 110)),
+      h('td', {}, h('b', {}, v.title), h('br'), h('a', { href: videoLink(v), target: '_blank', rel: 'noopener' }, v.kind === 'youtube' ? 'YouTube' : 'file'), v.description ? h('div', { class: 'muted', style: 'font-size:12px;max-width:260px' }, v.description.slice(0, 140)) : null),
+      h('td', {}, userLink(v.owner)),
+      h('td', {}, when(v.created)),
+      h('td', { class: v.status === 'failed' ? 'error' : (paused ? 'muted' : '') }, videoStatus(v)),
+      h('td', {}, v.views + ' / ' + v.comments),
+      h('td', {}, h('input', { type: 'checkbox', checked: v.featured, disabled: v.status !== 'ready', on: { change: async e => { await vAct('/api/videos/feature', { id: v.id, on: String(e.target.checked) }, e.target.checked ? 'On Memoryq TV' : 'Taken off TV'); } } })),
+      h('td', {},
+        v.status === 'ready' ? h('button', { on: { click: async () => { await vAct('/api/videos/pause', { id: v.id, paused: String(!paused) }, paused ? 'Showing again' : 'Paused - hidden from everyone but its owner'); loadAllVideos(); } } }, paused ? 'Show' : 'Pause') : null,
+        h('button', { on: { click: async () => { if (confirm('Delete "' + v.title + '" by ' + v.owner + ' for good?')) { await vAct('/api/videos/delete', { id: v.id }, 'Deleted'); loadAllVideos(); } } } }, 'Delete'))));
+  });
+  root.appendChild(t);
+}
+
+// ---- Live recordings (kept 30 days on the video disk) ----
+async function loadRecordings() {
+  const root = $('recBox'); root.textContent = '';
+  const r = await api('/api/admin/recordings/list');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load the recordings')); return; }
+  const d = r.data;
+  root.appendChild(h('div', { class: 'box muted' }, d.on
+    ? 'Every live channel is recorded to the video disk (' + d.disk + ') and kept ' + d.keepDays + ' days. Keep one as a video to make it permanent - it goes to the broadcaster\'s videos (Admin -> Videos -> All videos), where it can be put on Mkarimu TV.'
+    : 'Recording is off: this server has no video disk (setup-disks.sh).'));
+  if (!d.recordings.length) { root.appendChild(h('div', { class: 'box muted' }, 'No recordings yet.')); return; }
+  const player = h('video', { controls: true, style: 'width:100%;max-width:720px;display:none;margin-bottom:8px;background:#000' });
+  root.appendChild(player);
+  const t = h('table');
+  headerRow(t, ['Channel', 'Broadcaster', 'Started', 'Size', '']);
+  d.recordings.forEach(x => {
+    const mb = x.bytes / 1048576;
+    t.appendChild(h('tr', {},
+      h('td', {}, x.channel), h('td', {}, x.owner === 'admin' ? '-' : userLink(x.owner)), h('td', {}, when(x.started)),
+      h('td', {}, (mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : Math.round(mb) + ' MB') + (x.recording ? ' \u00b7 recording now' : '')),
+      h('td', {},
+        h('button', { on: { click: () => { player.style.display = 'block'; player.src = '/api/admin/recordings/file?path=' + encodeURIComponent(x.path) + '&token=' + encodeURIComponent(token); player.play().catch(() => {}); } } }, 'Watch'),
+        x.recording ? null : h('button', { on: { click: async () => {
+          const title = prompt('Title for this video:', (x.title || 'Live: ' + x.channel) + ' ' + new Date(x.started).toLocaleDateString());
+          if (title === null) { return; }
+          const q = await api('/api/admin/recordings/keep', { path: x.path, title: title, tv: '0' });
+          if (q.ok) { flash('Kept - it is being prepared as a video (Admin -> Videos -> All videos)', true); loadRecordings(); } else { flash(q.data.error || 'Could not keep it', false); } } } }, 'Keep as video'),
+        x.recording ? null : h('button', { on: { click: async () => {
+          const title = prompt('Title for this video:', (x.title || 'Live: ' + x.channel) + ' ' + new Date(x.started).toLocaleDateString());
+          if (title === null) { return; }
+          const q = await api('/api/admin/recordings/keep', { path: x.path, title: title, tv: '1' });
+          if (q.ok) { flash('Kept - it goes on Mkarimu TV as soon as it is prepared (a few minutes)', true); loadRecordings(); } else { flash(q.data.error || 'Could not keep it', false); } } } }, 'Keep + Mkarimu TV'),
+        x.recording ? null : h('button', { on: { click: async () => {
+          if (!confirm('Delete this recording for good?')) { return; }
+          const q = await api('/api/admin/recordings/delete', { path: x.path });
+          if (q.ok) { flash('Deleted', true); loadRecordings(); } else { flash(q.data.error || 'Could not delete it', false); } } } }, 'Delete'))));
+  });
+  root.appendChild(t);
+}
+
+// ---- Streamers: who streamed, for how long, loyalty; keep / TV on-off / take down ----
+function dur(ms) {
+  const m = Math.round((ms || 0) / 60000);
+  if (m < 1) { return Math.round((ms || 0) / 1000) + ' s'; }
+  return m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60) + ' min' : m + ' min';
+}
+let streamersUser = '';
+async function loadStreamers() {
+  const root = $('streamersBox'); root.textContent = '';
+  const [r, al] = await Promise.all([api('/api/admin/streamers/list'), api('/api/admin/streamers/alerts')]);
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load the streamers')); return; }
+  const d = r.data;
+  const box = h('div', { class: 'box' },
+    h('div', { class: 'muted' }, 'Everyone who went live on Memoryq / Vstream: how many streams, how long, and their loyalty. Points: 1 a minute streamed + 10 for each stream of 5 minutes or more (streams you take down do not count). Levels: '
+      + d.levels.map(l => l.name + ' ' + l.points).join(' \u00b7 ') + '. Members see their own in memoryq.com/me -> On air -> My streams, and in the Vstream app.'));
+  if (al.ok) {
+    const cb = h('input', { type: 'checkbox' }); cb.checked = al.data.on;
+    cb.addEventListener('change', async () => {
+      const q = await api('/api/admin/streamers/alerts', { on: cb.checked ? '1' : '0' });
+      flash(q.ok ? (cb.checked ? 'You get an e-mail when someone goes live' : 'No more e-mails about new streams') : (q.data.error || 'Could not save'), q.ok);
+    });
+    box.appendChild(h('label', { style: 'display:block;margin-top:8px' }, cb, ' E-mail me (' + al.data.to + ') when someone goes live \u00b7 ' + al.data.members + ' member(s) also asked for these e-mails'));
+  }
+  root.appendChild(box);
+  if (!d.streamers.length) { root.appendChild(h('div', { class: 'box muted' }, 'No one has streamed yet.')); }
+  else {
+    const t = h('table');
+    headerRow(t, ['Streamer', 'Streams', 'Total time', 'Longest', 'Average', 'Last streamed', 'Points', 'Level', '']);
+    d.streamers.forEach(x => {
+      const who = h('td', {}, x.account ? userLink(x.user) : x.user);
+      if (x.liveNow) { who.appendChild(h('span', { class: 'pill', style: 'background:#e5484d;color:#fff;margin-left:6px' }, 'LIVE')); }
+      if (x.anonymous) { who.appendChild(h('span', { class: 'muted small' }, ' (anonymous tester)')); }
+      if (!x.account) { who.appendChild(h('span', { class: 'muted small' }, ' (account gone)')); }
+      t.appendChild(h('tr', {}, who, h('td', {}, String(x.streams)), h('td', {}, dur(x.totalMs)), h('td', {}, dur(x.longestMs)),
+        h('td', {}, dur(x.averageMs)), h('td', {}, when(x.lastStart)), h('td', {}, String(x.points)),
+        h('td', {}, x.level + (x.nextLevel ? ' (' + x.pointsToNext + ' to ' + x.nextLevel + ')' : '')),
+        h('td', {}, h('button', { on: { click: () => { streamersUser = x.user; loadStreamSessions(); } } }, 'Streams'))));
+    });
+    root.appendChild(t);
+  }
+  loadStreamSessions();
+}
+async function loadStreamSessions() {
+  const root = $('streamSessions'); root.textContent = '';
+  const r = await api('/api/admin/streamers/sessions' + (streamersUser ? '?user=' + encodeURIComponent(streamersUser) : ''));
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load the streams')); return; }
+  root.appendChild(h('h3', { style: 'margin:18px 0 8px' }, streamersUser ? 'Streams by ' + streamersUser : 'Latest streams (everyone)',
+    streamersUser ? h('button', { style: 'margin-left:10px', on: { click: () => { streamersUser = ''; loadStreamSessions(); } } }, 'Show everyone') : null));
+  const list = r.data.sessions || [];
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No streams.')); return; }
+  const player = h('video', { controls: true, style: 'width:100%;max-width:720px;display:none;margin-bottom:8px;background:#000' });
+  root.appendChild(player);
+  const act = async (op, form, msg) => {
+    const q = await api('/api/admin/streamers/' + op, form);
+    flash(q.ok ? msg : (q.data.error || 'Could not do that'), q.ok);
+    if (q.ok) { loadStreamers(); }
+  };
+  const t = h('table');
+  headerRow(t, ['Started', 'Streamer', 'Title', 'Length', 'Recording', 'Video / Mkarimu TV', '']);
+  list.forEach(x => {
+    const recs = x.recordings || [];
+    const done = recs.filter(y => !y.recording);
+    const v = x.video;
+    const tvBox = v ? h('label', {}, (() => { const cb = h('input', { type: 'checkbox' }); cb.checked = v.onTv;
+      cb.addEventListener('change', () => act('tv', { session: x.id, on: cb.checked ? '1' : '0' }, cb.checked ? 'On Mkarimu TV' : 'Off Mkarimu TV - still kept as a video')); return cb; })(), ' On TV') : null;
+    t.appendChild(h('tr', { style: x.removed ? 'opacity:.55' : '' },
+      h('td', {}, when(x.start)), h('td', {}, x.user || '-'), h('td', {}, (x.title || x.channel) + ' \u00b7 ' + x.channel),
+      h('td', {}, x.live ? h('b', { style: 'color:#e5484d' }, 'LIVE \u00b7 ' + dur(x.durationMs)) : dur(x.durationMs)),
+      h('td', {}, x.removed ? 'taken down' : (recs.length ? recs.map(y => h('button', { on: { click: () => { player.style.display = 'block'; player.src = y.url; player.play().catch(() => {}); } } },
+        y.recording ? 'recording now' : 'Watch (' + Math.round(y.bytes / 1048576) + ' MB)')) : h('span', { class: 'muted small' }, v ? 'kept as a video' : 'none (kept 30 days)'))),
+      h('td', {}, v ? h('div', {}, h('div', {}, v.title + (v.status !== 'ready' ? ' (' + v.status + ')' : '')), tvBox) : '-'),
+      h('td', {},
+        !x.removed && !v && done.length ? h('button', { on: { click: () => act('keep', { session: x.id, tv: '0' }, 'Kept as a video') } }, 'Keep as video') : null,
+        !x.removed && !v && done.length ? h('button', { on: { click: () => act('keep', { session: x.id, tv: '1' }, 'Kept - on Mkarimu TV when it is prepared') } }, 'Keep + Mkarimu TV') : null,
+        !x.removed ? h('button', { style: 'color:#b42318', on: { click: () => {
+          if (confirm('Take this stream down?' + (x.live ? ' It is stopped now.' : '') + ' Its recordings' + (v ? ' and the video' : '') + ' are deleted for good and it no longer counts for ' + x.user + '.')) { act('delete', { session: x.id }, 'Taken down'); } } } }, x.live ? 'Stop + take down' : 'Take down') : null,
+        x.removed ? h('button', { on: { click: () => act('restore', { session: x.id }, 'It counts again (the files are gone)') } }, 'Count again') : null)));
+  });
+  root.appendChild(t);
+}
+
+// ---- Marketplace: approve listings, reports, all listings ----
+function mkMoney(c, cur) { if (!c) { return 'Ask for price'; } try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(c / 100); } catch (e) { return cur + ' ' + c / 100; } }
+const MK_STATUS = { pending: 'waiting', active: 'in the market', rejected: 'not approved', paused: 'paused', sold: 'sold', removed: 'taken down', deleted: 'deleted' };
+function mkRow(l, after, extra) {
+  const act = async (op, needReason, msg) => {
+    let reason = '';
+    if (needReason) { reason = prompt(needReason); if (reason === null) { return; } }
+    const q = await api('/api/admin/market/' + op, { id: l.id, reason: reason });
+    flash(q.ok ? msg : (q.data.error || 'Could not do that'), q.ok);
+    if (q.ok) { updateBadges(); after(); }
+  };
+  return h('div', { class: 'box', style: 'display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start' },
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;max-width:360px' }, l.photos.length ? l.photos.map(p => h('a', { href: p, target: '_blank' }, h('img', { src: p, style: 'width:110px;height:82px;object-fit:cover;border-radius:6px' }))) : h('div', { class: 'muted' }, 'no photos')),
+    h('div', { style: 'flex:1;min-width:260px' },
+      h('div', {}, h('b', { style: 'font-size:16px' }, l.title), ' ', h('span', { class: 'pill' }, MK_STATUS[l.status] || l.status)),
+      h('div', { style: 'color:#0f7b3f;font-weight:700' }, mkMoney(l.priceCents, l.currency)),
+      h('div', { class: 'muted small' }, 'by ', userLink(l.seller), ' \u00b7 ' + [l.category, l.condition, l.location].filter(Boolean).join(' \u00b7 ') + ' \u00b7 ' + when(l.updated) + ' \u00b7 ' + (l.views || 0) + ' views'),
+      h('div', { style: 'white-space:pre-wrap;margin-top:6px;max-height:160px;overflow:auto' }, l.desc || ''),
+      l.reason ? h('div', { class: 'muted small' }, 'Reason: ' + l.reason) : null,
+      extra || null,
+      h('div', { style: 'margin-top:8px' },
+        l.status === 'pending' ? h('button', { class: 'pri', on: { click: () => act('approve', null, 'Approved - it is in the Marketplace') } }, 'Approve') : null,
+        l.status === 'pending' ? h('button', { on: { click: () => act('reject', 'Why is it not approved? (the seller sees this)', 'Not approved - the seller was told') } }, 'Reject') : null,
+        l.status === 'active' || l.status === 'sold' || l.status === 'paused' ? h('button', { on: { click: () => act('remove', 'Why is it taken down? (the seller sees this)', 'Taken down') } }, 'Take down') : null,
+        l.status === 'removed' || l.status === 'rejected' ? h('button', { on: { click: () => act('restore', null, 'Back in the Marketplace') } }, 'Put back') : null,
+        h('a', { href: '/market#item/' + l.id, target: '_blank', style: 'margin-left:8px' }, 'Open'))));
+}
+async function loadMarket(status) {
+  const root = $(status === 'pending' ? 'mkPending' : 'mkAll'); root.textContent = '';
+  const [r, st] = await Promise.all([api('/api/admin/market/list?status=' + status), api('/api/admin/market/settings')]);
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  if (st.ok) {
+    const cb = h('input', { type: 'checkbox' }); cb.checked = st.data.autoApprove;
+    cb.addEventListener('change', async () => { const q = await api('/api/admin/market/settings', { autoApprove: cb.checked ? '1' : '0' }); flash(q.ok ? (cb.checked ? 'New listings go straight into the Marketplace' : 'New listings wait for your approval') : 'Could not save', q.ok); });
+    root.appendChild(h('div', { class: 'box muted' }, 'Members sell at memoryq.com/market (also in the Memoryq app). New listings, and changed titles, texts or photos, wait here for approval. Memoryq does not handle payments.',
+      h('label', { style: 'display:block;margin-top:6px' }, cb, ' Approve new listings automatically (not recommended)')));
+  }
+  const list = r.data.listings || [];
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, status === 'pending' ? 'Nothing is waiting.' : 'No listings yet.')); return; }
+  list.forEach(l => root.appendChild(mkRow(l, () => loadMarket(status))));
+}
+async function loadMarketReports() {
+  const root = $('mkReports'); root.textContent = '';
+  const r = await api('/api/admin/market/reports');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const list = r.data.reports || [];
+  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No open reports.')); return; }
+  list.forEach(x => { if (x.listing) { root.appendChild(mkRow(x.listing, loadMarketReports, h('div', { class: 'error', style: 'margin-top:6px' },
+    'Reported by ' + x.by + ' (' + when(x.at) + '): ' + x.reason, ' ', h('button', { on: { click: async () => { const q = await api('/api/admin/market/dismiss', { id: x.listing.id }); flash(q.ok ? 'Report dismissed' : 'Could not', q.ok); updateBadges(); loadMarketReports(); } } }, 'Dismiss report')))); } });
+}
+
+// ---- Disks and backups ----
+async function loadDisks(run) {
+  const root = $('disksBox'); root.textContent = '';
+  const r = run ? await api('/api/admin/disks/backup', {}) : await api('/api/admin/disks/status');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); if (!run) { return; } }
+  const d = r.ok ? r.data : (await api('/api/admin/disks/status')).data;
+  const t = h('table');
+  [['Video disk (Mkarimu TV)', d.video + (d.videoDir ? ' - ' + d.videoDir : '')], ['Backup disk', d.backup],
+   ['Last backup', d.lastRun ? when(d.lastRun) + (d.lastOk === d.lastRun ? '' : ' (FAILED - last good one: ' + when(d.lastOk) + ')') : 'none yet (every night at 03:30)'],
+   ['What it did', d.running ? 'running now...' : d.message], ['Live recordings', d.extra]].forEach(([k, v]) => t.appendChild(h('tr', {}, h('th', {}, k), h('td', {}, v))));
+  root.appendChild(h('div', { class: 'box' }, t,
+    h('div', { style: 'margin-top:8px' }, h('button', { disabled: !d.backupOn || d.running, on: { click: () => loadDisks(true) } }, 'Back up now'), ' ',
+      h('button', { on: { click: () => loadDisks() } }, 'Refresh')),
+    h('div', { class: 'muted', style: 'margin-top:8px;font-size:12px' }, 'Every night: the data (accounts, stations, chats, settings - last 14 nights), every uploaded video and every song are copied to the backup disk. To bring the data back on the VPS: sudo systemctl stop vstream; cd /opt/vstream; sudo tar -xzf /srv/backup/data/memoryq-DATE.tar.gz; sudo chown -R vstream:vstream /opt/vstream; sudo systemctl start vstream')));
+}
+
+// ---- One account: everything it has ----
+let userDetail = '';
+function userLink(name) {
+  if (!name || name.toLowerCase() === 'admin') { return document.createTextNode(name || '-'); }
+  return h('a', { href: '#', on: { click: e => { e.preventDefault(); openUser(name); } } }, name);
+}
+function openUser(name) { userDetail = name; show('users', 'detail'); }
+
+function section(title, count, body) {
+  return h('div', { class: 'box' }, h('h3', { style: 'margin:0 0 8px;font-size:16px' }, title + (count === null ? '' : ' (' + count + ')')), body);
+}
+
+async function loadUserDetail() {
+  const root = $('u360');
+  root.textContent = '';
+  if (!userDetail) { root.appendChild(h('div', { class: 'box muted' }, 'Open someone from Users \u2192 All users (click their name) to see everything they have here.')); return; }
+  const r = await api('/api/admin/user360?u=' + encodeURIComponent(userDetail));
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load ' + userDetail)); return; }
+  const d = r.data, a = d.account, reload = () => loadUserDetail();
+
+  // header + actions
+  const susp = a.suspension;
+  const state = susp ? 'Suspended' + (susp.until ? ' until ' + when(susp.until) : ' until you reinstate') : (a.disabled ? 'Disabled' : 'Active');
+  const hours = h('select', {}, [['24', '1 day'], ['72', '3 days'], ['168', '1 week'], ['720', '30 days'], ['0', 'Until I reinstate']].map(([v, l]) => h('option', { value: v }, l)));
+  const notice = h('input', { placeholder: 'Message shown to them (optional)', style: 'flex:1;min-width:200px' });
+  const reason = h('input', { placeholder: 'Your private note (optional)', style: 'flex:1;min-width:160px' });
+  const actions = susp
+    ? h('div', {}, h('button', { on: { click: async () => { await vAct('/api/admin/chat/accounts/lift', { username: a.username }, a.username + ' reinstated'); reload(); } } }, 'Reinstate'))
+    : h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, h('b', {}, 'Suspend:'), hours, notice, reason,
+        h('button', { style: 'border-color:var(--bad);color:var(--bad)', on: { click: async () => {
+          if (!confirm('Suspend ' + a.username + '? They are signed out, cannot sign in, and any live stream or claimed channel is stopped.')) { return; }
+          await vAct('/api/admin/chat/accounts/suspend', { username: a.username, hours: hours.value, notice: notice.value, reason: reason.value }, a.username + ' suspended');
+          reload();
+        } } }, 'Suspend'));
+  const p = d.profile;
+  root.appendChild(h('div', { class: 'box', style: 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap' },
+    p ? h('img', { src: p.picture, alt: '', style: 'width:88px;height:88px;border-radius:50%;object-fit:cover;background:#ddd' }) : null,
+    h('div', { style: 'flex:1;min-width:260px' },
+      h('h2', { style: 'margin:0' }, a.username, p && (p.firstName || p.lastName) ? h('span', { class: 'muted', style: 'font-weight:400;font-size:16px' }, '  ' + (p.firstName + ' ' + p.lastName).trim()) : null),
+      h('div', { style: 'margin:4px 0' }, h('b', { class: susp || a.disabled ? 'error' : 'ok' }, state), ' \u00B7 ', a.role, ' \u00B7 ', a.online ? 'online now' : 'last active ' + when(a.lastActive)),
+      h('div', { class: 'muted' }, 'Email: ', a.email ? a.email + (a.emailVerified ? ' (confirmed)' : ' (not confirmed)') : 'none'),
+      susp ? h('div', { class: 'muted' }, 'Suspended ' + when(susp.since) + ' by ' + susp.by + (susp.notice ? ' \u00B7 told them: "' + susp.notice + '"' : '') + (susp.reason ? ' \u00B7 note: ' + susp.reason : '')) : null,
+      h('div', { style: 'margin-top:10px' }, actions),
+      h('div', { style: 'margin-top:8px' }, h('button', { on: { click: async () => {
+        if (!confirm('Delete the account ' + a.username + ' and everything it has? This cannot be undone.')) { return; }
+        if (prompt('Type the username to confirm:') !== a.username) { return; }
+        if (await vAct('/api/admin/chat/accounts/delete', { username: a.username }, a.username + ' deleted')) { userDetail = ''; show('users', 'all'); }
+      } } }, 'Delete account')))));
+
+  // profile
+  if (p) {
+    root.appendChild(section('Profile', null, h('div', {},
+      p.stageName ? h('div', {}, 'Stage name: ', p.stageName) : null,
+      h('div', {}, 'From: ', [p.city, p.country].filter(Boolean).join(', ') || '-'),
+      p.education ? h('div', {}, 'Education: ', p.education) : null,
+      h('div', {}, 'Hobbies: ', p.hobbies.length ? p.hobbies.join(', ') : '-'),
+      h('div', {}, 'Friends: ', String(p.friends), p.test ? ' \u00B7 (test person made by the profiler)' : ''))));
+  }
+
+  // streams
+  const s = d.streams || {};
+  const dest = s.alsoStreamTo && s.alsoStreamTo.platforms ? s.alsoStreamTo.platforms.filter(x => x.saved) : [];
+  root.appendChild(section('Streams', null, h('div', {},
+    h('div', {}, 'Channel: ', s.channel ? s.channel + (s.assigned ? ' (assigned)' : ' (claimed from the pool)') : 'none', s.liveNow ? h('b', { class: 'live' }, '  \u25CF LIVE NOW') : ''),
+    s.channel && s.liveNow ? h('button', { on: { click: () => kick(s.channel) } }, 'Stop this stream (kick)') : null,
+    h('div', { style: 'margin-top:4px' }, 'Also streams to: ', dest.length ? dest.map(x => x.label + (x.on ? '' : ' (off)') + (x.state ? ' - ' + x.state : '')).join(', ') : 'nothing'),
+    h('div', { style: 'margin-top:4px' }, 'Radio stations: ', (d.stations || []).length ? d.stations.map(st => st.name + (st.enabled ? '' : ' (off)')).join(', ') : 'none'))));
+
+  // videos
+  const vids = d.videos || [];
+  root.appendChild(section('Videos', vids.length, vids.length ? h('table', {}, vids.map(v => h('tr', {},
+    h('td', {}, h('a', { href: v.link, target: '_blank', rel: 'noopener' }, v.title)),
+    h('td', {}, v.kind === 'youtube' ? 'YouTube' : 'upload'),
+    h('td', {}, videoStatus(v) + (v.featured ? ' \u00B7 on TV' : '')),
+    h('td', {}, v.views + ' views \u00B7 ' + v.comments + ' comments'),
+    h('td', {}, when(v.created)),
+    h('td', {},
+      v.status === 'ready' ? h('button', { on: { click: async () => { await vAct('/api/videos/pause', { id: v.id, paused: String(!v.paused) }, v.paused ? 'Showing again' : 'Paused'); reload(); } } }, v.paused ? 'Show' : 'Pause') : null,
+      h('button', { on: { click: async () => { if (confirm('Delete "' + v.title + '"?')) { await vAct('/api/videos/delete', { id: v.id }, 'Deleted'); reload(); } } } }, 'Delete'))))) : h('div', { class: 'muted' }, 'No videos.')));
+
+  // wall posts
+  const posts = d.posts || [];
+  root.appendChild(section('Wall posts', posts.length, posts.length ? h('table', {}, posts.map(pp => h('tr', {},
+    h('td', { style: 'max-width:520px' }, pp.text || (pp.image ? '(photo)' : '')),
+    h('td', {}, (pp.friendsOnly ? 'friends only' : 'everyone') + (pp.image ? ' \u00B7 photo' : '')),
+    h('td', {}, pp.likes + ' likes' + (pp.reports ? ' \u00B7 ' : ''), pp.reports ? h('b', { class: 'error' }, pp.reports + ' reports') : ''),
+    h('td', {}, when(pp.created)),
+    h('td', {}, h('button', { on: { click: async () => { if (confirm('Delete this post?')) { await vAct('/api/wall/delete', { id: pp.id }, 'Post deleted'); reload(); } } } }, 'Delete'))))) : h('div', { class: 'muted' }, 'No posts.')));
+
+  // comments on videos
+  const vc = d.videoComments || [];
+  if (vc.length) {
+    root.appendChild(section('Comments on videos', vc.length, h('table', {}, vc.map(c => h('tr', {},
+      h('td', { style: 'max-width:520px' }, c.text), h('td', {}, 'on "' + c.videoTitle + '"'), h('td', {}, when(c.created)),
+      h('td', {}, h('button', { on: { click: async () => { await vAct('/api/videos/comment/delete', { id: c.id }, 'Comment deleted'); reload(); } } }, 'Delete')))))));
+  }
+
+  // chat
+  const ch = d.chat || { messages: [], groups: [] };
+  root.appendChild(section('Chat groups', ch.groups.length, ch.groups.length ? h('div', {}, ch.groups.map(g => h('div', {}, g.title + ' \u2014 ' + (g.as === 'owner' ? 'owner' : 'member') + ', ' + g.members + ' members, ' + g.type))) : h('div', { class: 'muted' }, 'None.')));
+  root.appendChild(section('Recent chat messages', ch.messages.length, ch.messages.length ? h('table', {}, ch.messages.map(m => h('tr', {},
+    h('td', {}, m.room), h('td', { style: 'max-width:560px' }, m.text), h('td', {}, when(m.time)),
+    h('td', {}, h('button', { on: { click: async () => { await vAct('/api/chat/delete', { room: m.room, id: m.id }, 'Message deleted'); reload(); } } }, 'Delete'))))) : h('div', { class: 'muted' }, 'No messages.')));
+}
+
+// ================= Server: SERVERASSETS (SuperAgent), downloads, Alma =================
+function mdToHtml(md) {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const inline = s => esc(s).replace(/(https?:\/\/[^\s)]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  let out = '', inList = 0;
+  const close = to => { while (inList > to) { out += '</ul>'; inList--; } };
+  md.replace(/\r/g, '').split('\n').forEach(line => {
+    if (/^<!--/.test(line)) { close(0); out += '<hr>'; return; }
+    let m = line.match(/^(#{1,4})\s+(.*)$/);
+    if (m) { close(0); out += '<h' + (m[1].length + 1) + '>' + inline(m[2]) + '</h' + (m[1].length + 1) + '>'; return; }
+    m = line.match(/^(\s*)- (.*)$/);
+    if (m) {
+      const depth = Math.floor(m[1].length / 2) + 1;
+      while (inList < depth) { out += '<ul>'; inList++; }
+      close(depth);
+      out += '<li>' + inline(m[2]) + '</li>';
+      return;
+    }
+    if (!line.trim()) { close(0); return; }
+    if (inList && /^\s+\S/.test(line) && out.endsWith('</li>')) { out = out.slice(0, -5) + ' ' + inline(line.trim()) + '</li>'; return; }
+    close(0);
+    out += '<p>' + inline(line) + '</p>';
+  });
+  close(0);
+  return out;
+}
+
+let agentData = null;
+async function loadAgent() {
+  const root = $('agentBox');
+  const r = await api('/api/admin/agent');
+  root.textContent = '';
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load SERVERASSETS')); return; }
+  agentData = r.data;
+  const w = r.data.warnings || [];
+  if (w.length) { root.appendChild(h('div', { class: 'box', style: 'border-color:var(--bad)' }, h('b', { class: 'error' }, 'SuperAgent warnings'), h('ul', {}, w.map(x => h('li', {}, x))))); }
+  const view = h('div', { class: 'box md' });
+  view.innerHTML = mdToHtml(r.data.text);
+  const ta = h('textarea', { style: 'width:100%;min-height:420px;font-family:ui-monospace,Consolas,monospace;font-size:13px' });
+  ta.value = r.data.manual;
+  const editBox = h('div', { class: 'box', hidden: true },
+    h('div', { class: 'muted', style: 'margin-bottom:6px' }, 'Edit the part people keep (assets, accomplished, NEXT). The live status and the change log below it are written by the SuperAgent.'),
+    ta,
+    h('div', { style: 'margin-top:6px' },
+      h('button', { on: { click: async () => { if (await vAct('/api/admin/agent/save', { manual: ta.value }, 'SERVERASSETS saved')) { loadAgent(); } } } }, 'Save'),
+      h('button', { on: { click: () => { editBox.hidden = true; view.hidden = false; } } }, 'Cancel')));
+  root.appendChild(h('div', { style: 'margin-bottom:8px' },
+    h('button', { on: { click: () => { view.hidden = true; editBox.hidden = false; } } }, 'Edit'),
+    h('button', { on: { click: async () => {
+      const x = await api('/api/admin/agent/refresh', {});
+      flash(x.ok ? (x.data.message || 'Refreshed') : (x.data.error || 'Could not refresh'), x.ok);
+      loadAgent();
+    } } }, 'Check for changes now'),
+    h('button', { on: { click: async () => {
+      const x = await fetch('/api/admin/agent/file', { headers: { Authorization: 'Bearer ' + token } });
+      if (!x.ok) { flash('Could not download', false); return; }
+      const url = URL.createObjectURL(await x.blob());
+      const a = h('a', { href: url, download: 'SERVERASSETS.md' }); document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } } }, 'Download SERVERASSETS.md'),
+    h('span', { class: 'muted', style: 'margin-left:8px;font-size:13px' }, r.data.updated ? 'Status refreshed ' + when(r.data.updated) + ' (every 5 minutes)' : '')));
+  root.appendChild(editBox);
+  root.appendChild(view);
+}
+
+async function loadDownloads() {
+  const root = $('dlBox');
+  const r = await api('/api/admin/downloads');
+  root.textContent = '';
+  root.appendChild(h('div', { class: 'muted', style: 'margin-bottom:8px' }, 'Everything people can download at https://memoryq.com/download (Alma sends people there): the apps, and any other file you add - another APK, a Windows program (.exe), a ZIP or a PDF guide - each with a short description. The update script leaves the newest APK files in the Vidiserver\\downloads folder on your PC.'));
+  const sendFile = (url, f, bar, done) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', url);
+    x.setRequestHeader('Authorization', 'Bearer ' + token);
+    x.upload.onprogress = e => { if (e.lengthComputable) { bar.value = Math.round(e.loaded * 100 / e.total); } };
+    x.onload = () => { bar.hidden = true; let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { } flash(x.status === 200 ? done : (d.error || 'Upload failed'), x.status === 200); loadDownloads(); };
+    x.onerror = () => { bar.hidden = true; flash('The upload stopped', false); };
+    bar.hidden = false; x.send(f);
+  };
+  const accept = '.apk,.zip,.pdf,.exe,application/vnd.android.package-archive';
+  ((r.ok && r.data.apps) || []).forEach(a => {
+    const file = h('input', { type: 'file', accept: a.ext === 'apk' ? '.apk,application/vnd.android.package-archive' : '.' + a.ext });
+    const name = h('input', { value: a.name, maxlength: 40, style: 'width:180px', disabled: a.builtin ? true : null, title: a.builtin ? 'The app\'s name' : 'Name on the download page' });
+    const desc = h('textarea', { rows: 2, maxlength: 300, style: 'width:100%', placeholder: 'Short description shown on the download page' });
+    desc.value = a.desc || '';
+    const note = h('input', { placeholder: 'Version note (optional, e.g. 1.2 - new live menu)', value: a.note || '', style: 'width:280px' });
+    const bar = h('progress', { max: 100, value: 0, hidden: true, style: 'width:160px' });
+    const up = h('button', { on: { click: () => {
+      const f = file.files[0];
+      if (!f) { flash('Choose the file first', false); return; }
+      sendFile('/api/admin/downloads/upload?app=' + a.app + '&file=' + encodeURIComponent(f.name) + '&note=' + encodeURIComponent(note.value.trim()) + '&desc=' + encodeURIComponent(desc.value.trim()), f, bar, a.name + ' is ready to download');
+    } } }, 'Upload');
+    const saveText = h('button', { on: { click: async () => { await vAct('/api/admin/downloads/info', { app: a.app, name: name.value.trim(), desc: desc.value.trim(), note: note.value.trim() }, 'Saved'); loadDownloads(); } } }, 'Save text');
+    root.appendChild(h('div', { class: 'box' },
+      h('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, h('b', {}, '.' + a.ext), name,
+        a.have ? h('span', {}, a.sizeMb + ' MB, uploaded ' + when(a.updated) + ' ', h('a', { href: '/download/' + a.app + '.' + a.ext }, 'download'), ' ',
+          h('button', { on: { click: async () => { if (confirm((a.builtin ? 'Remove the file of ' : 'Remove the download ') + a.name + '?')) { await vAct('/api/admin/downloads/delete', { app: a.app }, 'Removed'); loadDownloads(); } } } }, 'Remove'))
+          : h('span', { class: 'muted' }, a.builtin ? 'not uploaded yet (the page says "Coming soon")' : 'no file yet - not shown on the page')),
+      h('div', { style: 'margin-top:6px' }, desc),
+      h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px' }, file, note, up, saveText, bar)));
+  });
+  // a new download
+  const nName = h('input', { placeholder: 'Name, e.g. Memoryq for Windows', maxlength: 40, style: 'width:240px' });
+  const nDesc = h('textarea', { rows: 2, maxlength: 300, style: 'width:100%', placeholder: 'Short description (what it is, who it is for)' });
+  const nFile = h('input', { type: 'file', accept: accept });
+  const nNote = h('input', { placeholder: 'Version note (optional)', style: 'width:200px' });
+  const nBar = h('progress', { max: 100, value: 0, hidden: true, style: 'width:160px' });
+  const nUp = h('button', { class: 'pri', on: { click: () => {
+    const f = nFile.files[0];
+    if (!nName.value.trim()) { flash('Give the download a name', false); return; }
+    if (!f) { flash('Choose the file (.apk, .zip, .pdf or .exe)', false); return; }
+    sendFile('/api/admin/downloads/upload?app=new&file=' + encodeURIComponent(f.name) + '&name=' + encodeURIComponent(nName.value.trim()) + '&desc=' + encodeURIComponent(nDesc.value.trim()) + '&note=' + encodeURIComponent(nNote.value.trim()), f, nBar, nName.value.trim() + ' is on the download page');
+  } } }, 'Add the download');
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'Add a download'),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px' }, nName, nFile, nNote),
+    h('div', { style: 'margin-top:6px' }, nDesc),
+    h('div', { style: 'display:flex;gap:8px;align-items:center;margin-top:6px' }, nUp, nBar)));
+  root.appendChild(h('div', {}, h('a', { href: '/download', target: '_blank' }, 'Open the download page')));
+}
+
+async function loadAlma() {
+  const root = $('almaBox');
+  const r = await api('/api/admin/alma/log');
+  root.textContent = '';
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data, qs = d.questions || [];
+  const missed = qs.filter(x => x.source === 'fallback').length;
+  root.appendChild(h('div', { class: 'box' },
+    h('b', {}, 'Alma'), ' answers with ', d.ai ? 'OpenAI (' + d.model + '), falling back to built-in answers' : 'built-in answers only (no OpenAI key on the server)',
+    h('div', { class: 'muted' }, d.today + ' questions today. "Not sure" means she had no good answer - those show what to add to the site or to her answers.'),
+    missed ? h('div', { class: 'error' }, missed + ' of the latest ' + qs.length + ' questions got a "not sure" answer') : null));
+  if (!qs.length) { root.appendChild(h('div', { class: 'box muted' }, 'Nobody has asked Alma anything yet. She is the round "A" button at the bottom right of the website pages.')); return; }
+  const t = h('table');
+  headerRow(t, ['Time', 'Question', 'Answered with', 'Topic']);
+  qs.forEach(x => t.appendChild(h('tr', {},
+    h('td', {}, when(Number(x.time))), h('td', { style: 'max-width:560px' }, x.q),
+    h('td', { class: x.source === 'fallback' ? 'error' : '' }, x.source === 'ai' ? 'AI' : x.source === 'faq' ? 'built-in answer' : 'not sure'),
+    h('td', {}, x.topic || '-'))));
+  root.appendChild(t);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Marketplace - Memoryq</title>
+<meta name="description" content="Buy and sell with Memoryq members: phones, electronics, fashion, home, vehicles, services and more.">
+<style>
+  :root {
+    --bg: #f2f4f7; --panel: #ffffff; --ink: #1b1f23; --muted: #667585; --line: #e2e7ed; --soft: #f6f8fa;
+    --accent: #2f6fed; --accent-soft: #e8efff; --good: #2e7d32; --bad: #c62828; --warn: #b26a00; --price: #0f7b3f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --panel: #182029; --ink: #e6ebf0; --muted: #8b9aa8; --line: #2a3542; --soft: #1e2833;
+            --accent: #5b8cff; --accent-soft: #1f2d4a; --price: #4cc38a; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; margin: 0; background: var(--bg); color: var(--ink); }
+  a { color: var(--accent); }
+  button, select, input, textarea { font: inherit; }
+  button { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+  textarea { resize: vertical; }
+  header { background: #16202a; color: #fff; position: sticky; top: 0; z-index: 20; }
+  .bar { max-width: 1200px; margin: 0 auto; padding: 8px 16px; display: flex; align-items: center; gap: 10px; }
+  .brand { font-weight: 800; font-size: 19px; color: #fff; text-decoration: none; white-space: nowrap; }
+  .brand small { font-weight: 600; color: #ffb547; margin-left: 4px; }
+  .search { flex: 1; display: flex; min-width: 0; }
+  .search input { border-radius: 8px 0 0 8px; border-color: #2c3a48; background: #0f1720; color: #fff; }
+  .search button { border-radius: 0 8px 8px 0; background: var(--accent); border-color: var(--accent); color: #fff; }
+  .hb { background: none; border: 0; color: #dfe7ee; padding: 8px 10px; white-space: nowrap; position: relative; }
+  .hb:hover { color: #fff; }
+  .hb.sell { background: #ffb547; color: #1b1f23; font-weight: 700; border-radius: 8px; }
+  .badge { background: var(--bad); color: #fff; border-radius: 10px; font-size: 11px; padding: 1px 6px; font-weight: 700; margin-left: 3px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px 16px 60px; }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; }
+  .chip { white-space: nowrap; border-radius: 16px; padding: 6px 12px; font-size: 14px; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .filters input { width: 110px; } .filters select { width: auto; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; }
+  .card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  .card .ph { aspect-ratio: 4/3; background: var(--soft); display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 34px; }
+  .card .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .card .tx { padding: 10px 12px 12px; }
+  .price { color: var(--price); font-weight: 800; font-size: 17px; }
+  .card .t { margin: 3px 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .note { background: var(--accent-soft); border-color: transparent; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 10px; }
+  .item { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .gal .big { background: #000; border-radius: 12px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .gal .big img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .gal .thumbs { display: flex; gap: 6px; margin-top: 8px; overflow-x: auto; }
+  .gal .thumbs img { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid transparent; }
+  .gal .thumbs img.on { border-color: var(--accent); }
+  .item h1 { font-size: 22px; margin: 0 0 6px; }
+  .item .price { font-size: 26px; }
+  .desc { white-space: pre-wrap; line-height: 1.5; }
+  .tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; background: var(--soft); color: var(--muted); margin-right: 4px; text-transform: uppercase; letter-spacing: .3px; }
+  .tag.pending { background: #fff4e0; color: var(--warn); } .tag.active { background: #e3f5e8; color: var(--good); }
+  .tag.rejected, .tag.removed { background: #fde7e7; color: var(--bad); } .tag.sold { background: #e8efff; color: var(--accent); }
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .form label { font-size: 13px; color: var(--muted); display: block; }
+  .form label > * { margin-top: 4px; }
+  .wide { grid-column: 1 / -1; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pics { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pics .p { position: relative; width: 110px; height: 82px; border-radius: 8px; overflow: hidden; background: var(--soft); }
+  .pics .p img { width: 100%; height: 100%; object-fit: cover; }
+  .pics .p button { position: absolute; top: 3px; right: 3px; padding: 1px 7px; font-size: 12px; }
+  .pics .p .cv { left: 3px; right: auto; }
+  .mine { display: grid; grid-template-columns: 90px 1fr auto; gap: 12px; align-items: center; }
+  .mine img, .mine .noimg { width: 90px; height: 68px; object-fit: cover; border-radius: 8px; background: var(--soft); display: flex; align-items: center; justify-content: center; }
+  .threads .th { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center; padding: 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .threads .th:hover { background: var(--soft); }
+  .threads .th img, .threads .th .noimg { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; background: var(--soft); }
+  .msgs { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; padding: 4px; }
+  .msg { max-width: 78%; padding: 8px 12px; border-radius: 12px; background: var(--soft); white-space: pre-wrap; }
+  .msg.me { align-self: flex-end; background: var(--accent); color: #fff; }
+  .msg .at { font-size: 11px; opacity: .7; margin-top: 3px; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: #1b1f23; color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 50; max-width: 90vw; }
+  .err { color: var(--bad); font-size: 14px; margin-top: 6px; }
+  .safety { font-size: 13px; }
+  .safety li { margin: 3px 0; }
+  @media (max-width: 760px) {
+    .bar { flex-wrap: wrap; } .search { order: 5; flex-basis: 100%; }
+    .item { grid-template-columns: 1fr; } .form { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .mine { grid-template-columns: 70px 1fr; } .mine img, .mine .noimg { width: 70px; height: 52px; } .mine .acts { grid-column: 1 / -1; }
+    .hb.txt { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <a class="brand" href="#" id="home">Memoryq <small>Marketplace</small></a>
+    <form class="search" id="searchForm"><input id="q" type="search" placeholder="Search phones, cars, services..." aria-label="Search"><button>Search</button></form>
+    <button class="hb sell" id="sellBtn">+ Sell</button>
+    <button class="hb" id="msgBtn" title="Messages">&#9993;<span class="txt"> Messages</span><span class="badge" id="msgBadge" hidden></span></button>
+    <button class="hb" id="mineBtn" title="My listings">&#9776;<span class="txt"> My listings</span></button>
+    <a class="hb" id="signIn" href="/me">Sign in</a>
+    <a class="hb txt" href="/me" id="meLink" hidden>Memoryq</a>
+  </div>
+</header>
+<main id="view"></main>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+function h(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  Object.entries(attrs || {}).forEach(([k, v]) => {
+    if (k === 'on') { Object.entries(v).forEach(([ev, fn]) => e.addEventListener(ev, fn)); }
+    else if (k === 'style') { e.style.cssText = v; }
+    else if (v !== null && v !== undefined && v !== false) { e.setAttribute(k, v === true ? '' : v); }
+  });
+  kids.flat().forEach(c => { if (c !== null && c !== undefined && c !== false) { e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c); } });
+  return e;
+}
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+// the Memoryq app opens this page with #token=...: remember it (the same sign-in as memoryq.com/me)
+(function () {
+  const m = location.hash.match(/token=([0-9a-f]{20,})/);
+  if (m) { store('vs_token', m[1]); history.replaceState(null, '', location.pathname + location.search + '#'); }
+})();
+let token = recall('vs_token');
+let me = null, meta = null;
+async function api(path, form, raw) {
+  const opts = { method: form || raw ? 'POST' : 'GET', headers: {} };
+  if (token) { opts.headers['Authorization'] = 'Bearer ' + token; }
+  if (raw) { opts.body = raw; opts.headers['Content-Type'] = 'application/octet-stream'; }
+  else if (form) { opts.headers['Content-Type'] = 'application/x-www-form-urlencoded'; opts.body = new URLSearchParams(form).toString(); }
+  try {
+    const r = await fetch(path, opts);
+    let data = {}; try { data = await r.json(); } catch (e) { }
+    return { ok: r.ok, status: r.status, data: data, error: (data && data.error) || ('error ' + r.status) };
+  } catch (e) { return { ok: false, status: 0, data: {}, error: 'Cannot reach Memoryq - check your connection' }; }
+}
+function toast(t, ms) { const d = h('div', { class: 'toast' }, t); document.body.appendChild(d); setTimeout(() => d.remove(), ms || 3000); }
+function money(cents, cur) {
+  if (!cents) { return 'Ask for price'; }
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: cents % 100 ? 2 : 0 }).format(cents / 100); }
+  catch (e) { return cur + ' ' + (cents / 100).toLocaleString(); }
+}
+function ago(t) {
+  const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if (m < 1) { return 'just now'; } if (m < 60) { return m + ' min ago'; }
+  const hr = Math.round(m / 60); if (hr < 24) { return hr + ' h ago'; }
+  const d = Math.round(hr / 24); return d < 30 ? d + ' days ago' : new Date(t).toLocaleDateString();
+}
+const STATUS = { pending: 'Waiting for approval', active: 'In the Marketplace', rejected: 'Not approved', paused: 'Paused', sold: 'Sold', removed: 'Taken down by Memoryq' };
+function needSignIn(what) {
+  const v = $('view'); v.textContent = '';
+  v.appendChild(h('div', { class: 'box', style: 'max-width:520px;margin:30px auto;text-align:center' },
+    h('h2', {}, 'Sign in to ' + what),
+    h('p', { class: 'muted' }, 'Use your Memoryq account (the same as memoryq.com/me and the Memoryq app). Then come back here.'),
+    h('div', { class: 'row', style: 'justify-content:center' }, h('a', { href: '/me' }, h('button', { class: 'primary' }, 'Sign in or create an account')))));
+}
+
+async function start() {
+  const [mr, ar] = await Promise.all([api('/api/market/meta'), token ? api('/api/me') : Promise.resolve({ ok: false })]);
+  meta = mr.ok ? mr.data : { categories: [], currencies: ['USD'], conditions: ['new', 'like new', 'used'], maxPhotos: 8 };
+  if (ar.ok) { me = ar.data; } else if (token && ar.status === 401) { token = null; store('vs_token', null); }
+  $('signIn').hidden = !!me; $('meLink').hidden = !me;
+  refreshBadge();
+  route();
+}
+async function refreshBadge() {
+  if (!me) { $('msgBadge').hidden = true; return; }
+  const r = await api('/api/market/threads');
+  const n = r.ok ? r.data.unread : 0;
+  $('msgBadge').hidden = !n; $('msgBadge').textContent = n;
+}
+setInterval(() => { if (me && !document.hidden) { refreshBadge(); } }, 30000);
+window.addEventListener('hashchange', route);
+$('home').addEventListener('click', (e) => { e.preventDefault(); filters.q = ''; $('q').value = ''; go(''); });
+$('sellBtn').addEventListener('click', () => go('sell'));
+$('msgBtn').addEventListener('click', () => go('messages'));
+$('mineBtn').addEventListener('click', () => go('mine'));
+$('searchForm').addEventListener('submit', (e) => { e.preventDefault(); filters.q = $('q').value.trim(); if (location.hash.replace('#', '')) { go(''); } else { browse(); } });
+function go(where) { if (location.hash.replace('#', '') === where) { route(); } else { location.hash = where; } }
+function route() {
+  const p = location.hash.replace(/^#/, '').split('/');
+  window.scrollTo(0, 0);
+  if (p[0] === 'item' && p[1]) { return showItem(Number(p[1])); }
+  if (p[0] === 'sell') { return sellForm(0); }
+  if (p[0] === 'edit' && p[1]) { return sellForm(Number(p[1])); }
+  if (p[0] === 'mine') { return showMine(); }
+  if (p[0] === 'messages') { return showThreads(); }
+  if (p[0] === 'thread' && p[1]) { return showThread(Number(p[1]), decodeURIComponent(p[2] || '')); }
+  if (p[0] === 'seller' && p[1]) { filters.seller = decodeURIComponent(p[1]); return browse(); }
+  filters.seller = '';
+  return browse();
+}
+
+// ---------- browse ----------
+const filters = { q: '', cat: '', min: '', max: '', cur: '', sort: 'new', seller: '' };
+let shown = 0, browseSeq = 0;
+async function browse(more) {
+  const v = $('view');
+  const seq = ++browseSeq;
+  if (!more) {
+    v.textContent = ''; shown = 0;
+    const chips = h('div', { class: 'chips' });
+    const chip = (name, label) => h('button', { class: 'chip' + (filters.cat === name ? ' on' : ''), on: { click: () => { filters.cat = name; browse(); } } }, label);
+    chips.appendChild(chip('', 'All'));
+    (meta.categories || []).forEach(c => chips.appendChild(chip(c.name, c.name + (c.count ? ' (' + c.count + ')' : ''))));
+    v.appendChild(chips);
+    const min = h('input', { type: 'number', min: '0', placeholder: 'Min price', value: filters.min });
+    const max = h('input', { type: 'number', min: '0', placeholder: 'Max price', value: filters.max });
+    const cur = h('select', {}, h('option', { value: '' }, 'Any currency'), (meta.currencies || []).map(c => h('option', { value: c, selected: c === filters.cur }, c)));
+    const sort = h('select', {}, [['new', 'Newest first'], ['price', 'Price: low to high'], ['-price', 'Price: high to low']].map(([k, l]) => h('option', { value: k, selected: k === filters.sort }, l)));
+    const apply = () => { filters.min = min.value; filters.max = max.value; filters.cur = cur.value; filters.sort = sort.value; browse(); };
+    [cur, sort].forEach(x => x.addEventListener('change', apply));
+    v.appendChild(h('div', { class: 'filters' }, min, max, cur, sort, h('button', { on: { click: apply } }, 'Apply'),
+      filters.seller ? h('span', { class: 'tag' }, 'Seller: ' + filters.seller) : null,
+      filters.q ? h('span', { class: 'muted small' }, 'Results for "' + filters.q + '"') : null));
+    v.appendChild(h('div', { class: 'grid', id: 'grid' }));
+    v.appendChild(h('div', { id: 'moreBox', style: 'text-align:center;margin-top:16px' }));
+  }
+  const qs = new URLSearchParams({ q: filters.q, cat: filters.cat, min: filters.min, max: filters.max, cur: filters.cur, sort: filters.sort, seller: filters.seller, offset: shown, limit: 24 });
+  const r = await api('/api/market/list?' + qs.toString());
+  if (seq !== browseSeq) { return; } // a newer search started meanwhile
+  const grid = $('grid'), mb = $('moreBox');
+  if (!grid) { return; }
+  if (!r.ok) { grid.appendChild(h('div', { class: 'empty' }, r.error)); return; }
+  const list = r.data.listings || [];
+  list.forEach(l => grid.appendChild(cardOf(l)));
+  shown += list.length;
+  mb.textContent = '';
+  if (!shown) {
+    mb.appendChild(h('div', { class: 'empty' }, filters.q || filters.cat || filters.min || filters.max ? 'Nothing matches - try other words or another category.' : 'Nothing for sale yet - be the first!',
+      h('div', { style: 'margin-top:12px' }, h('button', { class: 'primary', on: { click: () => go('sell') } }, '+ Sell something'))));
+  } else if (shown < r.data.total) {
+    mb.appendChild(h('button', { on: { click: () => browse(true) } }, 'Show more (' + (r.data.total - shown) + ')'));
+  }
+}
+function cardOf(l) {
+  return h('div', { class: 'card', on: { click: () => go('item/' + l.id) } },
+    h('div', { class: 'ph' }, l.photos.length ? h('img', { src: l.photos[0], alt: '', loading: 'lazy' }) : '\ud83d\udecd'),
+    h('div', { class: 'tx' },
+      h('div', { class: 'price' }, money(l.priceCents, l.currency)),
+      h('div', { class: 't', title: l.title }, l.title),
+      h('div', { class: 'muted small' }, (l.location ? l.location + ' \u00b7 ' : '') + ago(l.created))));
+}
+
+// ---------- one listing ----------
+async function showItem(id) {
+  const v = $('view'); v.textContent = 'Loading...';
+  const r = await api('/api/market/item?id=' + id);
+  v.textContent = '';
+  if (!r.ok) { v.appendChild(h('div', { class: 'empty' }, r.error, h('div', {}, h('a', { href: '#' }, 'Back to the Marketplace')))); return; }
+  const l = r.data;
+  const big = h('div', { class: 'big' }, l.photos.length ? h('img', { src: l.photos[0], alt: l.title }) : h('span', { style: 'font-size:60px' }, '\ud83d\udecd'));
+  const thumbs = h('div', { class: 'thumbs' });
+  l.photos.forEach((p, i) => {
+    const t = h('img', { src: p, alt: '', class: i ? '' : 'on' });
+    t.addEventListener('click', () => { big.firstChild.src = p; thumbs.querySelectorAll('img').forEach(x => x.classList.remove('on')); t.classList.add('on'); });
+    thumbs.appendChild(t);
+  });
+  const side = h('div', {});
+  side.appendChild(h('div', { class: 'box' },
+    l.status !== 'active' ? h('div', { style: 'margin-bottom:6px' }, h('span', { class: 'tag ' + l.status }, STATUS[l.status] || l.status)) : null,
+    h('h1', {}, l.title), h('div', { class: 'price' }, money(l.priceCents, l.currency)),
+    h('div', { class: 'muted small', style: 'margin-top:6px' }, [l.category, l.condition, l.location].filter(Boolean).join(' \u00b7 ') + ' \u00b7 listed ' + ago(l.created)),
+    l.reason && (l.mine || (me && me.role === 'ADMIN')) ? h('div', { class: 'err' }, 'Memoryq: ' + l.reason) : null));
+  const seller = h('div', { class: 'box' },
+    h('div', { class: 'muted small' }, 'Seller'),
+    h('div', { style: 'font-weight:700;font-size:17px' }, l.seller),
+    h('div', { class: 'muted small' }, (l.sellerActive || 0) + ' item(s) for sale' + (l.sellerSince ? ' \u00b7 selling since ' + new Date(l.sellerSince).toLocaleDateString() : '')),
+    h('a', { href: '#seller/' + encodeURIComponent(l.seller), class: 'small' }, 'See all from ' + l.seller));
+  side.appendChild(seller);
+  if (l.mine) {
+    side.appendChild(h('div', { class: 'box' }, h('div', { class: 'row' },
+      h('button', { class: 'primary', on: { click: () => go('edit/' + l.id) } }, 'Edit'),
+      h('button', { on: { click: () => go('mine') } }, 'My listings'),
+      h('button', { on: { click: () => go('messages') } }, 'Messages'))));
+  } else if (l.status === 'active') {
+    const ta = h('textarea', { rows: 3, maxlength: 1000 }, 'Hi ' + l.seller + ', is this still available?');
+    const err = h('div', { class: 'err' });
+    side.appendChild(h('div', { class: 'box' },
+      h('b', {}, 'Message the seller'),
+      l.myThread ? h('div', { class: 'small' }, 'You already wrote - ', h('a', { href: '#thread/' + l.id + '/' + encodeURIComponent(me.username) }, 'open the conversation')) : null,
+      h('div', { style: 'margin:8px 0' }, ta),
+      h('button', { class: 'primary', on: { click: async () => {
+        if (!me) { needSignIn('message the seller'); return; }
+        const q = await api('/api/market/ask', { id: l.id, text: ta.value });
+        if (!q.ok) { err.textContent = q.error; return; }
+        toast('Sent to ' + l.seller); go('thread/' + l.id + '/' + encodeURIComponent(me.username));
+      } } }, 'Send'), err));
+  }
+  side.appendChild(h('div', { class: 'box safety note' }, h('b', {}, 'Stay safe'), h('ul', { style: 'margin:6px 0 0;padding-left:18px' },
+    h('li', {}, 'Meet in a busy public place and check the item before you pay.'),
+    h('li', {}, 'Never send money in advance or share passwords and codes.'),
+    h('li', {}, 'Memoryq does not handle payments - you agree directly with the seller.'))));
+  if (!l.mine && me) {
+    side.appendChild(h('div', { style: 'text-align:right' }, h('button', { class: 'danger small', on: { click: async () => {
+      const why = prompt('What is wrong with this listing? (e.g. scam, stolen, not allowed, wrong category)');
+      if (!why) { return; }
+      const q = await api('/api/market/report', { id: l.id, reason: why });
+      toast(q.ok ? 'Thank you - Memoryq will check it' : q.error);
+    } } }, 'Report this listing')));
+  }
+  v.appendChild(h('div', { style: 'margin-bottom:10px' }, h('a', { href: '#' }, '\u2190 Marketplace')));
+  v.appendChild(h('div', { class: 'item' }, h('div', {}, h('div', { class: 'gal' }, big, l.photos.length > 1 ? thumbs : null),
+    h('div', { class: 'box', style: 'margin-top:14px' }, h('h3', { style: 'margin-top:0' }, 'Description'), h('div', { class: 'desc' }, l.desc || ''))), side));
+  document.title = l.title + ' - Memoryq Marketplace';
+}
+
+// ---------- sell / edit ----------
+async function shrink(file) {
+  // phone photos: turned the right way up, at most 1600 pixels, as JPEG (the server cleans them again)
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const sc = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * sc); c.height = Math.round(bmp.height * sc);
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(b => res(b || file), 'image/jpeg', 0.88));
+  } catch (e) { return file; }
+}
+async function sellForm(id) {
+  const v = $('view');
+  if (!me) { needSignIn('sell'); return; }
+  let l = { id: 0, title: '', desc: '', priceCents: 0, currency: recall('mk_cur') || 'USD', category: '', condition: '', location: recall('mk_loc') || '', photos: [], photoIds: [], status: '' };
+  if (id) {
+    const r = await api('/api/market/item?id=' + id);
+    if (!r.ok || !r.data.mine && me.role !== 'ADMIN') { v.textContent = ''; v.appendChild(h('div', { class: 'empty' }, r.error || 'Not your listing')); return; }
+    l = r.data;
+  }
+  v.textContent = '';
+  const f = {
+    title: h('input', { maxlength: 80, value: l.title, placeholder: 'e.g. Samsung Galaxy A54, 128 GB' }),
+    price: h('input', { inputmode: 'decimal', value: l.priceCents ? String(l.priceCents / 100) : '', placeholder: 'empty = ask for price' }),
+    currency: h('select', {}, (meta.currencies || ['USD']).map(c => h('option', { value: c, selected: c === l.currency }, c))),
+    category: h('select', {}, h('option', { value: '' }, 'Choose...'), (meta.categories || []).map(c => h('option', { value: c.name, selected: c.name === l.category }, c.name))),
+    condition: h('select', {}, [['', '-'], ['new', 'New'], ['like new', 'Like new'], ['used', 'Used']].map(([k, t]) => h('option', { value: k, selected: k === l.condition }, t))),
+    location: h('input', { maxlength: 60, value: l.location, placeholder: 'Town or area' }),
+    desc: h('textarea', { rows: 6, maxlength: 3000, placeholder: 'What it is, its condition, what comes with it, how to collect or deliver...' }, l.desc)
+  };
+  const err = h('div', { class: 'err' });
+  const pics = h('div', { class: 'pics' });
+  const file = h('input', { type: 'file', accept: 'image/*', multiple: true, style: 'width:auto' });
+  const picNote = h('div', { class: 'muted small' });
+  let current = l;
+  const drawPics = () => {
+    pics.textContent = '';
+    (current.photos || []).forEach((p, i) => {
+      const pid = current.photoIds[i];
+      pics.appendChild(h('div', { class: 'p' }, h('img', { src: p, alt: '' }),
+        i ? h('button', { class: 'cv', title: 'Make this the cover picture', on: { click: async (e) => { e.preventDefault(); const q = await api('/api/market/photo/cover', { id: current.id, photo: pid }); if (q.ok) { current = q.data; drawPics(); } } } }, '\u2605') : null,
+        h('button', { title: 'Remove', on: { click: async (e) => { e.preventDefault(); const q = await api('/api/market/photo/remove', { id: current.id, photo: pid }); if (q.ok) { current = q.data; drawPics(); } else { toast(q.error); } } } }, '\u2715')));
+    });
+    picNote.textContent = current.id ? (current.photos.length + ' of ' + meta.maxPhotos + ' photos. The first is the cover.') : 'Save first, then add up to ' + meta.maxPhotos + ' photos.';
+    file.disabled = !current.id || current.photos.length >= meta.maxPhotos;
+  };
+  file.addEventListener('change', async () => {
+    const files = Array.from(file.files || []).slice(0, meta.maxPhotos - current.photos.length);
+    for (const fl of files) {
+      picNote.textContent = 'Uploading ' + fl.name + '...';
+      const q = await api('/api/market/photo/add?id=' + current.id, null, await shrink(fl));
+      if (q.ok) { current = q.data; drawPics(); } else { toast(q.error, 5000); }
+    }
+    file.value = '';
+    drawPics();
+  });
+  const save = async () => {
+    err.textContent = '';
+    const q = await api('/api/market/save', { id: current.id || '', title: f.title.value, desc: f.desc.value, price: f.price.value, currency: f.currency.value,
+      category: f.category.value, condition: f.condition.value, location: f.location.value });
+    if (!q.ok) { err.textContent = q.error; return false; }
+    store('mk_cur', f.currency.value); store('mk_loc', f.location.value);
+    const fresh = !current.id; current = q.data; drawPics();
+    if (fresh) { history.replaceState(null, '', '#edit/' + current.id); toast('Saved - now add photos, then you are done', 5000); }
+    else { toast(current.status === 'pending' ? 'Saved - waiting for Memoryq\'s approval' : 'Saved'); }
+    statusLine.textContent = STATUS[current.status] || '';
+    return true;
+  };
+  const statusLine = h('span', { class: 'tag ' + (l.status || '') }, STATUS[l.status] || '');
+  v.appendChild(h('div', { style: 'margin-bottom:10px' }, h('a', { href: '#mine' }, '\u2190 My listings')));
+  v.appendChild(h('div', { class: 'box', style: 'max-width:860px' },
+    h('h2', { style: 'margin-top:0' }, id ? 'Edit listing ' : 'Sell something ', l.status ? statusLine : null),
+    h('div', { class: 'form' },
+      h('label', { class: 'wide' }, 'Title', f.title),
+      h('label', {}, 'Price', h('div', { class: 'row', style: 'flex-wrap:nowrap' }, f.price, f.currency)),
+      h('label', {}, 'Category', f.category),
+      h('label', {}, 'Condition', f.condition),
+      h('label', {}, 'Location', f.location),
+      h('label', { class: 'wide' }, 'Description', f.desc),
+      h('div', { class: 'wide' }, h('div', { class: 'muted small', style: 'margin-bottom:4px' }, 'Photos'), pics, h('div', { class: 'row', style: 'margin-top:8px' }, file, picNote))),
+    err,
+    h('div', { class: 'row', style: 'margin-top:14px' },
+      h('button', { class: 'primary', on: { click: save } }, id ? 'Save changes' : 'Save'),
+      h('button', { on: { click: async () => { if (await save()) { go('mine'); } } } }, 'Save and close'),
+      id ? h('button', { on: { click: () => go('item/' + id) } }, 'View') : null),
+    h('div', { class: 'box note small', style: 'margin:16px 0 0' },
+      h('b', {}, 'Before you list: '),
+      'new listings and changed titles, texts and photos are checked by Memoryq before they show. Not allowed: weapons, drugs and medicines, alcohol and tobacco, animals, ',
+      'stolen or fake goods, adult content, anything illegal where you live. Use real photos of the item and an honest price.')));
+  drawPics();
+}
+
+// ---------- my listings ----------
+async function showMine() {
+  const v = $('view');
+  if (!me) { needSignIn('see your listings'); return; }
+  v.textContent = 'Loading...';
+  const r = await api('/api/market/mine');
+  v.textContent = '';
+  if (!r.ok) { v.appendChild(h('div', { class: 'empty' }, r.error)); return; }
+  v.appendChild(h('div', { class: 'row', style: 'margin-bottom:12px' }, h('h2', { style: 'margin:0;flex:1' }, 'My listings'),
+    h('button', { on: { click: () => go('messages') } }, 'Messages' + (r.data.unread ? ' (' + r.data.unread + ' new)' : '')),
+    h('button', { class: 'primary', on: { click: () => go('sell') } }, '+ Sell something')));
+  const list = r.data.listings || [];
+  if (!list.length) { v.appendChild(h('div', { class: 'empty' }, 'You are not selling anything yet.')); return; }
+  const set = async (l, status, ask) => {
+    if (ask && !confirm(ask)) { return; }
+    const q = await api('/api/market/status', { id: l.id, status: status });
+    if (q.ok) { showMine(); } else { toast(q.error); }
+  };
+  list.forEach(l => {
+    v.appendChild(h('div', { class: 'box mine' },
+      l.photos.length ? h('img', { src: l.photos[0], alt: '' }) : h('div', { class: 'noimg' }, '\ud83d\udecd'),
+      h('div', { style: 'min-width:0' },
+        h('div', { style: 'font-weight:700' }, l.title),
+        h('div', {}, h('span', { class: 'price', style: 'font-size:15px' }, money(l.priceCents, l.currency)), ' ', h('span', { class: 'tag ' + l.status }, STATUS[l.status] || l.status)),
+        h('div', { class: 'muted small' }, (l.views || 0) + ' views \u00b7 updated ' + ago(l.updated) + (l.photos.length ? '' : ' \u00b7 no photos yet')),
+        l.reason && (l.status === 'rejected' || l.status === 'removed') ? h('div', { class: 'err' }, 'Memoryq: ' + l.reason) : null),
+      h('div', { class: 'row acts' },
+        h('button', { on: { click: () => go('item/' + l.id) } }, 'View'),
+        l.status !== 'removed' ? h('button', { on: { click: () => go('edit/' + l.id) } }, 'Edit') : null,
+        l.status === 'active' ? h('button', { on: { click: () => set(l, 'sold') } }, 'Mark sold') : null,
+        l.status === 'active' ? h('button', { on: { click: () => set(l, 'paused') } }, 'Pause') : null,
+        l.status === 'paused' || l.status === 'sold' ? h('button', { on: { click: () => set(l, 'active') } }, 'Sell again') : null,
+        h('button', { class: 'danger', on: { click: () => set(l, 'deleted', 'Delete "' + l.title + '" and its photos?') } }, 'Delete'))));
+  });
+}
+
+// ---------- messages ----------
+async function showThreads() {
+  const v = $('view');
+  if (!me) { needSignIn('see your messages'); return; }
+  v.textContent = 'Loading...';
+  const r = await api('/api/market/threads');
+  v.textContent = '';
+  v.appendChild(h('h2', { style: 'margin-top:0' }, 'Messages'));
+  if (!r.ok) { v.appendChild(h('div', { class: 'empty' }, r.error)); return; }
+  const list = r.data.threads || [];
+  if (!list.length) { v.appendChild(h('div', { class: 'empty' }, 'No messages yet. Open a listing and message the seller.')); return; }
+  const box = h('div', { class: 'box threads', style: 'padding:0' });
+  list.forEach(t => box.appendChild(h('div', { class: 'th', on: { click: () => go('thread/' + t.id + '/' + encodeURIComponent(t.buyer)) } },
+    t.photo ? h('img', { src: t.photo, alt: '' }) : h('div', { class: 'noimg' }),
+    h('div', { style: 'min-width:0' },
+      h('div', {}, h('b', {}, t.with), h('span', { class: 'muted small' }, (t.selling ? ' \u00b7 buying your ' : ' \u00b7 selling ') + t.title)),
+      h('div', { class: 'muted small', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap' }, t.last)),
+    h('div', { style: 'text-align:right' }, h('div', { class: 'muted small' }, ago(t.at)), t.unread ? h('span', { class: 'badge' }, t.unread) : null))));
+  v.appendChild(box);
+  refreshBadge();
+}
+async function showThread(id, buyer) {
+  const v = $('view');
+  if (!me) { needSignIn('see your messages'); return; }
+  const r = await api('/api/market/thread?id=' + id + '&buyer=' + encodeURIComponent(buyer));
+  v.textContent = '';
+  if (!r.ok) { v.appendChild(h('div', { class: 'empty' }, r.error)); return; }
+  const d = r.data, l = d.listing, other = d.seller === me.username ? d.buyer : d.seller;
+  v.appendChild(h('div', { style: 'margin-bottom:10px' }, h('a', { href: '#messages' }, '\u2190 Messages')));
+  const msgs = h('div', { class: 'msgs' });
+  d.messages.forEach(m => msgs.appendChild(h('div', { class: 'msg' + (m.mine ? ' me' : '') }, m.text, h('div', { class: 'at' }, (m.mine ? 'You' : m.from) + ' \u00b7 ' + ago(m.at)))));
+  const ta = h('textarea', { rows: 2, maxlength: 1000, placeholder: 'Write to ' + other });
+  const err = h('div', { class: 'err' });
+  v.appendChild(h('div', { class: 'box', style: 'max-width:760px' },
+    h('div', { class: 'row', style: 'cursor:pointer;margin-bottom:10px', on: { click: () => go('item/' + l.id) } },
+      l.photos.length ? h('img', { src: l.photos[0], alt: '', style: 'width:64px;height:48px;object-fit:cover;border-radius:6px' }) : null,
+      h('div', {}, h('b', {}, l.title), h('div', { class: 'price', style: 'font-size:14px' }, money(l.priceCents, l.currency))),
+      h('span', { style: 'flex:1' }), h('span', { class: 'muted small' }, 'with ' + other)),
+    msgs,
+    h('div', { class: 'row', style: 'margin-top:10px;flex-wrap:nowrap' }, ta, h('button', { class: 'primary', on: { click: async () => {
+      const q = await api('/api/market/reply', { id: l.id, buyer: d.buyer, text: ta.value });
+      if (q.ok) { showThread(id, buyer); } else { err.textContent = q.error; }
+    } } }, 'Send')), err,
+    h('div', { class: 'muted small', style: 'margin-top:8px' }, 'Never send money in advance. Meet in a public place.')));
+  msgs.scrollTop = msgs.scrollHeight;
+  refreshBadge();
+}
+
+start();
+</script>
+<script src="/alma.js" defer></script>
+</body>
+</html>
