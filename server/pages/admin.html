@@ -181,6 +181,9 @@
       <div class="panel" id="panel-market-reports" hidden><div id="mkReports"></div></div>
       <div class="panel" id="panel-market-all" hidden><div id="mkAll"></div></div>
       <div class="panel" id="panel-world-stations" hidden><div id="wrList"></div></div>
+      <div class="panel" id="panel-world-countries" hidden><div id="wrCountries"></div></div>
+      <div class="panel" id="panel-world-review" hidden><div id="wrReview"></div></div>
+      <div class="panel" id="panel-world-bot" hidden><div id="wrBot"></div></div>
 
       <div class="panel" id="panel-videos-streamers" hidden>
         <div id="streamersBox"></div>
@@ -1519,8 +1522,11 @@ const NAV = [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
     { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
-  { id: 'world', label: 'World Radio', icon: '\uD83C\uDF0D', tabs: [
-    { id: 'stations', label: 'Stations on the globe', load: loadWorld } ] },
+  { id: 'world', label: 'Global Radio', icon: '\uD83C\uDF0D', tabs: [
+    { id: 'stations', label: 'All stations', load: loadWorld },
+    { id: 'countries', label: 'By country', load: loadWorldCountries },
+    { id: 'review', label: 'Needs attention', load: loadWorldReview },
+    { id: 'bot', label: 'Station finder bot', load: loadWorldBot } ] },
   { id: 'radio', label: 'Radio', icon: '\uD83D\uDCFB', tabs: [
     { id: 'onair', label: 'On air', load: loadRadioLive },
     { id: 'stations', label: 'Stations', load: loadRadioStations, noAuto: true },
@@ -2658,26 +2664,211 @@ async function loadMarket(status) {
   if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, status === 'pending' ? 'Nothing is waiting.' : 'No listings yet.')); return; }
   list.forEach(l => root.appendChild(mkRow(l, () => loadMarket(status))));
 }
-// ---- World Radio (memoryq.com/world): the open station list + stations members added ----
-async function loadWorld() {
-  const root = $('wrList'); root.textContent = '';
-  const r = await api('/api/admin/world/status');
+// ---- Global Radio (memoryq.com/world): every station on the globe, editing, the station finder bot ----
+const WR_STATUS = { active: 'on the globe', broken: 'silent (hidden)', removed: 'taken off', noplace: 'no place yet' };
+const WR_STATUS_BG = { active: '#2e7d32', broken: '#b26a00', removed: '#6b7a88', noplace: '#7b4fd6' };
+const WR_SOURCE = { rb: 'Radio Browser', wikidata: 'Wikidata', icecast: 'Icecast directory', list: 'from a list', member: 'member', admin: 'super-admin' };
+let wrCountries = null;
+async function wrCountryList() {
+  if (!wrCountries) { const r = await api('/api/admin/world/countries'); wrCountries = r.ok ? r.data.countries : []; }
+  return wrCountries;
+}
+function wrPlace(s) { return [s.city, s.country].filter(Boolean).join(', ') || 'place not known'; }
+function wrPlayUrl(s) { return /^https:\/\//i.test(s.url) && !/\.(pls|m3u)(\?|$)/i.test(s.url) ? s.url : '/api/admin/world/listen?id=' + s.id + '&token=' + encodeURIComponent(token); }
+function wrAgo(t) { if (!t) { return 'never'; } const d = Math.round((Date.now() - t) / 3600000); return d < 1 ? 'just now' : d < 48 ? d + ' h ago' : Math.round(d / 24) + ' days ago'; }
+
+// the edit form (also for a new station)
+function wrEdit(s, after) {
+  const box = h('div', { class: 'box', style: 'border-color:var(--accent);box-shadow:0 2px 12px rgba(0,0,0,.08)' });
+  const f = {};
+  const field = (k, label, val, attrs) => { f[k] = h('input', Object.assign({ value: val == null ? '' : val }, attrs || {})); return h('label', {}, label, f[k]); };
+  const st = h('select', {}, ...Object.keys(WR_STATUS).map(k => h('option', { value: k }, WR_STATUS[k])));
+  st.value = s ? s.status : 'active'; f.status = st;
+  const force = h('input', { type: 'checkbox' });
+  const msg = h('div', { class: 'small', style: 'margin:6px 0' });
+  const player = h('audio', { controls: true, preload: 'none', style: 'height:32px;vertical-align:middle;max-width:100%' });
+  if (s) { player.src = wrPlayUrl(s); }
+  box.appendChild(h('div', {}, h('b', { style: 'font-size:16px' }, s ? 'Edit: ' + s.name + ' (#' + s.id + ')' : 'New station'),
+    s ? h('span', { class: 'muted small' }, '  ' + (WR_SOURCE[s.source] || s.source) + (s.addedBy ? ' (' + s.addedBy + ')' : '') + ' \u00b7 ' + s.plays + ' plays \u00b7 last check ' + wrAgo(s.lastCheck) + (s.note ? ' \u00b7 ' + s.note : '')) : null));
+  box.appendChild(h('div', { class: 'fgrid' },
+    field('name', 'Station name', s && s.name, { maxlength: 80 }),
+    field('url', 'Stream address', s && s.url, { maxlength: 500, style: 'font-family:monospace' }),
+    field('home', 'Website', s && s.home, { maxlength: 300 }),
+    field('tags', 'Genre (comma between)', s && s.tags, { maxlength: 160 }),
+    field('lang', 'Language', s && s.lang, { maxlength: 60 }),
+    field('city', 'Town / region', s && s.city, { maxlength: 60 }),
+    field('country', 'Country', s && s.country, { maxlength: 60 }),
+    field('cc', 'Country code (TZ, KE...)', s && s.cc, { maxlength: 2, style: 'text-transform:uppercase' }),
+    field('lat', 'Latitude', s && (s.lat || s.lon) ? s.lat : ''),
+    field('lon', 'Longitude', s && (s.lat || s.lon) ? s.lon : ''),
+    h('label', {}, 'Status', st)));
+  const where = h('input', { placeholder: 'Find the place: town, country', style: 'width:260px' });
+  box.appendChild(h('div', {}, where, h('button', { on: { click: async () => {
+    if (!where.value.trim()) { return; }
+    const r = await api('/api/world/geocode?q=' + encodeURIComponent(where.value.trim()));
+    if (!r.ok) { msg.className = 'error small'; msg.textContent = r.data.error || 'Not found'; return; }
+    f.lat.value = r.data.lat; f.lon.value = r.data.lon; if (r.data.city) { f.city.value = r.data.city; } if (r.data.country) { f.country.value = r.data.country; } if (r.data.cc) { f.cc.value = r.data.cc; }
+    msg.className = 'ok small'; msg.textContent = 'Place found: ' + [r.data.city, r.data.country].filter(Boolean).join(', ');
+  } } }, 'Find place'), s && (s.lat || s.lon) ? h('a', { href: 'https://www.openstreetmap.org/?mlat=' + s.lat + '&mlon=' + s.lon + '#map=9/' + s.lat + '/' + s.lon, target: '_blank', style: 'margin-left:6px' }, 'See it on a map') : null,
+    s && !s.exact ? h('span', { class: 'muted small', style: 'margin-left:8px' }, '(place approximate - only the country is known)') : null));
+  box.appendChild(h('div', { style: 'margin-top:8px' }, player, ' ',
+    h('button', { on: { click: async () => {
+      msg.className = 'muted small'; msg.textContent = 'Testing the stream (up to 15 seconds)...';
+      const r = await api('/api/admin/world/test', { url: f.url.value.trim() });
+      if (r.ok && r.data.ok) { msg.className = 'ok small'; msg.textContent = 'It plays (' + r.data.codec + ')' + (r.data.url !== f.url.value.trim() ? ' - the real stream address: ' + r.data.url : ''); }
+      else { msg.className = 'error small'; msg.textContent = 'No sound: ' + ((r.data && r.data.error) || 'not reachable'); }
+    } } }, 'Test the stream'),
+    h('label', { class: 'small', style: 'margin-left:8px' }, force, ' save without testing')));
+  box.appendChild(msg);
+  box.appendChild(h('div', {},
+    h('button', { class: 'pri', on: { click: async () => {
+      const form = { name: f.name.value.trim(), url: f.url.value.trim(), home: f.home.value.trim(), tags: f.tags.value.trim(), lang: f.lang.value.trim(),
+        city: f.city.value.trim(), country: f.country.value.trim(), cc: f.cc.value.trim(), lat: f.lat.value.trim(), lon: f.lon.value.trim(), status: st.value, force: force.checked ? '1' : '' };
+      if (s) { form.id = s.id; }
+      msg.className = 'muted small'; msg.textContent = 'Saving (a new stream address is tested first)...';
+      const r = await api('/api/admin/world/save', form);
+      if (!r.ok) { msg.className = 'error small'; msg.textContent = r.data.error || 'Could not save'; return; }
+      flash('Saved: ' + r.data.name + ' - ' + (WR_STATUS[r.data.status] || r.data.status), true); wrCountries = null; box.remove(); after(r.data);
+    } } }, s ? 'Save changes' : 'Add the station'),
+    h('button', { on: { click: () => box.remove() } }, 'Cancel'),
+    s && s.status !== 'removed' ? h('button', { on: { click: () => wrAct(s, 'remove', after, box) } }, 'Take off the globe') : null,
+    s && s.status !== 'active' ? h('button', { on: { click: () => wrAct(s, 'restore', after, box) } }, 'Put back on the globe') : null,
+    s && s.reports ? h('button', { on: { click: () => wrAct(s, 'dismiss', after, box) } }, 'Dismiss reports') : null,
+    s && (s.source === 'member' || s.source === 'admin' || s.source === 'list') ? h('button', { style: 'color:var(--bad)', on: { click: () => { if (confirm('Delete ' + s.name + ' for good?')) { wrAct(s, 'delete', after, box); } } } }, 'Delete for good') : null));
+  return box;
+}
+async function wrAct(s, op, after, box) {
+  const r = await api('/api/admin/world/' + op, { id: s.id });
+  const words = { remove: 'Taken off the globe', restore: 'Back on the globe', dismiss: 'Reports dismissed', delete: 'Deleted' };
+  flash(r.ok ? words[op] + ': ' + s.name : (r.data.error || 'Could not'), r.ok);
+  if (r.ok) { wrCountries = null; if (box) { box.remove(); } after(op === 'delete' ? null : r.data); }
+}
+
+// a searchable, filterable list of stations (used by All stations, By country and Needs attention)
+async function wrTable(root, filters, title) {
+  root.textContent = '';
+  const fl = Object.assign({ q: '', cc: '', status: '', source: '', sort: 'name', page: 0, reported: '' }, filters || {});
+  const countries = await wrCountryList();
+  const q = h('input', { type: 'search', placeholder: 'Search name, genre, town, address...', value: fl.q, style: 'width:240px' });
+  const cc = h('select', {}, h('option', { value: '' }, 'All countries'), ...countries.map(c => h('option', { value: c.cc }, c.name + ' (' + (c.active + c.broken + c.noplace) + ')')));
+  cc.value = fl.cc;
+  const status = h('select', {}, h('option', { value: '' }, 'All but taken off'), h('option', { value: 'all' }, 'Everything'), ...Object.keys(WR_STATUS).map(k => h('option', { value: k }, WR_STATUS[k])));
+  status.value = fl.status;
+  const source = h('select', {}, h('option', { value: '' }, 'Any source'), ...Object.keys(WR_SOURCE).map(k => h('option', { value: k }, WR_SOURCE[k])));
+  source.value = fl.source;
+  const sort = h('select', {}, h('option', { value: 'name' }, 'A-Z'), h('option', { value: 'popular' }, 'Most popular'), h('option', { value: 'plays' }, 'Most played here'), h('option', { value: 'new' }, 'Newest'));
+  sort.value = fl.sort;
+  const go = page => { fl.page = page || 0; fl.q = q.value.trim(); fl.cc = cc.value; fl.status = status.value; fl.source = source.value; fl.sort = sort.value; wrTable(root, fl, title); };
+  q.addEventListener('keydown', e => { if (e.key === 'Enter') { go(0); } });
+  [cc, status, source, sort].forEach(x => x.addEventListener('change', () => go(0)));
+  const editHolder = h('div');
+  root.appendChild(h('div', { class: 'box' }, title ? h('div', { style: 'margin-bottom:6px' }, title) : null, q, cc, status, source, sort, h('button', { on: { click: () => go(0) } }, 'Search'),
+    h('button', { class: 'pri', on: { click: () => { editHolder.textContent = ''; editHolder.appendChild(wrEdit(null, () => go(fl.page))); } } }, '+ New station'), editHolder));
+  const r = await api('/api/admin/world/list?' + new URLSearchParams(fl).toString());
   if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
   const d = r.data;
-  const imp = h('button', { on: { click: async () => { imp.disabled = true; imp.textContent = 'Fetching (up to a minute)...'; const q = await api('/api/admin/world/import', {}); flash(q.ok ? q.data.imported + ' stations from Radio Browser' : (q.data.error || 'Could not reach Radio Browser'), q.ok); loadWorld(); } } }, 'Refresh the list now');
-  root.appendChild(h('div', { class: 'box muted' }, 'memoryq.com/world shows ' + d.total + ' stations on the globe (' + d.members + ' added by members). The open list comes from Radio Browser (radio-browser.info) and refreshes every day - last: '
-    + (d.lastImport ? when(d.lastImport) : 'not yet') + ' (' + d.importNote + '). Listening through Memoryq right now: ' + d.relaysNow + '. ', h('a', { href: '/world', target: '_blank' }, 'Open World Radio'), h('div', { style: 'margin-top:8px' }, imp)));
-  const list = d.stations || [];
-  if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No member stations or reports yet.')); return; }
-  list.forEach(s => {
-    const act = async op => { const q = await api('/api/admin/world/' + op, { id: s.id }); flash(q.ok ? (op === 'remove' ? 'Taken off the globe' : 'Back on the globe') : (q.data.error || 'Could not'), q.ok); if (q.ok) { loadWorld(); } };
-    root.appendChild(h('div', { class: 'box' },
-      h('div', {}, h('b', {}, s.name), ' ', h('span', { class: 'pill' }, s.status === 'active' ? 'on the globe' : s.status), s.reports ? h('span', { class: 'pill', style: 'background:#fde8e8;color:#c62828' }, s.reports + ' report(s)') : null),
-      h('div', { class: 'muted small' }, [s.city, s.country].filter(Boolean).join(', ') + ' \u00b7 ' + (s.tags || 'no genre') + ' \u00b7 ' + s.plays + ' plays \u00b7 ' + (s.source === 'member' ? 'added by ' : 'Radio Browser') , s.source === 'member' ? userLink(s.addedBy) : null, ' \u00b7 ' + when(s.created)),
-      h('div', { class: 'small', style: 'word-break:break-all' }, s.play.startsWith('/') ? 'http stream (plays through Memoryq)' : s.play),
-      h('div', { style: 'margin-top:6px' }, h('audio', { controls: '', preload: 'none', src: s.play, style: 'height:32px;vertical-align:middle' }), ' ',
-        s.status === 'active' ? h('button', { on: { click: () => act('remove') } }, 'Take off the globe') : h('button', { on: { click: () => act('restore') } }, 'Put back'))));
+  if (!d.stations.length) { root.appendChild(h('div', { class: 'box muted' }, 'No stations match.')); return; }
+  const tbl = h('table', {}, h('tr', {}, h('th', {}, 'Station'), h('th', {}, 'Place'), h('th', {}, 'Genre'), h('th', {}, 'Source'), h('th', {}, 'Status'), h('th', {}, 'Checked'), h('th', {}, '')));
+  d.stations.forEach(s => {
+    const holder = h('td', { colspan: 7, style: 'padding:0 10px' });
+    const extra = h('tr', {}, holder); extra.hidden = true;
+    const edit = () => { holder.textContent = ''; extra.hidden = false; holder.appendChild(wrEdit(s, () => go(fl.page))); };
+    tbl.appendChild(h('tr', {},
+      h('td', {}, h('a', { href: '#', on: { click: e => { e.preventDefault(); edit(); } } }, h('b', {}, s.name)), h('div', { class: 'muted small', style: 'word-break:break-all;max-width:320px' }, s.url)),
+      h('td', {}, wrPlace(s), s.exact ? null : h('div', { class: 'muted small' }, 'approximate')),
+      h('td', { class: 'small' }, s.tags || '-'),
+      h('td', { class: 'small' }, WR_SOURCE[s.source] || s.source, s.addedBy ? h('div', { class: 'muted' }, s.addedBy) : null),
+      h('td', {}, h('span', { class: 'pill', style: 'background:' + (WR_STATUS_BG[s.status] || '#6b7a88') }, WR_STATUS[s.status] || s.status),
+        s.reports ? h('div', { class: 'error small' }, s.reports + ' report(s)') : null, s.edited ? h('div', { class: 'muted small' }, 'edited') : null),
+      h('td', { class: 'small' }, wrAgo(s.lastCheck), s.fails ? h('div', { class: 'error' }, 'silent ' + s.fails + 'x') : null),
+      h('td', {}, h('button', { on: { click: edit } }, 'Edit'))));
+    tbl.appendChild(extra);
   });
+  root.appendChild(h('div', { class: 'muted small', style: 'margin:6px 0' }, d.count.toLocaleString() + ' stations - page ' + (d.page + 1) + ' of ' + d.pages + ' ',
+    d.page > 0 ? h('button', { on: { click: () => go(d.page - 1) } }, '< Previous') : null,
+    d.page + 1 < d.pages ? h('button', { on: { click: () => go(d.page + 1) } }, 'Next >') : null));
+  root.appendChild(tbl);
+}
+
+async function loadWorld() { wrTable($('wrList'), {}, null); }
+
+async function loadWorldCountries() {
+  const root = $('wrCountries'); root.textContent = '';
+  wrCountries = null;
+  const list = await wrCountryList();
+  const total = list.reduce((a, c) => a + c.active, 0);
+  root.appendChild(h('div', { class: 'box muted' }, total.toLocaleString() + ' stations on the globe in ' + list.filter(c => c.active && c.cc !== '--').length + ' countries. Click a country to see and edit its stations. ',
+    h('a', { href: '/world', target: '_blank' }, 'Open World Radio')));
+  const holder = h('div');
+  const grid = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px' });
+  list.forEach(c => grid.appendChild(h('div', { class: 'box', style: 'margin:0;cursor:pointer', on: { click: () => { holder.scrollIntoView({ behavior: 'smooth' }); wrTable(holder, { cc: c.cc, sort: 'popular' }, h('b', { style: 'font-size:16px' }, c.name)); } } },
+    h('b', {}, c.name), ' ', h('span', { class: 'muted small' }, c.cc),
+    h('div', { class: 'small' }, c.active + ' on the globe', c.broken ? h('span', { style: 'color:#b26a00' }, ' \u00b7 ' + c.broken + ' silent') : null,
+      c.noplace ? h('span', { style: 'color:#7b4fd6' }, ' \u00b7 ' + c.noplace + ' no place') : null, c.members ? ' \u00b7 ' + c.members + ' by members' : null))));
+  root.appendChild(grid);
+  root.appendChild(holder);
+}
+
+async function loadWorldReview() {
+  const root = $('wrReview'); root.textContent = '';
+  const a = h('div'), b = h('div'), c = h('div');
+  root.append(a, b, c);
+  wrTable(a, { reported: '1', status: 'all' }, h('b', {}, 'Reported by listeners ("Not working?")'));
+  wrTable(b, { status: 'noplace' }, h('b', {}, 'Plays, but no place yet - set the place to put them on the globe'));
+  wrTable(c, { status: 'broken', sort: 'popular' }, h('b', {}, 'Silent 3 checks running (hidden; they come back by themselves when they play again)'));
+}
+
+const WR_JOBS = { rb: ['Radio Browser', 'every day', 'The most listened-to stations that have a place (radio-browser.info, open data).'],
+  wikidata: ['Wikidata', 'every day', 'Stations with a stream address on Wikidata (the open data behind Wikipedia). Only streams that play are added.'],
+  icecast: ['Icecast directory', 'every week', 'Public Icecast streams (dir.xiph.org). The country comes from the address (.tz, .de) or where the server is; the dot goes in that country, marked approximate.'],
+  check: ['Stream checker', 'every night', 'Plays every station for a moment. Silent 3 nights running = hidden; broken ones are repaired from their website or the Wayback Machine.'],
+  list: ['Find from a list', 'when you ask', 'Paste station names (e.g. the TCRA licence list) below.'] };
+let wrBotTimer = null;
+async function loadWorldBot() {
+  const root = $('wrBot');
+  const r = await api('/api/admin/world/bot');
+  root.textContent = '';
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data, b = d.bot || { jobs: [], log: [], notFound: [] }, st = d.settings || {};
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'Station finder bot'), ' - ',
+    b.running ? h('span', { class: 'live' }, 'working: ' + (WR_JOBS[b.running] || [b.running])[0] + (b.total ? ' (' + b.done + ' of ' + b.total + ')' : '') + ' ') : h('span', { class: 'muted' }, 'resting '),
+    b.running ? h('button', { on: { click: async () => { await api('/api/admin/world/stop', {}); flash('Stopping after the current station', true); } } }, 'Stop') : null,
+    h('div', { class: 'muted small', style: 'margin-top:4px' }, d.total.toLocaleString() + ' on the globe \u00b7 ' + d.broken + ' silent \u00b7 ' + d.noplace + ' without a place \u00b7 ' + d.removed + ' taken off \u00b7 ' + d.members + ' by members \u00b7 listening through Memoryq now: ' + d.relaysNow)));
+  const tbl = h('table', {}, h('tr', {}, h('th', {}, 'Job'), h('th', {}, 'When'), h('th', {}, 'Last run'), h('th', {}, 'Result'), h('th', {}, '')));
+  b.jobs.forEach(j => {
+    const info = WR_JOBS[j.job] || [j.job, '', ''];
+    tbl.appendChild(h('tr', {}, h('td', {}, h('b', {}, info[0]), h('div', { class: 'muted small', style: 'max-width:320px' }, info[2])),
+      h('td', { class: 'small' }, j.enabled ? info[1] : 'switched off'), h('td', { class: 'small' }, j.last ? when(j.last) : 'not yet'),
+      h('td', { class: 'small' }, j.note),
+      h('td', {}, j.job === 'list' ? null : h('button', { disabled: !!b.running, on: { click: async () => {
+        const q = await api('/api/admin/world/run', { job: j.job }); flash(q.ok ? info[0] + ' started' : (q.data.error || 'Could not start'), q.ok); loadWorldBot();
+      } } }, 'Run now'))));
+  });
+  root.appendChild(tbl);
+  const lim = h('input', { type: 'number', min: 100, max: 60000, step: 500, value: st.rbLimit || 5000, style: 'width:100px' });
+  const sw = k => { const x = h('input', { type: 'checkbox' }); x.checked = st[k] !== 'off'; return x; };
+  const wd = sw('wikidata'), ic = sw('icecast'), ch = sw('checker'), rp = sw('repair');
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'Settings'), h('div', { class: 'small', style: 'margin-top:6px' },
+    'Radio Browser: the ', lim, ' most listened-to stations  ',
+    h('label', {}, wd, ' Wikidata '), h('label', {}, ic, ' Icecast directory '), h('label', {}, ch, ' Nightly stream check '), h('label', {}, rp, ' Repair broken stations (website / Wayback Machine) '),
+    h('button', { class: 'pri', on: { click: async () => {
+      const q = await api('/api/admin/world/settings', { rbLimit: lim.value, wikidata: wd.checked ? 'on' : 'off', icecast: ic.checked ? 'on' : 'off', checker: ch.checked ? 'on' : 'off', repair: rp.checked ? 'on' : 'off' });
+      flash(q.ok ? 'Settings saved' : (q.data.error || 'Could not save'), q.ok);
+    } } }, 'Save settings'))));
+  const names = h('textarea', { rows: 7, style: 'width:100%;font-family:inherit', placeholder: 'One station per line, the town after a dash if you know it:\nRadio Free Africa - Mwanza\nUhuru FM - Dar es Salaam\nPambazuka FM' });
+  const lcc = h('select', {}, h('option', { value: '' }, 'Any country'), ...((await wrCountryList()).filter(c => c.cc !== '--').map(c => h('option', { value: c.cc }, c.name))));
+  lcc.value = 'TZ';
+  if (!lcc.value) { lcc.appendChild(h('option', { value: 'TZ' }, 'Tanzania')); lcc.value = 'TZ'; }
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'Find stations from a list'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 6px' }, 'For example the TCRA list of licensed radio stations (copy the names out of the PDF). Each name is looked for in Radio Browser and Wikidata; a stream that plays goes on the globe at its town. Names not found are listed here so you can add them by hand (All stations -> + New station).'),
+    names, h('div', {}, 'Country: ', lcc, h('button', { class: 'pri', disabled: !!b.running, on: { click: async () => {
+      const q = await api('/api/admin/world/find', { names: names.value, cc: lcc.value }); flash(q.ok ? 'Looking for them - the results appear below' : (q.data.error || 'Could not start'), q.ok); loadWorldBot();
+    } } }, 'Find these stations')),
+    b.notFound.length ? h('div', { style: 'margin-top:8px' }, h('b', { class: 'small' }, 'Not found last time (' + b.notFound.length + '):'), h('pre', { style: 'white-space:pre-wrap;font-size:12px;max-height:180px;overflow:auto;background:#f6f8fa;padding:8px;border-radius:6px' }, b.notFound.join('\n'))) : null));
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'What the bot did'), h('pre', { style: 'white-space:pre-wrap;font-size:12px;max-height:340px;overflow:auto;background:#f6f8fa;padding:8px;border-radius:6px;margin:6px 0 0' },
+    b.log.length ? b.log.slice().reverse().join('\n') : 'Nothing yet - the first jobs start a minute after the server starts.')));
+  clearTimeout(wrBotTimer);
+  if (b.running) { wrBotTimer = setTimeout(() => { if (!$('panel-world-bot').hidden) { loadWorldBot(); } }, 4000); }
 }
 async function loadMarketReports() {
   const root = $('mkReports'); root.textContent = '';

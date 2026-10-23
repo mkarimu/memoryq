@@ -122,7 +122,7 @@
       <div class="quick" id="quick">
         <button data-q="Tanzania">Tanzania</button><button data-q="Kenya">Kenya</button><button data-q="gospel">Gospel</button>
         <button data-q="bongo flava">Bongo flava</button><button data-q="jazz">Jazz</button><button data-q="news">News</button>
-        <button id="nearMe">Near me</button>
+        <button id="nearMe">Near me</button><button id="browseBtn">All countries</button>
       </div>
       <div class="alma" id="almaBox" hidden><b>A</b><span id="almaSays"></span></div>
       <div class="list" id="list"></div>
@@ -455,6 +455,20 @@ async function ask(q) {
 }
 $('askForm').onsubmit = e => { e.preventDefault(); ask($('q').value); };
 $('quick').querySelectorAll('button[data-q]').forEach(b => { b.onclick = () => { $('q').value = b.dataset.q; ask(b.dataset.q); }; });
+$('browseBtn').onclick = async () => {
+  $('almaBox').hidden = false; $('almaSays').textContent = 'Radio stations by country - pick one.';
+  const r = await api('/api/world/browse');
+  if (!r.ok) { return; }
+  const list = r.data.countries, el = $('list');
+  el.innerHTML = list.map((c, i) => '<div class="row" data-i="' + i + '"><div class="ic">' + esc(c[0]) + '</div><div class="tx"><div class="n">' + esc(c[1])
+    + '</div><div class="p">' + c[2].toLocaleString() + ' station' + (c[2] === 1 ? '' : 's') + '</div></div></div>').join('');
+  el.querySelectorAll('.row').forEach(row => { row.onclick = async () => {
+    const c = list[+row.dataset.i];
+    flyTo(c[3], c[4], 2.2);
+    const q = await api('/api/world/search?cc=' + c[0]);
+    if (q.ok) { $('almaSays').textContent = 'The most listened-to stations in ' + c[1] + '.'; rows(q.data.stations); if (q.data.stations[0]) { choose(q.data.stations[0], false); } }
+  }; });
+};
 $('nearMe').onclick = () => {
   if (!navigator.geolocation) { $('almaBox').hidden = false; $('almaSays').textContent = 'This browser cannot tell where you are.'; return; }
   $('almaBox').hidden = false; $('almaSays').textContent = 'Finding stations near you...';

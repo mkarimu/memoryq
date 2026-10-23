@@ -296,7 +296,9 @@ public class VideoServerMain {
         world.setAi(RadioWriter.OpenAi.fromEnvironment());
         Runtime.getRuntime().addShutdownHook(new Thread(world::flushIfDirty));
         api.addModule(world::register);
-        world.start();
+        // the station finder bot: Radio Browser + Wikidata daily, the Icecast directory weekly, every stream checked nightly
+        WorldBot worldBot = new WorldBot(world, geoIp::country);
+        worldBot.startSchedule();
         ScheduledExecutorService marketTimer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "market-save");
             t.setDaemon(true);
