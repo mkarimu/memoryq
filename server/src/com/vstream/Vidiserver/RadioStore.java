@@ -98,6 +98,8 @@ public final class RadioStore {
         public int idEvery = 4;
         /** The AI presenter (Alma) on this station at all - switched by the admin (Admin - Radio - Stations, AI). */
         public boolean aiOn = true;
+        /** Alma tells the heart of a song (its message, found in its words) about every ... songs (0 = never). */
+        public int msgEvery;
 
         public boolean hasOwnLimits() {
             return limListeners != 0 || limKbps != 0 || limStorageMb != 0 || limTransferGb != 0 || limDjs != 0;
@@ -144,6 +146,7 @@ public final class RadioStore {
             s.storyEvery = storyEvery;
             s.idEvery = idEvery;
             s.aiOn = aiOn;
+            s.msgEvery = msgEvery;
             s.limListeners = limListeners;
             s.limKbps = limKbps;
             s.limStorageMb = limStorageMb;
@@ -738,6 +741,7 @@ public final class RadioStore {
         s.sayArtist = changes.sayArtist;
         s.storyEvery = Math.max(0, Math.min(20, changes.storyEvery));
         s.idEvery = Math.max(0, Math.min(20, changes.idEvery));
+        s.msgEvery = Math.max(0, Math.min(20, changes.msgEvery));
         s.promo = clean(changes.promo, 200);
         dirty = true;
         return s.copy();
@@ -1847,6 +1851,9 @@ public final class RadioStore {
                     if (f.length >= 39) {
                         s.aiOn = !"0".equals(f[37]);
                     }
+                    if (f.length >= 40) {
+                        s.msgEvery = Integer.parseInt(f[38]);
+                    }
                     stations.put(s.id, s);
                     nextStation = Math.max(nextStation, s.id + 1);
                 } else if ("T".equals(f[0]) && f.length >= 12) {
@@ -1990,7 +1997,7 @@ public final class RadioStore {
                     .append('\t').append(s.limListeners).append(',').append(s.limKbps).append(',').append(s.limStorageMb).append(',')
                     .append(s.limTransferGb).append(',').append(s.limDjs).append('\t').append(s.company).append('\t').append(s.email)
                     .append('\t').append(s.sayArtist ? "1" : "0").append('\t').append(s.storyEvery).append('\t').append(s.idEvery)
-                    .append('\t').append(s.aiOn ? "1" : "0").append("\tend\n");
+                    .append('\t').append(s.aiOn ? "1" : "0").append('\t').append(s.msgEvery).append("\tend\n");
         }
         for (Track t : tracks.values()) {
             sb.append("T\t").append(t.id).append('\t').append(t.station).append('\t').append(t.file).append('\t')

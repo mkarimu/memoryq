@@ -923,6 +923,13 @@ public final class AccountApi {
         return true;
     }
 
+    /** The super-admin's changes to the website's words (home, terms, privacy, Vstream legal). */
+    private volatile SiteContent siteContent;
+
+    public void setSiteContent(SiteContent c) {
+        this.siteContent = c;
+    }
+
     private void servePage(HttpExchange ex, String route, Path page) throws IOException {
         try {
             String path = ex.getRequestURI().getPath();
@@ -940,6 +947,10 @@ public final class AccountApi {
                 return;
             }
             byte[] bytes = Files.readAllBytes(page);
+            SiteContent sc = siteContent;
+            if (sc != null && (route.equals("/") || route.equals("/terms") || route.equals("/privacy") || route.equals("/vstream-legal"))) {
+                bytes = sc.apply(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
+            }
             ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
             ex.getResponseHeaders().set("Cache-Control", "no-store");
             ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");

@@ -543,7 +543,13 @@ function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } els
 function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 const enc = encodeURIComponent;
 
-let token = recall('vs_token');
+// "View as a user": the super-admin opens /me#as=TOKEN - that sign-in lives in this tab only
+const AS_MODE = (() => {
+  const m = location.hash.match(/^#as=([0-9a-f]{20,})/);
+  if (m) { try { sessionStorage.setItem('vs_as', m[1]); } catch (e) { } history.replaceState(null, '', location.pathname + location.search); }
+  try { return sessionStorage.getItem('vs_as') || ''; } catch (e) { return ''; }
+})();
+let token = AS_MODE || recall('vs_token');
 let me = null;
 let myProfile = null;
 let photoVer = Date.now();
@@ -648,6 +654,7 @@ $('loginForm').addEventListener('submit', async (e) => {
   if (r.data.verify) { showCodeStep(r.data.username, r.data.email); return; }
   token = r.data.token; store('vs_token', token);
   $('p').value = ''; $('p2').value = '';
+  if (r.data.role === 'ADMIN') { location.href = '/admin'; return; } // the super-admin's main page is the admin panel
   await start();
 });
 // New accounts: the account is created when the code from the email comes back.
@@ -717,6 +724,7 @@ function ebSay(bold, rest) {
   box.appendChild(document.createTextNode(rest));
 }
 function signedOut(msg) {
+  if (AS_MODE) { try { sessionStorage.removeItem('vs_as'); } catch (e) { } token = null; me = null; document.body.innerHTML = '<p style="font:16px system-ui;padding:30px">The user view has ended - close this tab.</p>'; return; }
   token = null; me = null; store('vs_token', null);
   clearInterval(pollTimer); clearInterval(callTimer); clearInterval(badgeTimer);
   stopWatching();
@@ -2216,6 +2224,12 @@ async function start() {
   $('app').hidden = false;
   $('hdrAv').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
   $('adminLink').hidden = me.role !== 'ADMIN';
+  if (AS_MODE && !$('asBanner')) {
+    const b = document.createElement('div'); b.id = 'asBanner';
+    b.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:60;background:#b26a00;color:#fff;padding:8px 14px;border-radius:20px;font:600 13px system-ui;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+    b.textContent = 'Super-admin view: you see Memoryq as the member ' + me.username + ' - close this tab to go back';
+    document.body.appendChild(b);
+  }
   await refreshMe();
   $('hdrName').textContent = (myProfile && myProfile.stageName) || me.username;
   const f = await api('/api/calls/features');

@@ -1319,6 +1319,10 @@ public final class RadioApi {
                     if (se != null && se.trim().matches("\\d{1,2}")) {
                         s.storyEvery = Integer.parseInt(se.trim());
                     }
+                    String me2 = MediaAuthHttpServer.queryParam(body, "msgEvery");
+                    if (me2 != null && me2.trim().matches("\\d{1,2}")) {
+                        s.msgEvery = Integer.parseInt(me2.trim());
+                    }
                     String ie = MediaAuthHttpServer.queryParam(body, "idEvery");
                     if (ie != null && ie.trim().matches("\\d{1,2}")) {
                         s.idEvery = Integer.parseInt(ie.trim());
@@ -1757,7 +1761,8 @@ public final class RadioApi {
                     .append(",\"talkEvery\":").append(s.talkEvery).append(",\"newsOn\":").append(s.newsOn)
                     .append(",\"shoutOn\":").append(s.shoutOn).append(",\"introsOn\":").append(s.introsOn)
                     .append(",\"sayArtist\":").append(s.sayArtist).append(",\"storyEvery\":").append(s.storyEvery)
-                    .append(",\"aiOn\":").append(s.aiOn).append(",\"myRole\":").append(q(myRole))
+                    .append(",\"aiOn\":").append(s.aiOn).append(",\"msgEvery\":").append(s.msgEvery).append(",\"myRole\":").append(q(myRole))
+                    .append(",\"songMessages\":").append(radio.songMessagesReady())
                     .append(",\"idEvery\":").append(s.idEvery)
                     .append(",\"promo\":").append(q(s.promo)).append(",\"owner\":").append(q(s.owner))
                     .append(",\"status\":").append(q(s.status)).append(",\"onAir\":").append(s.onAir())

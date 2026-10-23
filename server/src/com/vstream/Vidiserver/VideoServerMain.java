@@ -176,6 +176,12 @@ public class VideoServerMain {
             System.out.println("Radio stories could not be read: " + e.getMessage());
         }
         radio.setStories(radioStories);
+        // what songs are about: Alma tells a song's message before or after it (OpenAI listens to each song once)
+        SongMessages songMessages = new SongMessages(Paths.get(System.getProperty("vstream.songMessagesFile", "radio-messages.txt")),
+                radioStore, audioTools, RadioWriter.OpenAi.fromEnvironment(), System::currentTimeMillis,
+                Integer.getInteger("vstream.songMessagesPerDay", 300));
+        songMessages.init();
+        radio.setSongMessages(songMessages);
         RadioStats radioStats = new RadioStats(Paths.get(System.getProperty("vstream.radioStatsFile", "radio-stats.txt")),
                 System::currentTimeMillis);
         radioStats.init();
@@ -275,6 +281,13 @@ public class VideoServerMain {
                 }, System.getProperty("vstream.adminEmail", "support@memoryq.com"),
                         System.getProperty("vstream.publicHost", System.getProperty("vstream.mediaHost", "memoryq.com")));
         api.addModule(marketApi::register);
+        // the super-admin edits the website's words in place (the pencil on each part of the page)
+        java.nio.file.Path pagesDir = Paths.get(System.getProperty("vstream.adminPage", "admin.html")).toAbsolutePath().getParent();
+        SiteContent siteContent = new SiteContent(Paths.get(System.getProperty("vstream.siteContentFile", "site-content.txt")),
+                pagesDir == null ? Paths.get(".") : pagesDir, sessions, users);
+        siteContent.init();
+        api.setSiteContent(siteContent);
+        api.addModule(siteContent::register);
         ScheduledExecutorService marketTimer = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "market-save");
             t.setDaemon(true);

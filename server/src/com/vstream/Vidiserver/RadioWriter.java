@@ -26,6 +26,59 @@ public final class RadioWriter {
         boolean ready();
 
         String write(String instructions, String input) throws IOException;
+
+        /** The words sung or spoken in an audio file (null when this AI cannot listen). */
+        default String transcribe(java.nio.file.Path audio) throws IOException {
+            return null;
+        }
+    }
+
+    // ---- What a song is about ----
+
+    static final String MESSAGE_INSTRUCTIONS = "You help a friendly radio presenter called Alma. You get the title of a song and the words "
+            + "sung in it (written down by a machine, so some words may be wrong; the song may be in English, Kiswahili or another language). "
+            + "Find the most important message the song implies - its heart: what it is really saying to the listener, or the feeling it "
+            + "wants to leave. Write it as ONE or TWO short spoken sentences in English (at most 40 words) that Alma can say on air, warm "
+            + "and natural, like a presenter sharing a thought. Do not quote the song (never more than four words in a row from it), do "
+            + "not say the title or the singer, and do not mention lyrics, words or a transcript. If there are no real words (instrumental), "
+            + "the words make no sense, or the message is hateful, sexual or violent, answer exactly: NONE";
+
+    /** The song's message for the presenter from its words, or "" (none, or no AI). */
+    public String songMessage(String title, String words) throws IOException {
+        if (ai == null || !ai.ready() || words == null || words.trim().split("\\s+").length < 12) {
+            return "";
+        }
+        String w = words.trim();
+        if (w.length() > 6000) {
+            w = w.substring(0, 6000);
+        }
+        String out = ai.write(MESSAGE_INSTRUCTIONS, "Song title: " + title + "\nWords heard in the song:\n" + w);
+        out = out == null ? "" : out.replaceAll("\\s+", " ").trim();
+        if (out.isEmpty() || out.toUpperCase(java.util.Locale.ROOT).startsWith("NONE") || out.length() > 400) {
+            return "";
+        }
+        return out;
+    }
+
+    /** Before the song: its message, then the song. */
+    public String messageBefore(RadioStore.Track next, String message, String requestedBy, boolean sayArtist) {
+        String song = !sayArtist || next.artist.isEmpty() ? next.title : next.artist + ", with " + next.title;
+        String m = message.trim().replaceAll("[.!?]*$", ".");
+        String by = requestedBy == null || requestedBy.isEmpty() ? "" : " This one is for " + requestedBy + ".";
+        return forSpeech(pick("Here is a song with something to say. " + m + by + " Listen for it in " + song + ".",
+                "Before the next song, a little thought. " + m + by + " Here is " + song + ".",
+                m + by + " That is the heart of our next song. Here is " + song + ".",
+                "Listen closely to this one. " + m + by + " " + song + "."));
+    }
+
+    /** After the song: what it was saying. */
+    public String messageAfter(RadioStore.Track prev, String message, boolean sayArtist) {
+        String song = !sayArtist || prev.artist.isEmpty() ? prev.title : prev.title + " by " + prev.artist;
+        String m = message.trim().replaceAll("[.!?]*$", ".");
+        return forSpeech(pick("That was " + song + ". " + m,
+                "You just heard " + song + ". If you listened closely: " + m,
+                song + ". What a song. " + m,
+                "That was " + song + ", and here is what I take from it. " + m));
     }
 
     /** A listener's song request. */
@@ -427,6 +480,71 @@ public final class RadioWriter {
             } finally {
                 c.disconnect();
             }
+        }
+
+        /** OpenAI's speech-to-text: the words in a short audio file (MP3, up to 25 MB). */
+        @Override
+        public String transcribe(java.nio.file.Path audio) throws IOException {
+            if (key.isEmpty()) {
+                return null;
+            }
+            String model = System.getProperty("vstream.transcribeModel", "gpt-4o-mini-transcribe");
+            String boundary = "----memoryq" + Long.toHexString(System.nanoTime());
+            HttpURLConnection c = (HttpURLConnection) new URL("https://api.openai.com/v1/audio/transcriptions").openConnection();
+            try {
+                c.setRequestMethod("POST");
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(180000);
+                c.setDoOutput(true);
+                c.setRequestProperty("Authorization", "Bearer " + key);
+                c.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+                OutputStream os = c.getOutputStream();
+                String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\n" + model + "\r\n"
+                        + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n"
+                        + "--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"song.mp3\"\r\n"
+                        + "Content-Type: audio/mpeg\r\n\r\n";
+                os.write(head.getBytes(StandardCharsets.UTF_8));
+                os.write(java.nio.file.Files.readAllBytes(audio));
+                os.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+                os.close();
+                int code = c.getResponseCode();
+                byte[] raw = AudioTools.readAll(code >= 400 ? c.getErrorStream() : c.getInputStream());
+                if (code < 200 || code >= 300) {
+                    throw new IOException("OpenAI speech-to-text answered HTTP " + code);
+                }
+                return jsonText(new String(raw, StandardCharsets.UTF_8));
+            } finally {
+                c.disconnect();
+            }
+        }
+
+        /** The "text" value of a small JSON answer. */
+        static String jsonText(String json) throws IOException {
+            Matcher m = Pattern.compile("\"text\"\\s*:\\s*\"").matcher(json);
+            if (!m.find()) {
+                throw new IOException("no text in the answer");
+            }
+            StringBuilder sb = new StringBuilder();
+            for (int i = m.end(); i < json.length(); i++) {
+                char ch = json.charAt(i);
+                if (ch == '"') {
+                    return sb.toString();
+                }
+                if (ch == '\\' && i + 1 < json.length()) {
+                    char e = json.charAt(++i);
+                    if (e == 'n') {
+                        sb.append(' ');
+                    } else if (e == 'u' && i + 4 < json.length()) {
+                        sb.append((char) Integer.parseInt(json.substring(i + 1, i + 5), 16));
+                        i += 4;
+                    } else if (e != 'r' && e != 't') {
+                        sb.append(e);
+                    }
+                } else {
+                    sb.append(ch);
+                }
+            }
+            throw new IOException("cut-off answer");
         }
 
         /** The text of the first "output_text" part of a Responses API answer. */

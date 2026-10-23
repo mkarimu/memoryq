@@ -400,6 +400,7 @@
           <label class="f">The DJ talks about every ... songs (0 = never)<input id="sEvery" type="number" min="0" max="20"></label>
           <label class="f">Promo line (the DJ says it now and then)<input id="sPromo" maxlength="200" placeholder="e.g. Get all my songs on Spotify - just search my name!"></label>
           <label class="f">Says the station name over a song about every ... songs (0 = never)<input id="sIdEvery" type="number" min="0" max="20"></label>
+          <label class="f" title="Alma listens to each song once (ahead of time) and tells its message - the heart of the song - just before it or just after it, at random. Songs under 2 minutes, ads and station IDs are left out.">Tells what a song is about (its message) about every ... songs (0 = never)<input id="sMsgEvery" type="number" min="0" max="20"><span class="small muted" id="sMsgNote"></span></label>
         </div>
         <div style="margin:4px 0 14px">
           <label class="chk"><input type="checkbox" id="sOn"> On air</label>
@@ -1197,6 +1198,8 @@ function drawSettings() {
   $('sEvery').value = s.talkEvery; $('sPromo').value = s.promo || '';
   $('sOn').checked = s.enabled; $('sNews').checked = s.newsOn; $('sShout').checked = s.shoutOn; $('sIntros').checked = s.introsOn;
   $('sArtist').checked = !!s.sayArtist; $('sIdEvery').value = s.idEvery == null ? 4 : s.idEvery;
+  $('sMsgEvery').value = s.msgEvery || 0;
+  $('sMsgNote').textContent = s.songMessages ? 'Alma says it before or after the song, at random (songs of 2 minutes or more).' : 'Needs OpenAI on the server (ask Memoryq).';
   const v = $('sVoice'); v.innerHTML = '';
   const voices = (status.voices && status.voices.length) ? status.voices : [''];
   voices.forEach(x => { const o = el('option', x || '(default voice)'); o.value = x; if (x === s.voice) { o.selected = true; } v.appendChild(o); });
@@ -1213,7 +1216,7 @@ $('saveBtn').addEventListener('click', async () => {
     company: $('sCompany').value.trim(), email: $('sEmail').value.trim(),
     djName: $('sDj').value, voice: $('sVoice').value, talkEvery: $('sEvery').value, promo: $('sPromo').value,
     enabled: $('sOn').checked, newsOn: $('sNews').checked, shoutOn: $('sShout').checked, introsOn: $('sIntros').checked,
-    sayArtist: $('sArtist').checked, idEvery: $('sIdEvery').value });
+    sayArtist: $('sArtist').checked, idEvery: $('sIdEvery').value, msgEvery: $('sMsgEvery').value });
   $('saveMsg').textContent = r.ok ? 'Saved.' : r.error; $('saveMsg').className = 'small ' + (r.ok ? 'ok' : 'error');
   if (r.ok) { await refresh(true); drawHeader(); }
 });

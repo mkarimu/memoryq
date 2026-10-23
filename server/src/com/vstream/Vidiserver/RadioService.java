@@ -86,6 +86,21 @@ public final class RadioService {
     }
 
     private volatile RadioStories stories;
+    private volatile SongMessages songMessages;
+
+    /** What songs are about: Alma tells a song's message before or after it (needs OpenAI). */
+    public void setSongMessages(SongMessages m) {
+        this.songMessages = m;
+    }
+
+    public SongMessages songMessages() {
+        return songMessages;
+    }
+
+    public boolean songMessagesReady() {
+        SongMessages m = songMessages;
+        return m != null && m.ready();
+    }
 
     /** Alma's stories (books read between songs). */
     public void setStories(RadioStories s) {
@@ -519,6 +534,7 @@ public final class RadioService {
                     s.introsOn = false;
                     s.storyEvery = 0;
                     s.idEvery = 0;
+                    s.msgEvery = 0;
                 }
                 return s;
             }
@@ -617,6 +633,20 @@ public final class RadioService {
             @Override
             public boolean lastPickWasBreak() {
                 return scheduler.lastPickWasBreak(id);
+            }
+
+            @Override
+            public void prepareSongMessage(RadioStore.Track t) {
+                SongMessages m = songMessages;
+                if (m != null && cast.listenerCount() > 0) {
+                    m.request(t); // only while someone listens (it costs a little, once per song)
+                }
+            }
+
+            @Override
+            public String songMessage(RadioStore.Track t, long waitMs) {
+                SongMessages m = songMessages;
+                return m == null ? null : m.await(t, waitMs);
             }
         };
     }

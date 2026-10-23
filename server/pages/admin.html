@@ -16,6 +16,9 @@
            position: sticky; top: 0; z-index: 5; }
   header .brand { font-weight: 700; letter-spacing: .3px; }
   header .who { color: #9fb0bf; font-size: 13px; margin-right: 12px; }
+  #gearMenu .gm { display: block; width: 100%; text-align: left; background: #fff; color: #1b1f23; border: 0; border-bottom: 1px solid #e2e7ed; border-radius: 0; padding: 10px 14px; font-weight: 600; cursor: pointer; }
+  #gearMenu .gm:hover { background: #eef3ff; }
+  #gearMenu .gm small { display: block; font-weight: 400; color: #667585; font-size: 12px; margin-top: 2px; }
   .shell { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 46px); }
   nav#side { background: var(--side); padding: 12px 8px; position: sticky; top: 46px; height: calc(100vh - 46px); overflow-y: auto; }
   nav#side button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--side-ink);
@@ -117,7 +120,13 @@
 <div id="app" hidden>
   <header>
     <span class="brand">Memoryq admin</span>
-    <span><span class="who" id="serverInfo"></span><button id="signOut">Sign out</button></span>
+    <span style="position:relative"><span class="who" id="serverInfo"></span><button id="gearBtn" title="View the site as someone else, edit the website" style="margin-right:8px">&#9881; View as</button><button id="signOut">Sign out</button>
+      <div id="gearMenu" hidden style="position:absolute;right:0;top:40px;z-index:50;background:#fff;color:#1b1f23;border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.25);min-width:300px;overflow:hidden">
+        <button class="gm" data-g="admin">View as Standard Admin<small>The member site (memoryq.com/me) as you</small></button>
+        <button class="gm" data-g="user">View as a user<small>The member site as the Memoryq trial account (opens in a new tab)</small></button>
+        <button class="gm" data-g="edit">Edit the website<small>The home page with a pencil on each part - saves at once</small></button>
+        <button class="gm" data-g="legal">Edit Terms / Privacy / Vstream legal<small>The same pencil on the legal pages</small></button>
+      </div></span>
   </header>
   <div class="shell">
     <nav id="side"></nav>
@@ -565,6 +574,7 @@ function flash(text, good) {
 function signOut(message) {
   if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
   token = null;
+  try { localStorage.removeItem('vs_token'); } catch (e) { }
   clearInterval(timer);
   hideKey();
   $('app').hidden = true;
@@ -581,12 +591,43 @@ $('loginForm').addEventListener('submit', async (ev) => {
   if (!r.ok) { $('loginError').textContent = r.data.error || 'Sign in failed'; return; }
   if (r.data.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; }
   token = r.data.token;
+  try { localStorage.setItem('vs_token', token); } catch (e) { } // the same sign-in for memoryq.com/me and the page editor
   $('p').value = '';
+  enterAdmin(r.data.username || 'admin');
+});
+function enterAdmin(name) {
   $('login').hidden = true;
   $('app').hidden = false;
-  $('serverInfo').textContent = 'signed in as admin';
+  $('serverInfo').textContent = 'signed in as ' + name + ' (super-admin)';
   startDashboard();
-});
+}
+// signed in already (memoryq.com/me or an earlier visit): straight in - the super-admin's main page is this panel
+(async () => {
+  let t = null;
+  try { t = localStorage.getItem('vs_token'); } catch (e) { }
+  if (!t) { return; }
+  const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + t } }).catch(() => null);
+  if (!r || !r.ok) { return; }
+  const me = await r.json().catch(() => ({}));
+  if (me.role !== 'ADMIN' || token) { return; }
+  token = t;
+  enterAdmin(me.username || 'admin');
+})();
+$('gearBtn').addEventListener('click', (e) => { e.stopPropagation(); $('gearMenu').hidden = !$('gearMenu').hidden; });
+document.addEventListener('click', () => { $('gearMenu').hidden = true; });
+document.querySelectorAll('#gearMenu .gm').forEach(b => b.addEventListener('click', async () => {
+  $('gearMenu').hidden = true;
+  const g = b.dataset.g;
+  if (g === 'admin') { window.open('/me', '_blank'); }
+  else if (g === 'edit') { window.open('/?edit=1', '_blank'); }
+  else if (g === 'legal') { window.open('/terms?edit=1', '_blank'); }
+  else if (g === 'user') {
+    const w = window.open('about:blank', '_blank');
+    const r = await api('/api/admin/view-as', { who: 'user' });
+    if (!r.ok) { if (w) { w.close(); } flash(r.data.error || 'Could not open the user view', false); return; }
+    if (w) { w.location = '/me#as=' + r.data.token; }
+  }
+}));
 
 
 // ---------- Radio ----------

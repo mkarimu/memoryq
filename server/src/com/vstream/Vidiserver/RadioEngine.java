@@ -94,6 +94,15 @@ public final class RadioEngine implements Runnable {
         default void storyAired(RadioStories.Part p) {
         }
 
+        /** Starts finding out what this song is about (its message), in the background. */
+        default void prepareSongMessage(RadioStore.Track t) {
+        }
+
+        /** The song's message for the presenter (waits up to waitMs for it), or null. */
+        default String songMessage(RadioStore.Track t, long waitMs) {
+            return null;
+        }
+
         /** Whether the last song chosen is part of an ad break / station ID (a request must not push it out). */
         default boolean lastPickWasBreak() {
             return false;
@@ -214,6 +223,9 @@ public final class RadioEngine implements Runnable {
     private boolean transitioning;
     private int songsSinceTalk;
     private int songsSinceStory;
+    private int songsSinceMsg;
+    /** Ad / station ID songs seen in breaks: never talked about. */
+    private final java.util.Set<Long> breakSongs = java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<Long, Boolean>());
     private int songsSinceId;
     // Alma over a song: the line being prepared, her voice while she talks, and the song under it
     private Future<short[]> idPrep;
@@ -493,7 +505,7 @@ public final class RadioEngine implements Runnable {
                 talkBreak = b;
                 talkStage = 0;
                 talking = true;
-                if (b.main != null) {
+                if (b.main != null && !"message".equals(b.mainKind)) {
                     songsSinceTalk = 0;
                     talkThreshold = -1;
                 }
@@ -736,6 +748,7 @@ public final class RadioEngine implements Runnable {
         voices.add(v);
         songsSinceTalk++;
         songsSinceStory++;
+        songsSinceMsg++;
         songsSinceId++;
         content.played(t);
         addEvent("song", t.label(), t);
@@ -818,16 +831,24 @@ public final class RadioEngine implements Runnable {
         if (talkThreshold < 0) {
             talkThreshold = Math.max(1, st.talkEvery + random.nextInt(3) - 1);
         }
-        if (plannedRequestBy.isEmpty() && content.lastPickWasBreak() && !talkNow) {
+        boolean isBreak = plannedRequestBy.isEmpty() && content.lastPickWasBreak();
+        if (isBreak) {
+            breakSongs.add(planned.id);
+        } else if (st.msgEvery > 0 && messageWorthy(planned)) {
+            content.prepareSongMessage(planned); // find out what it is about while this song plays
+        }
+        if (isBreak && !talkNow) {
             return; // ads and station IDs play straight, without an introduction
         }
         boolean due = st.talkEvery > 0 && songsSinceTalk >= talkThreshold;
         boolean storyDue = st.storyEvery > 0 && songsSinceStory >= st.storyEvery && content.nextStory() != null;
         boolean forced = talkNow;
         talkNow = false;
+        boolean msgDue = st.msgEvery > 0 && songsSinceMsg >= st.msgEvery
+                && (messageWorthy(planned) || messageWorthy(current == null ? null : current.track));
         boolean introOnly = !due && !forced && !storyDue && st.introsOn
                 && (random.nextInt(4) == 0 || !plannedRequestBy.isEmpty());
-        if (!due && !forced && !introOnly && !storyDue) {
+        if (!due && !forced && !introOnly && !storyDue && !msgDue) {
             return;
         }
         final RadioStore.Track next = planned;
@@ -835,14 +856,47 @@ public final class RadioEngine implements Runnable {
         final boolean full = due || forced;
         final boolean ai = content.listeners() > 0;
         final String by = plannedRequestBy;
-        plannedTalk = prep.submit(() -> prepare(st, next, prev, full, ai, by, storyDue));
+        plannedTalk = prep.submit(() -> prepare(st, next, prev, full, ai, by, storyDue, msgDue));
+    }
+
+    /** A real song (not an ad, jingle or station ID): at least 2 minutes long and not from a break. */
+    boolean messageWorthy(RadioStore.Track t) {
+        return t != null && t.durationMs >= 120000L && !breakSongs.contains(t.id);
     }
 
     private Break prepare(RadioStore.Station st, RadioStore.Track next, RadioStore.Track prev, boolean full, boolean ai,
                           String requestedBy, boolean story) {
+        return prepare(st, next, prev, full, ai, requestedBy, story, false);
+    }
+
+    private Break prepare(RadioStore.Station st, RadioStore.Track next, RadioStore.Track prev, boolean full, boolean ai,
+                          String requestedBy, boolean story, boolean msg) {
         RadioWriter writer = writer();
         Break b = new Break();
         String said = "";
+        // the heart of a song: said after it (about the song that is ending) or before the next one - at random
+        String msgBefore = null;
+        if (msg && !story && !full) {
+            boolean afterFirst = random.nextBoolean();
+            for (int round = 0; round < 2 && said.isEmpty() && msgBefore == null; round++) {
+                boolean after = (round == 0) == afterFirst;
+                RadioStore.Track t = after ? prev : next;
+                if (!messageWorthy(t)) {
+                    continue;
+                }
+                String m = content.songMessage(t, after ? 0 : 90000L);
+                if (m == null || m.isEmpty()) {
+                    continue;
+                }
+                if (after) {
+                    said = writer.messageAfter(t, m, st.sayArtist);
+                    b.mainKind = "message";
+                } else {
+                    msgBefore = writer.messageBefore(t, m, requestedBy, st.sayArtist);
+                }
+                songsSinceMsg = 0;
+            }
+        }
         if (story) {
             // Alma's story: the next part of the book, then a song, then more of the story at a later break
             RadioStories.Part p = content.nextStory();
@@ -883,7 +937,7 @@ public final class RadioEngine implements Runnable {
             }
         }
         if (!said.isEmpty()) {
-            if (!"story".equals(b.mainKind)) {
+            if (!"story".equals(b.mainKind) && !"message".equals(b.mainKind)) {
                 lastTalkKind = b.mainKind;
             }
             b.mainText = said;
@@ -901,8 +955,10 @@ public final class RadioEngine implements Runnable {
                         + " and no public chat posts from the last 12 hours.", null);
             }
         }
-        if (st.introsOn || b.main != null) {
-            String intro = b.story != null && b.main != null ? writer.storyBridge(next, b.story, st.sayArtist)
+        if (st.introsOn || b.main != null || msgBefore != null) {
+            String intro = msgBefore != null ? msgBefore
+                    : b.story != null && b.main != null ? writer.storyBridge(next, b.story, st.sayArtist)
+                    : "message".equals(b.mainKind) && b.main != null ? writer.intro(next, null, st.name, false, requestedBy, st.promo, st.sayArtist)
                     : writer.intro(next, prev, st.name, "news".equals(b.mainKind) && b.main != null, requestedBy, st.promo, st.sayArtist);
             short[] voice = content.speak(intro, st.voice, ai);
             if (voice != null) {
