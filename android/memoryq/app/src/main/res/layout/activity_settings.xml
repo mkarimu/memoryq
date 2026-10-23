@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingBottom="12dp"
+            android:text="Settings"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/settingsStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:paddingTop="4dp"
+            android:paddingBottom="12dp"
+            android:text="Server: found automatically on this Wi-Fi"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/serverSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Server address (only needed when the server is not on this Wi-Fi)"
+                android:textSize="13sp" />
+
+            <EditText
+                android:id="@+id/settingsHost"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Server address"
+                android:inputType="textNoSuggestions"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/settingsFind"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Search this Wi-Fi again" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:text="Account"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/accountOut"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingBottom="8dp"
+                android:text="Watching and reading chat is open to everyone. Chatting needs an account."
+                android:textSize="15sp" />
+
+            <EditText
+                android:id="@+id/accUser"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Username (3 to 24 letters, numbers or _)"
+                android:inputType="textNoSuggestions"
+                android:singleLine="true" />
+
+            <EditText
+                android:id="@+id/accPass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Password (at least 8 characters)"
+                android:inputType="textPassword"
+                android:singleLine="true" />
+
+            <Button
+                android:id="@+id/accSignIn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sign in" />
+
+            <Button
+                android:id="@+id/accRegister"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Create account (chat + broadcast)" />
+
+            <Button
+                android:id="@+id/accGuest"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Join as guest (chat only)" />
+
+            <Button
+                android:id="@+id/accViewer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Continue as viewer (read only)" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/accountIn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/accWho"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/accSignOut"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Sign out" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/accMessage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="4dp"
+            android:textColor="#C62828"
+            android:textSize="14sp" />
+
+        <LinearLayout
+            android:id="@+id/channelSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="Your channel"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/noticeRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#FFE0B2"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/noticeText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#5D4037"
+                    android:textSize="14sp" />
+
+                <Button
+                    android:id="@+id/noticeOk"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="OK" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/claimText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/releaseBtn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Release my channel"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/poolHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="6dp"
+                android:paddingBottom="4dp"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:id="@+id/poolList"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/keySection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:text="Stream key (advanced)"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:id="@+id/settingsKey"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Stream key"
+                android:inputType="textPassword"
+                android:singleLine="true" />
+
+            <CheckBox
+                android:id="@+id/showKey"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Show key" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="8dp"
+            android:paddingBottom="16dp"
+            android:text="Keys and sign-in stay on this phone and are not included in backups."
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/settingsSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save" />
+
+        <Button
+            android:id="@+id/settingsHome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Home" />
+    </LinearLayout>
+</ScrollView>

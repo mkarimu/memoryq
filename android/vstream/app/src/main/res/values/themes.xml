@@ -1,0 +1,14 @@
+<resources>
+    <style name="Theme.Vstream" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#2F6FED</item>
+        <item name="colorPrimaryVariant">#1F56C7</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondary">#E53935</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+        <item name="android:windowBackground">#0F1419</item>
+        <item name="android:statusBarColor">#0F1419</item>
+        <item name="android:navigationBarColor">#0F1419</item>
+        <item name="android:textColorPrimary">#E6EBF0</item>
+        <item name="android:textColorSecondary">#8B9AA8</item>
+    </style>
+</resources>
