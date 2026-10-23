@@ -142,6 +142,7 @@ public class VideoServerMain {
                 Paths.get(System.getProperty("vstream.adsDir", "ads")));
         adStore.init();
         Runtime.getRuntime().addShutdownHook(new Thread(adStore::flushIfDirty));
+        api.setAdFree(adStore::adFree); // the team's accounts never get Google ads
         listServer.setFeedApi(new FeedApi(adStore, profiles, users, sessions, new Limiter(),
                 System::currentTimeMillis, new java.security.SecureRandom()));
         WallStore wall = new WallStore(Paths.get(System.getProperty("vstream.wallFile", "wall.txt")),

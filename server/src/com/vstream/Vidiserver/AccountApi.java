@@ -923,6 +923,13 @@ public final class AccountApi {
         return true;
     }
 
+    /** Whether a member never gets Google ads (the team's accounts). */
+    private volatile java.util.function.BiPredicate<String, UserStore.Role> adFreeCheck;
+
+    public void setAdFree(java.util.function.BiPredicate<String, UserStore.Role> check) {
+        this.adFreeCheck = check;
+    }
+
     /** The super-admin's changes to the website's words (home, terms, privacy, Vstream legal). */
     private volatile SiteContent siteContent;
 
@@ -974,6 +981,8 @@ public final class AccountApi {
         }
         sb.append("\"username\":").append(quote(info.username));
         sb.append(",\"role\":").append(quote(info.role.name()));
+        java.util.function.BiPredicate<String, UserStore.Role> af = adFreeCheck;
+        sb.append(",\"adFree\":").append(af != null && af.test(info.username, info.role)); // the apps show no Google ads
         if (info.role == UserStore.Role.BROADCASTER && info.channelId != null) {
             sb.append(",\"channelId\":").append(quote(info.channelId));
             String key = users.getStreamKey(info.username);

@@ -322,7 +322,10 @@
           &nbsp; <label><input type="checkbox" id="setAdCard"> with an ad card</label>
           &nbsp; <label><input type="checkbox" id="setGoogle"> Google ads fill gaps</label><br>
           AdMob ad unit ID: <input id="setUnit" style="width:330px" placeholder="ca-app-pub-.../...">
-          <span id="unitNote" class="muted"></span>
+          <span id="unitNote" class="muted"></span><br>
+          <label style="display:block;margin-top:8px">Ad-free members (never get Google ads - the team, so nobody taps our own ads):
+            <input id="setAdFree" style="width:100%;max-width:520px" placeholder="admin, ndere, dadi, jaba, *gad*"></label>
+          <span class="muted small">Usernames separated by commas; * means any letters (*gad* = every name with "gad" in it). Admin accounts are always ad-free. Our own paid ads still show to them.</span><br>
           <button id="setSave">Save slider settings</button>
         </div>
       </div>
@@ -2048,6 +2051,7 @@ async function loadAds() {
     $('setAdCard').checked = st.adCardOn;
     $('setGoogle').checked = st.googleOn;
     $('setUnit').value = st.googleUnit;
+    $('setAdFree').value = st.adFree || '';
     adsSettingsShown = true;
   }
   $('unitNote').textContent = st.googleTest ? '(Google test ads - put your own unit ID here when your AdMob account is ready)' : '';
@@ -2092,7 +2096,7 @@ async function loadAds() {
 $('setSave').addEventListener('click', async () => {
   const r = await run('/api/admin/ads/settings', {
     sliderOn: String($('setSlider').checked), every: $('setEvery').value, adCardOn: String($('setAdCard').checked),
-    googleOn: String($('setGoogle').checked), googleUnit: $('setUnit').value }, 'Slider settings saved');
+    googleOn: String($('setGoogle').checked), googleUnit: $('setUnit').value, adFree: $('setAdFree').value }, 'Slider settings saved');
   if (r.ok) { adsSettingsShown = false; }
 });
 

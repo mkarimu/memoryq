@@ -64,6 +64,44 @@ public final class AdStore {
         public boolean adCardOn = true;
         public boolean googleOn = true;
         public String googleUnit = GOOGLE_TEST_UNIT;
+        /** Members who never get Google ads (the team - so nobody taps our own ads): names, * = any letters. */
+        public String adFree = DEFAULT_AD_FREE;
+    }
+
+    /** The team's accounts (every account with "gad" in its name is the same person). Admin accounts are always ad-free. */
+    public static final String DEFAULT_AD_FREE = "admin, ndere, dadi, jaba, *gad*";
+
+    /** True when this member never gets Google ads: an admin account, or a name on the ad-free list. */
+    public static boolean adFree(String list, String username, UserStore.Role role) {
+        if (role == UserStore.Role.ADMIN) {
+            return true;
+        }
+        if (username == null || list == null) {
+            return false;
+        }
+        String u = username.toLowerCase(java.util.Locale.ROOT);
+        for (String raw : list.split("[,;\\s]+")) {
+            String p = raw.trim().toLowerCase(java.util.Locale.ROOT);
+            if (p.isEmpty()) {
+                continue;
+            }
+            if (p.contains("*")) {
+                StringBuilder re = new StringBuilder();
+                for (String part : p.split("\\*", -1)) {
+                    re.append(java.util.regex.Pattern.quote(part)).append(".*");
+                }
+                if (u.matches(re.substring(0, re.length() - 2))) {
+                    return true;
+                }
+            } else if (u.equals(p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public synchronized boolean adFree(String username, UserStore.Role role) {
+        return adFree(settings.adFree, username, role);
     }
 
     private final Path file;
@@ -97,6 +135,7 @@ public final class AdStore {
         s.adCardOn = settings.adCardOn;
         s.googleOn = settings.googleOn;
         s.googleUnit = settings.googleUnit;
+        s.adFree = settings.adFree;
         return s;
     }
 
@@ -221,6 +260,9 @@ public final class AdStore {
                     settings.adCardOn = "1".equals(f[3]);
                     settings.googleOn = "1".equals(f[4]);
                     settings.googleUnit = f[5];
+                    if (f.length >= 7) {
+                        settings.adFree = f[6];
+                    }
                 } else if ("A".equals(f[0]) && f.length >= 13) {
                     Ad a = new Ad();
                     a.id = Long.parseLong(f[1]);
@@ -259,7 +301,7 @@ public final class AdStore {
         StringBuilder sb = new StringBuilder("# VStream ads and news slider settings\n");
         sb.append("S\t").append(settings.sliderOn ? "1" : "0").append('\t').append(settings.every).append('\t')
                 .append(settings.adCardOn ? "1" : "0").append('\t').append(settings.googleOn ? "1" : "0").append('\t')
-                .append(settings.googleUnit).append('\n');
+                .append(settings.googleUnit).append('\t').append(settings.adFree.replace('\t', ' ').replace('\n', ' ')).append('\n');
         for (Ad a : ads.values()) {
             sb.append("A\t").append(a.id).append('\t').append(a.advertiser).append('\t').append(a.headline).append('\t')
                     .append(a.text).append('\t').append(a.link).append('\t').append(a.image).append('\t').append(a.start)

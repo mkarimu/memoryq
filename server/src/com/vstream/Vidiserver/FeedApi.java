@@ -171,7 +171,8 @@ public final class FeedApi {
                     .append(",\"headline\":").append(ProfileApi.quote(paid.headline))
                     .append(",\"text\":").append(ProfileApi.quote(paid.text))
                     .append(",\"imageUrl\":").append(ProfileApi.quote("/api/feed/ad/image?id=" + paid.id)).append('}');
-        } else if (s.sliderOn && s.adCardOn && s.googleOn && !s.googleUnit.isEmpty()) {
+        } else if (s.sliderOn && s.adCardOn && s.googleOn && !s.googleUnit.isEmpty()
+                && (me == null || !AdStore.adFree(s.adFree, me.username, me.role))) { // the team never gets Google ads
             sb.append("{\"type\":\"google\",\"unitId\":").append(ProfileApi.quote(s.googleUnit)).append('}');
         } else {
             sb.append("null");
@@ -287,6 +288,10 @@ public final class FeedApi {
                 throw new Bad(400, "every must be a number");
             }
         }
+        v = MediaAuthHttpServer.queryParam(body, "adFree");
+        if (v != null) {
+            s.adFree = ProfileStore.clean(v, 1000);
+        }
         v = MediaAuthHttpServer.queryParam(body, "googleUnit");
         if (v != null) {
             String u = v.trim();
@@ -368,7 +373,8 @@ public final class FeedApi {
         StringBuilder sb = new StringBuilder("{\"settings\":{\"sliderOn\":").append(s.sliderOn)
                 .append(",\"every\":").append(s.every).append(",\"adCardOn\":").append(s.adCardOn)
                 .append(",\"googleOn\":").append(s.googleOn).append(",\"googleUnit\":").append(ProfileApi.quote(s.googleUnit))
-                .append(",\"googleTest\":").append(AdStore.GOOGLE_TEST_UNIT.equals(s.googleUnit)).append("},\"ads\":[");
+                .append(",\"googleTest\":").append(AdStore.GOOGLE_TEST_UNIT.equals(s.googleUnit))
+                .append(",\"adFree\":").append(ProfileApi.quote(s.adFree)).append("},\"ads\":[");
         boolean first = true;
         for (AdStore.Ad a : ads.all()) {
             if (!first) {
