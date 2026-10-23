@@ -294,6 +294,8 @@ public class VideoServerMain {
                 System::currentTimeMillis);
         world.init();
         world.setAi(RadioWriter.OpenAi.fromEnvironment());
+        world.setOwnHosts(System.getProperty("vstream.publicHost", ""), System.getProperty("vstream.mediaHost", ""), "memoryq.com", "www.memoryq.com",
+                "mkarimu.net", "www.mkarimu.net");
         Runtime.getRuntime().addShutdownHook(new Thread(world::flushIfDirty));
         api.addModule(world::register);
         // the station finder bot: Radio Browser + Wikidata daily, the Icecast directory weekly, every stream checked nightly

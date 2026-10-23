@@ -130,8 +130,16 @@
 
     <div class="pane" id="pAdd" hidden>
       <div id="addSignIn" hidden>
-        <p>Members add radio stations to the map. <a href="/me">Sign in or join Memoryq</a> (it is free), then come back here.</p>
+        <p id="signWhy" style="margin-top:0">Members add radio stations to the map. Sign in here - you stay on this page.</p>
+        <form id="signForm">
+          <label for="lu">Memoryq username</label><input id="lu" autocomplete="username" required>
+          <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+          <p id="lErr" class="err"></p>
+          <button class="primary" id="lBtn" style="width:100%">Sign in</button>
+        </form>
+        <p class="small muted">No account yet? <a href="/me">Join Memoryq</a> (free), then come back to memoryq.com/world.</p>
       </div>
+      <p id="whoAmI" class="small muted" hidden style="margin-top:0"></p>
       <form id="addForm" hidden>
         <p class="small muted" style="margin:0">Add an internet radio station. Memoryq checks that it plays, finds its place and puts it on the globe for everyone.</p>
         <label for="aUrl">Stream address (the link that plays)</label>
@@ -402,8 +410,8 @@ async function loadLand() {
   }
   land = out;
 }
-async function loadDots() {
-  const r = await api('/api/world/dots');
+async function loadDots(fresh) {
+  const r = await api('/api/world/dots' + (fresh ? '?t=' + Date.now() : ''));
   if (!r.ok) { $('count').textContent = 'The stations could not be loaded - try again soon.'; return; }
   const parts = r.data.dots ? r.data.dots.split(';') : [], n = parts.length;
   const ids = new Array(n), sl = new Float32Array(n), cl = new Float32Array(n), lon = new Float32Array(n), kind = new Uint8Array(n);
@@ -420,11 +428,26 @@ function tab(which) {
   $('tSearch').classList.toggle('on', which === 'search'); $('tAdd').classList.toggle('on', which === 'add');
   $('pSearch').hidden = which !== 'search'; $('pAdd').hidden = which !== 'add';
   $('side').classList.remove('small-sheet');
-  if (which === 'add') { $('addSignIn').hidden = !!token; $('addForm').hidden = !token; }
+  if (which === 'add') { $('addSignIn').hidden = !!token; $('addForm').hidden = !token; $('whoAmI').hidden = !token; if (token) { showMe(); } }
   else if (pickMark && pickMark.kind === 'new') { pickMark = picked ? { lat: picked.lat, lon: picked.lon } : null; pickingPlace = false; }
 }
 $('tSearch').onclick = () => tab('search');
 $('tAdd').onclick = () => tab('add');
+async function showMe() {
+  const r = await api('/api/me');
+  if (r.status === 401) { signedOut('Your sign-in has ended - please sign in again.'); return; }
+  if (r.ok && r.data.username) { $('whoAmI').innerHTML = 'Signed in as <b>' + esc(r.data.username) + '</b> \u00b7 <a href="#" id="signOutW">sign out</a>'; $('signOutW').onclick = e => { e.preventDefault(); signedOut('Signed out.'); }; }
+}
+function signedOut(why) { token = null; store('vs_token', null); $('signWhy').textContent = why; tab('add'); }
+$('signForm').onsubmit = async e => {
+  e.preventDefault();
+  $('lErr').textContent = ''; $('lBtn').disabled = true;
+  const r = await api('/api/login', { username: $('lu').value.trim(), password: $('lp').value });
+  $('lBtn').disabled = false;
+  if (!r.ok || !r.data.token) { $('lErr').textContent = (r.data && r.data.error) || 'Wrong username or password.'; return; }
+  token = r.data.token; store('vs_token', token); $('lp').value = '';
+  tab('add');
+};
 $('grab').onclick = () => $('side').classList.toggle('small-sheet');
 
 function place(s) { return [s.city, s.country].filter(Boolean).join(', ') || 'Somewhere on Earth'; }
@@ -530,13 +553,17 @@ async function reversePlace(lat, lon) {
   const r = await api('/api/world/reverse?lat=' + lat + '&lon=' + lon);
   if (r.ok && newPlace && newPlace.lat === lat) { setPlace(lat, lon, r.data.city, r.data.country, r.data.cc); }
 }
-$('aFind').onclick = async () => {
-  const q = $('aWhere').value.trim(); if (!q) { return; }
+async function findPlace() {
+  const q = $('aWhere').value.trim(); if (!q) { return false; }
   $('aPlace').textContent = 'Looking for ' + q + '...';
   const r = await api('/api/world/geocode?q=' + encodeURIComponent(q));
-  if (r.ok) { setPlace(r.data.lat, r.data.lon, r.data.city, r.data.country, r.data.cc); }
-  else { $('aPlace').textContent = r.data.error || 'That place was not found.'; }
-};
+  if (r.status === 401) { signedOut('Your sign-in has ended - sign in again (what you typed is kept).'); return false; }
+  if (r.ok) { setPlace(r.data.lat, r.data.lon, r.data.city, r.data.country, r.data.cc); return true; }
+  $('aPlace').textContent = (r.data.error || 'That place was not found.') + ' Add the country, e.g. "Dar es Salaam, Tanzania".';
+  return false;
+}
+$('aFind').onclick = () => { findPlace(); };
+$('aWhere').addEventListener('input', () => { if (newPlace && newPlace.typed) { newPlace = null; } });
 $('aWhere').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('aFind').click(); } });
 $('aGeo').onclick = () => {
   if (!navigator.geolocation) { $('aPlace').textContent = 'This browser cannot tell where you are - type the town instead.'; return; }
@@ -554,17 +581,19 @@ $('aPick').onclick = () => {
 $('addForm').onsubmit = async e => {
   e.preventDefault();
   const msg = $('aMsg');
-  if (!newPlace) { msg.className = 'err'; msg.textContent = 'Say where the station is (Find, Use my location or Pick on the globe).'; return; }
+  if (!newPlace && $('aWhere').value.trim()) { msg.className = 'small muted'; msg.textContent = 'Finding the place first...'; await findPlace(); }
+  if (!newPlace) { msg.className = 'err'; msg.textContent = 'Where is the station? Type the town and country (e.g. "Dar es Salaam, Tanzania"), or press Use my location, or Pick on the globe.'; $('aWhere').focus(); return; }
+  msg.textContent = '';
   $('aSend').disabled = true; msg.className = 'small muted'; msg.textContent = 'Checking that the stream plays (up to 15 seconds)...';
   const r = await api('/api/world/add', { url: $('aUrl').value.trim(), name: $('aName').value.trim(), tags: $('aTags').value.trim(),
     lang: $('aLang').value.trim(), home: $('aHome').value.trim(), lat: newPlace.lat, lon: newPlace.lon, city: newPlace.city,
     country: newPlace.country, cc: newPlace.cc });
   $('aSend').disabled = false;
-  if (r.status === 401) { token = null; store('vs_token', null); tab('add'); return; }
+  if (r.status === 401) { signedOut('Your sign-in has ended - sign in again, then press the button once more (what you typed is kept).'); return; }
   if (!r.ok) { msg.className = 'err'; msg.textContent = r.data.error || 'That did not work.'; return; }
   msg.className = 'ok'; msg.textContent = r.data.name + ' is on the map now. Thank you!';
   $('addForm').reset(); newPlace = null; $('aPlace').textContent = 'No place yet.';
-  await loadDots();
+  await loadDots(true);
   choose(r.data, false);
   tab('search'); rows([r.data]);
   $('almaBox').hidden = false; $('almaSays').textContent = r.data.name + ' is on the globe now - press play.';

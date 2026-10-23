@@ -142,6 +142,9 @@ public final class WorldRadioTest {
             checkTrue("signed-out visitors cannot add", call(port, "/api/world/add", form, null)[0].equals("401"));
             String[] r = call(port, "/api/world/add", form, amina);
             checkTrue("addresses inside a network are refused (" + r[1] + ")", r[0].equals("400") && r[1].contains("not on the internet"));
+            w.setOwnHosts("127.0.0.1");
+            r = call(port, "/api/world/add", form.replace("listen.pls", "page"), amina);
+            checkTrue("Memoryq's own address (memoryq.com) is allowed even when the server sees it inside (" + r[1] + ")", r[0].equals("400") && r[1].contains("not an audio stream"));
             w.allowPrivateAddresses(true);
             r = call(port, "/api/world/add", form.replace("listen.pls", "page"), amina);
             checkTrue("a web page is not a radio stream (" + r[1] + ")", r[0].equals("400") && r[1].contains("not an audio stream"));

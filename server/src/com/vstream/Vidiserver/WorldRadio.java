@@ -126,6 +126,7 @@ public final class WorldRadio {
     private volatile Tester tester = this::check;
     private volatile RadioWriter.Ai ai;
     private volatile boolean allowPrivate;
+    private final java.util.Set<String> ownHosts = new java.util.concurrent.CopyOnWriteArraySet<String>();
     private volatile WorldBot bot;
     static final Map<String, String[]> COUNTRY_BY_NAME = new HashMap<String, String[]>();
     static final Map<String, String[]> COUNTRY_BY_CODE = new HashMap<String, String[]>();
@@ -189,6 +190,15 @@ public final class WorldRadio {
 
     long now() {
         return clock.getAsLong();
+    }
+
+    /** Memoryq's own names (memoryq.com, mkarimu.net): its own radio streams may be added even when the server sees them inside. */
+    public void setOwnHosts(String... hosts) {
+        for (String h : hosts) {
+            if (h != null && !h.trim().isEmpty()) {
+                ownHosts.add(h.trim().toLowerCase(Locale.ROOT).replaceFirst(":\\d+$", ""));
+            }
+        }
     }
 
     /** Tests only: allow stream addresses on this computer. */
@@ -831,7 +841,7 @@ public final class WorldRadio {
         if (!p.equals("http") && !p.equals("https")) {
             throw new IOException("the stream address must start with http:// or https://");
         }
-        if (allowPrivate) {
+        if (allowPrivate || ownHosts.contains(u.getHost().toLowerCase(Locale.ROOT))) {
             return;
         }
         for (InetAddress a : InetAddress.getAllByName(u.getHost())) {
