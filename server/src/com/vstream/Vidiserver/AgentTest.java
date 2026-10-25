@@ -157,9 +157,26 @@ public final class AgentTest {
         r = http("POST", "/api/admin/downloads/upload?app=vstream&note=" + URLEncoder.encode("1.1 - live menu", "UTF-8"), apk, admin);
         checkTrue("the admin uploads the Vstream APK", r[0].equals("200") && r[1].contains("\"have\":true"));
         r = get("/download", null);
-        checkTrue("the page offers it", r[1].contains("/download/vstream.apk") && r[1].contains("1.1 - live menu"));
+        checkTrue("the page offers it: version, what's new", r[1].contains("/download/vstream.apk") && r[1].contains("Vstream 1.1")
+                && r[1].contains("version: 1.1") && r[1].contains("What's new:</b> live menu") && r[1].contains("downloads: 0"));
         checkTrue("and the file downloads", get("/download/vstream.apk", null)[1].length() == 20000);
-        checkTrue("Alma knows it is ready", downloads.available().equals("Vstream"));
+        checkTrue("Alma knows it is ready", downloads.available().equals("Vstream 1.1"));
+        checkTrue("the download is counted", get("/download", null)[1].contains("downloads: 1"));
+        byte[] apk2 = new byte[30000];
+        apk2[0] = 'P';
+        apk2[1] = 'K';
+        apk2[5] = 7;
+        r = http("POST", "/api/admin/downloads/upload?app=vstream&version=1.2.0&released=2026-10-20&note=" + URLEncoder.encode("Faster start", "UTF-8"), apk2, admin);
+        checkTrue("a new version (version, release date)", r[0].equals("200") && r[1].contains("\"version\":\"1.2.0\"") && r[1].contains("\"downloads\":1")
+                && r[1].contains("\"thisVersion\":0"));
+        r = get("/download", null);
+        checkTrue("the page: the new version, its date, all downloads; the old one in the version history",
+                r[1].contains("Vstream 1.2.0") && r[1].contains("October 20, 2026") && r[1].contains("downloads: 1")
+                && r[1].contains("Version history") && r[1].contains("<td>1.1</td>") && r[1].contains("/download/old/vstream-1.1-"));
+        String old = r[1].substring(r[1].indexOf("/download/old/"), r[1].indexOf('"', r[1].indexOf("/download/old/")));
+        checkTrue("the old version still downloads", get(old, null)[1].length() == 20000);
+        checkTrue("and is counted too", get("/download", null)[1].contains("downloads: 2"));
+        checkTrue("the SHA-256 is shown", get("/download", null)[1].contains(DownloadApi.sha256(dl.resolve("vstream.apk"))));
 
         System.out.println("-- SERVERASSETS in the admin page --");
         check("not for members", get("/api/admin/agent", bob)[0], "403");

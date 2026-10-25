@@ -218,7 +218,7 @@ public final class PlaylistStudioTest {
                 && r[1].contains("How to go live with BUTT"));
         r = call(port, "GET", "/download", null, null);
         checkTrue("the page shows it with its description", r[1].contains("DJ Guide") && r[1].contains("How to go live with BUTT")
-                && r[1].contains("/download/dj-guide.pdf") && r[1].contains("Download the PDF"));
+                && r[1].contains("/download/dj-guide.pdf") && r[1].contains("Guides (PDF)"));
         r = call(port, "GET", "/download/dj-guide.pdf", null, null);
         checkTrue("and it downloads", r[0].equals("200") && r[1].length() == 5000);
         r = call(port, "POST", "/api/admin/downloads/info", "app=vstream&desc=" + "Go+live+in+one+tap", admin);

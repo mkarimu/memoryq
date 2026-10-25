@@ -10,21 +10,26 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.LongSupplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * The download page: https://memoryq.com/download, with the files the super-admin uploads - the Memoryq and Vstream
- * apps, and any other downloadable (another APK, a Windows program, a ZIP, a PDF guide), each with a short description.
+ * The download page: https://memoryq.com/download - a classic download table (like java.com's): for each app its
+ * version, release date, file size, number of downloads, install instructions and SHA-256, and below it the version
+ * history (the last 3 older files can still be downloaded).
  *
- *   GET  /download                 the page          GET /download/ID.EXT   (e.g. /download/vstream.apk)
- *   GET  /api/admin/downloads      POST /api/admin/downloads/upload?app=ID|new&name=&desc=&note=&file=NAME.EXT (the file is the body)
- *   POST /api/admin/downloads/info   app=, name=, desc=, note=        POST /api/admin/downloads/delete  app=      (super-admin)
- * Files: downloads/ID.EXT, the list in downloads/items.tsv (ID, name, description, file type, version note).
+ *   GET  /download                 the page          GET /download/ID.EXT   (e.g. /download/vstream.apk)   GET /download/old/FILE
+ *   GET  /api/admin/downloads      POST /api/admin/downloads/upload?app=ID|new&name=&desc=&note=&version=&released=YYYY-MM-DD&file=NAME.EXT
+ *   POST /api/admin/downloads/info   app=, name=, desc=, note=, version=, released=        POST /api/admin/downloads/delete  app=  (super-admin)
+ * Files: downloads/ID.EXT; downloads/items.tsv (ID, name, description, type, what's new, version, released, sha-256);
+ * downloads/stats.tsv (ID, all downloads, downloads of this version); downloads/history.tsv and downloads/old/ (older versions).
  */
 public final class DownloadApi {
 
@@ -36,7 +41,9 @@ public final class DownloadApi {
     }
     static final List<String> TYPES = java.util.Arrays.asList("apk", "zip", "pdf", "exe");
     static final int MAX_ITEMS = 30;
+    static final int KEEP_OLD_FILES = 3;
     private static final long MAX = 300L * 1024 * 1024;
+    private static final Pattern VERSION = Pattern.compile("(?i)^\\s*(?:version\\s*|v)?(\\d+(?:\\.\\d+){1,3}(?:[-+][\\w.]+)?)\\b");
 
     static final class Item {
         String id;
@@ -44,12 +51,27 @@ public final class DownloadApi {
         String desc;
         String ext = "apk";
         String note = "";
+        String version = "";
+        long released;
+        String sha = "";
         boolean builtin;
+    }
+
+    static final class Old {
+        String id;
+        String version = "";
+        long released;
+        long size;
+        String file = "";
+        long downloads;
+        String sha = "";
     }
 
     private final Path dir;
     private final SessionStore sessions;
     private final LongSupplier clock;
+    private final Map<String, long[]> stats = new LinkedHashMap<String, long[]>(); // id -> {all, this version}
+    private boolean statsRead;
 
     public DownloadApi(Path dir, SessionStore sessions, LongSupplier clock) {
         this.dir = dir;
@@ -97,12 +119,41 @@ public final class DownloadApi {
                     }
                     it.ext = it.builtin ? "apk" : v[3];
                     it.note = v[4];
+                    if (v.length >= 8) {
+                        it.version = v[5];
+                        it.released = parseLong(v[6]);
+                        it.sha = v[7];
+                    }
                 }
             } catch (IOException e) {
                 System.out.println("[downloads] could not read the list: " + e.getMessage());
             }
         }
+        for (Item it : map.values()) {
+            splitNote(it);
+        }
         return new ArrayList<Item>(map.values());
+    }
+
+    /** An old-style note ("Version 1.2 - released 24 Oct 2026", "1.1 - live menu") gives the version; the rest is what's new. */
+    static void splitNote(Item it) {
+        if (!it.version.isEmpty() || it.note.isEmpty()) {
+            return;
+        }
+        Matcher m = VERSION.matcher(it.note);
+        if (m.find()) {
+            it.version = m.group(1);
+            String rest = it.note.substring(m.end()).replaceFirst("^\\s*[-:,]?\\s*", "").replaceFirst("(?i)^released\\s+[^-]*$", "").trim();
+            it.note = rest;
+        }
+    }
+
+    private static long parseLong(String s) {
+        try {
+            return Long.parseLong(s.trim());
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     private void saveItems(List<Item> list) throws IOException {
@@ -110,11 +161,17 @@ public final class DownloadApi {
         StringBuilder sb = new StringBuilder();
         for (Item it : list) {
             sb.append(it.id).append('\t').append(clean(it.name, 40)).append('\t').append(clean(it.desc, 300)).append('\t')
-                    .append(it.ext).append('\t').append(clean(it.note, 80)).append('\n');
+                    .append(it.ext).append('\t').append(clean(it.note, 120)).append('\t').append(clean(it.version, 30)).append('\t')
+                    .append(it.released).append('\t').append(it.sha).append('\n');
         }
-        Path part = dir.resolve("items.tsv.part");
-        Files.write(part, sb.toString().getBytes(StandardCharsets.UTF_8));
-        Files.move(part, dir.resolve("items.tsv"), StandardCopyOption.REPLACE_EXISTING);
+        write(dir.resolve("items.tsv"), sb.toString());
+    }
+
+    private void write(Path p, String text) throws IOException {
+        Files.createDirectories(dir);
+        Path part = p.resolveSibling(p.getFileName() + ".part");
+        Files.write(part, text.getBytes(StandardCharsets.UTF_8));
+        Files.move(part, p, StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static String clean(String s, int max) {
@@ -152,7 +209,7 @@ public final class DownloadApi {
 
     String note(String app) {
         Item it = item(app);
-        return it == null ? "" : it.note;
+        return it == null ? "" : (it.version.isEmpty() ? it.note : "Version " + it.version + (it.note.isEmpty() ? "" : " - " + it.note));
     }
 
     /** What can be downloaded right now (for Alma). */
@@ -160,10 +217,146 @@ public final class DownloadApi {
         StringBuilder sb = new StringBuilder();
         for (Item it : items()) {
             if (Files.isRegularFile(fileOf(it))) {
-                sb.append(sb.length() > 0 ? ", " : "").append(it.name);
+                sb.append(sb.length() > 0 ? ", " : "").append(it.name).append(it.version.isEmpty() ? "" : " " + it.version);
             }
         }
         return sb.length() == 0 ? "none uploaded yet" : sb.toString();
+    }
+
+    // ---- Download counts and the version history ----
+
+    private synchronized long[] stat(String id) {
+        if (!statsRead) {
+            statsRead = true;
+            try {
+                Path f = dir.resolve("stats.tsv");
+                if (Files.isRegularFile(f)) {
+                    for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                        String[] v = line.split("\t", -1);
+                        if (v.length >= 3) {
+                            stats.put(v[0], new long[] {parseLong(v[1]), parseLong(v[2])});
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                System.out.println("[downloads] could not read the counts: " + e.getMessage());
+            }
+        }
+        return stats.computeIfAbsent(id, k -> new long[2]);
+    }
+
+    private synchronized void saveStats() {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<String, long[]> e : stats.entrySet()) {
+            sb.append(e.getKey()).append('\t').append(e.getValue()[0]).append('\t').append(e.getValue()[1]).append('\n');
+        }
+        try {
+            write(dir.resolve("stats.tsv"), sb.toString());
+        } catch (IOException e) {
+            System.out.println("[downloads] could not save the counts: " + e.getMessage());
+        }
+    }
+
+    synchronized void counted(String id) {
+        long[] s = stat(id);
+        s[0]++;
+        s[1]++;
+        saveStats();
+    }
+
+    synchronized long downloads(String id) {
+        return stat(id)[0];
+    }
+
+    synchronized List<Old> history() {
+        List<Old> out = new ArrayList<Old>();
+        Path f = dir.resolve("history.tsv");
+        if (Files.isRegularFile(f)) {
+            try {
+                for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                    String[] v = line.split("\t", -1);
+                    if (v.length < 7) {
+                        continue;
+                    }
+                    Old o = new Old();
+                    o.id = v[0];
+                    o.version = v[1];
+                    o.released = parseLong(v[2]);
+                    o.size = parseLong(v[3]);
+                    o.file = v[4];
+                    o.downloads = parseLong(v[5]);
+                    o.sha = v[6];
+                    out.add(o);
+                }
+            } catch (IOException e) {
+                System.out.println("[downloads] could not read the history: " + e.getMessage());
+            }
+        }
+        return out;
+    }
+
+    private synchronized void saveHistory(List<Old> list) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        for (Old o : list) {
+            sb.append(o.id).append('\t').append(clean(o.version, 30)).append('\t').append(o.released).append('\t').append(o.size).append('\t')
+                    .append(o.file).append('\t').append(o.downloads).append('\t').append(o.sha).append('\n');
+        }
+        write(dir.resolve("history.tsv"), sb.toString());
+    }
+
+    /** The file being replaced goes to the history (its file kept for the last 3 versions). */
+    private void archive(Item it) throws IOException {
+        Path cur = fileOf(it);
+        if (!Files.isRegularFile(cur)) {
+            return;
+        }
+        List<Old> hist = history();
+        Old o = new Old();
+        o.id = it.id;
+        o.version = it.version;
+        o.released = it.released > 0 ? it.released : Files.getLastModifiedTime(cur).toMillis();
+        o.size = Files.size(cur);
+        o.sha = it.sha.isEmpty() ? sha256(cur) : it.sha;
+        long[] s = stat(it.id);
+        o.downloads = s[1];
+        s[1] = 0;
+        saveStats();
+        Path oldDir = dir.resolve("old");
+        Files.createDirectories(oldDir);
+        String tag = (o.version.isEmpty() ? "" : o.version.replaceAll("[^A-Za-z0-9.-]", "") + "-") + clock.getAsLong();
+        o.file = it.id + "-" + tag + "." + it.ext;
+        Files.move(cur, oldDir.resolve(o.file), StandardCopyOption.REPLACE_EXISTING);
+        hist.add(o);
+        int kept = 0;
+        for (int k = hist.size() - 1; k >= 0; k--) {
+            Old h = hist.get(k);
+            if (!h.id.equals(it.id) || h.file.isEmpty()) {
+                continue;
+            }
+            if (++kept > KEEP_OLD_FILES) {
+                Files.deleteIfExists(oldDir.resolve(h.file));
+                h.file = "";
+            }
+        }
+        saveHistory(hist);
+    }
+
+    static String sha256(Path f) {
+        try (InputStream in = Files.newInputStream(f)) {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] b = new byte[1 << 16];
+            int n;
+            while ((n = in.read(b)) > 0) {
+                md.update(b, 0, n);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte x : md.digest()) {
+                sb.append(String.format("%02x", x));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     private static String typeOf(String ext) {
@@ -181,6 +374,28 @@ public final class DownloadApi {
 
     // ---- The page ----
 
+    private void sendFile(HttpExchange ex, Path f, String name, String ext, Runnable count) throws IOException {
+        long size = Files.size(f);
+        ex.getResponseHeaders().set("Content-Type", typeOf(ext));
+        ex.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + name + "\"");
+        ex.getResponseHeaders().set("Cache-Control", "no-cache");
+        if ("HEAD".equalsIgnoreCase(ex.getRequestMethod())) {
+            ex.getResponseHeaders().set("Content-Length", String.valueOf(size));
+            ex.sendResponseHeaders(200, -1);
+            return;
+        }
+        String range = ex.getRequestHeaders().getFirst("Range");
+        if (range == null || range.matches("bytes=0-.*")) { // a resumed download is not counted twice
+            count.run();
+        }
+        ex.sendResponseHeaders(200, size);
+        try (OutputStream os = ex.getResponseBody()) {
+            Files.copy(f, os);
+        } catch (IOException e) {
+            // the download was cancelled
+        }
+    }
+
     private void handlePublic(HttpExchange ex) throws IOException {
         try {
             String path = ex.getRequestURI().getPath();
@@ -194,17 +409,33 @@ public final class DownloadApi {
                     if (!Files.isRegularFile(f)) {
                         break;
                     }
-                    long size = Files.size(f);
-                    ex.getResponseHeaders().set("Content-Type", typeOf(it.ext));
-                    ex.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + it.id + "." + it.ext + "\"");
-                    ex.getResponseHeaders().set("Cache-Control", "no-cache");
-                    ex.sendResponseHeaders(200, size);
-                    try (OutputStream os = ex.getResponseBody()) {
-                        Files.copy(f, os);
-                    } catch (IOException e) {
-                        // the download was cancelled
-                    }
+                    String name = it.id + (it.version.isEmpty() ? "" : "-" + it.version.replaceAll("[^A-Za-z0-9.-]", "")) + "." + it.ext;
+                    sendFile(ex, f, name, it.ext, () -> counted(it.id));
                     return;
+                }
+            }
+            if (path.startsWith("/download/old/")) {
+                String file = path.substring("/download/old/".length());
+                if (file.matches("[a-z0-9-]+-[A-Za-z0-9.-]+\\.(apk|zip|pdf|exe)")) {
+                    synchronized (this) {
+                        List<Old> hist = history();
+                        for (Old o : hist) {
+                            if (o.file.equals(file) && Files.isRegularFile(dir.resolve("old").resolve(file))) {
+                                Path f = dir.resolve("old").resolve(file);
+                                sendFile(ex, f, file.replaceFirst("-\\d{10,}(?=\\.)", ""), file.substring(file.lastIndexOf('.') + 1), () -> {
+                                    o.downloads++;
+                                    stat(o.id)[0]++;
+                                    saveStats();
+                                    try {
+                                        saveHistory(hist);
+                                    } catch (IOException e) {
+                                        // not counted
+                                    }
+                                });
+                                return;
+                            }
+                        }
+                    }
                 }
             }
             SuperAgent.send(ex, 404, "text/plain; charset=utf-8", "Not found - see https://memoryq.com/download");
@@ -213,58 +444,171 @@ public final class DownloadApi {
         }
     }
 
-    private static String button(String ext) {
+    private static String platform(String ext) {
         switch (ext) {
             case "apk":
-                return "Download for Android";
+                return "Android";
             case "exe":
-                return "Download for Windows";
+                return "Windows";
             case "pdf":
-                return "Download the PDF";
+                return "Guides (PDF)";
             default:
-                return "Download";
+                return "Other downloads";
+        }
+    }
+
+    private static String size(long bytes) {
+        return bytes >= 1048576 ? String.format(Locale.ENGLISH, "%.2f MB", bytes / 1048576.0) : Math.max(1, bytes / 1024) + " KB";
+    }
+
+    private static String date(long t) {
+        return new java.text.SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).format(new java.util.Date(t));
+    }
+
+    private static String num(long n) {
+        return String.format(Locale.ENGLISH, "%,d", n);
+    }
+
+    private static String instructions(String ext) {
+        switch (ext) {
+            case "apk":
+                return "<ol><li>Tap the download link on your Android phone or tablet.</li><li>Open the downloaded file (Downloads, or the notification).</li>"
+                        + "<li>If Android asks, allow your browser to install apps (Settings &rarr; Install unknown apps), then tap <b>Install</b>.</li>"
+                        + "<li>Updating: install the new file over the old one - your sign-in and settings stay.</li></ol>";
+            case "exe":
+                return "<ol><li>Download the file and open it.</li><li>If Windows SmartScreen asks, choose <b>More info &rarr; Run anyway</b>.</li>"
+                        + "<li>Follow the installer.</li></ol>";
+            case "zip":
+                return "<ol><li>Download the file.</li><li>Right-click it and choose <b>Extract All</b>.</li></ol>";
+            default:
+                return "<ol><li>Download the file and open it.</li></ol>";
+        }
+    }
+
+    private static String sideNote(String ext) {
+        switch (ext) {
+            case "apk":
+                return "Android 7.0 or newer. After installing, sign in with your Memoryq account - the same one as on memoryq.com.";
+            case "exe":
+                return "Windows 10 or 11 (64-bit).";
+            default:
+                return "Check the file with its SHA-256 below if you want to be sure it is the original.";
         }
     }
 
     String page() throws IOException {
-        StringBuilder cards = new StringBuilder();
-        for (Item it : items()) {
-            Path f = fileOf(it);
-            boolean have = Files.isRegularFile(f);
-            if (!have && !it.builtin) {
+        List<Item> all = items();
+        List<Old> hist = history();
+        Map<String, List<Item>> groups = new LinkedHashMap<String, List<Item>>();
+        for (Item it : all) {
+            if (!Files.isRegularFile(fileOf(it)) && !it.builtin) {
                 continue; // an added download without its file yet is not shown
             }
-            cards.append("<div class=\"card\"><h2>").append(esc(it.name)).append("</h2><p>").append(esc(it.desc)).append("</p>");
-            if (have) {
-                long mb = Files.size(f) / 1048576;
-                cards.append("<a class=\"btn\" href=\"/download/").append(it.id).append('.').append(it.ext).append("\">").append(button(it.ext)).append("</a>")
-                        .append("<div class=\"small\">").append(mb > 0 ? mb + " MB" : Math.max(1, Files.size(f) / 1024) + " KB").append(" &middot; updated ")
-                        .append(new java.text.SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).format(new java.util.Date(Files.getLastModifiedTime(f).toMillis())))
-                        .append(it.note.isEmpty() ? "" : " &middot; " + esc(it.note)).append("</div>");
-            } else {
-                cards.append("<div class=\"soon\">Coming soon</div>");
-            }
-            cards.append("</div>");
+            groups.computeIfAbsent(it.ext, k -> new ArrayList<Item>()).add(it);
         }
+        StringBuilder body = new StringBuilder();
+        for (Map.Entry<String, List<Item>> g : groups.entrySet()) {
+            String ext = g.getKey();
+            List<Item> items = g.getValue();
+            body.append("<section><div class=\"bar\"><span class=\"os\">").append(platform(ext)).append("</span>")
+                    .append("<a href=\"#help-").append(ext).append("\" class=\"which\">&#9432; Which download should I choose?</a></div>")
+                    .append("<table class=\"dl\">");
+            for (int k = 0; k < items.size(); k++) {
+                Item it = items.get(k);
+                Path f = fileOf(it);
+                boolean have = Files.isRegularFile(f);
+                body.append("<tr><td class=\"ico\">").append(have ? "<a href=\"/download/" + it.id + "." + it.ext + "\" aria-label=\"Download " + esc(it.name)
+                        + "\"><span class=\"arrow\">&#x2B07;</span></a>" : "<span class=\"arrow off\">&#x2B07;</span>").append("</td><td class=\"what\">");
+                if (have) {
+                    long released = it.released > 0 ? it.released : Files.getLastModifiedTime(f).toMillis();
+                    body.append("<a class=\"name\" href=\"/download/").append(it.id).append('.').append(it.ext).append("\">").append(esc(it.name))
+                            .append(it.version.isEmpty() ? "" : " " + esc(it.version)).append("</a>")
+                            .append("<div class=\"desc\">").append(esc(it.desc)).append("</div>")
+                            .append("<div class=\"meta\">filesize: ").append(size(Files.size(f)))
+                            .append(" &nbsp;&middot;&nbsp; version: ").append(it.version.isEmpty() ? "-" : esc(it.version))
+                            .append(" &nbsp;&middot;&nbsp; released: ").append(date(released))
+                            .append(" &nbsp;&middot;&nbsp; downloads: ").append(num(downloads(it.id))).append("</div>");
+                    if (!it.note.isEmpty()) {
+                        body.append("<div class=\"new\"><b>What's new:</b> ").append(esc(it.note)).append("</div>");
+                    }
+                } else {
+                    body.append("<span class=\"name off\">").append(esc(it.name)).append("</span><div class=\"desc\">").append(esc(it.desc))
+                            .append("</div><div class=\"meta\">Coming soon</div>");
+                }
+                body.append("</td><td class=\"inst\"><a href=\"#help-").append(ext).append("\">Instructions</a></td>");
+                if (k == 0) {
+                    body.append("<td class=\"side\" rowspan=\"").append(items.size()).append("\">").append(sideNote(ext)).append("</td>");
+                }
+                body.append("</tr>");
+            }
+            body.append("<tr><td colspan=\"4\" class=\"foot\" id=\"help-").append(ext).append("\"><b>Installing</b>").append(instructions(ext));
+            StringBuilder shas = new StringBuilder();
+            for (Item it : items) {
+                if (Files.isRegularFile(fileOf(it))) {
+                    String sha = it.sha.isEmpty() ? sha256(fileOf(it)) : it.sha;
+                    shas.append("<div><span>").append(esc(it.name)).append(it.version.isEmpty() ? "" : " " + esc(it.version)).append(":</span> <code>")
+                            .append(sha).append("</code></div>");
+                }
+            }
+            if (shas.length() > 0) {
+                body.append("<details class=\"sha\"><summary>SHA-256 checksums &raquo;</summary>").append(shas).append("</details>");
+            }
+            body.append("</td></tr></table></section>");
+        }
+        // the version history
+        StringBuilder hrows = new StringBuilder();
+        List<Old> sorted = new ArrayList<Old>(hist);
+        sorted.sort((a, b) -> Long.compare(b.released, a.released));
+        for (Old o : sorted) {
+            Item it = null;
+            for (Item x : all) {
+                if (x.id.equals(o.id)) {
+                    it = x;
+                }
+            }
+            if (it == null) {
+                continue;
+            }
+            boolean file = !o.file.isEmpty() && Files.isRegularFile(dir.resolve("old").resolve(o.file));
+            hrows.append("<tr><td>").append(esc(it.name)).append("</td><td>").append(o.version.isEmpty() ? "-" : esc(o.version)).append("</td><td>")
+                    .append(date(o.released)).append("</td><td class=\"r\">").append(size(o.size)).append("</td><td class=\"r\">").append(num(o.downloads))
+                    .append("</td><td>").append(file ? "<a href=\"/download/old/" + o.file + "\">Download</a>" : "<span class=\"muted\">no longer available</span>")
+                    .append("</td></tr>");
+        }
+        String history = hrows.length() == 0 ? "" : "<section><div class=\"bar\"><span class=\"os\">Version history</span>"
+                + "<span class=\"which muted\">Older versions - use the newest one above unless you need an older one.</span></div>"
+                + "<div class=\"scroll\"><table class=\"hist\"><tr><th>App</th><th>Version</th><th>Released</th><th class=\"r\">File size</th><th class=\"r\">Downloads</th><th></th></tr>"
+                + hrows + "</table></div></section>";
         return "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
-                + "<title>Downloads - Memoryq</title><style>"
-                + ":root{--bg:#f2f4f7;--panel:#fff;--ink:#1b1f23;--muted:#5f6e7d;--line:#e2e7ed;--accent:#2f6fed}"
-                + "@media (prefers-color-scheme:dark){:root{--bg:#0f1419;--panel:#182029;--ink:#e6ebf0;--muted:#8b9aa8;--line:#2a3542;--accent:#5b8cff}}"
-                + "*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6}"
-                + "header{background:#16202a}header a{display:block;max-width:820px;margin:0 auto;padding:16px 20px;color:#fff;font-weight:800;font-size:20px;text-decoration:none}"
-                + "main{max-width:820px;margin:28px auto 60px;padding:0 20px}h1{margin:0 0 6px}.lead{color:var(--muted);margin:0 0 22px}"
-                + ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}"
-                + ".card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px}.card h2{margin:0 0 6px}.card p{color:var(--muted);margin:0 0 16px}"
-                + ".btn{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:700;padding:11px 18px;border-radius:12px}"
-                + ".small{color:var(--muted);font-size:13px;margin-top:8px}.soon{color:var(--muted);font-weight:700}"
-                + ".how{margin-top:26px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 22px}.how li{margin:4px 0}"
-                + "</style></head><body><header><a href=\"/\">Memoryq</a></header><main><h1>Download the apps</h1>"
-                + "<p class=\"lead\">For Android phones and tablets. On a computer, use <a href=\"/me\">the web app</a> and <a href=\"/tv\">Memoryq TV</a>.</p>"
-                + "<div class=\"grid\">" + cards + "</div>"
-                + "<div class=\"how\"><b>Installing an Android app</b><ol><li>Tap Download on your phone.</li><li>Open the downloaded file.</li>"
-                + "<li>If Android asks, allow installing apps from your browser, then tap Install.</li></ol>"
-                + "<span class=\"small\">By installing you accept the <a href=\"/terms\">Terms</a> and <a href=\"/privacy\">Privacy Policy</a>"
-                + " (Vstream: <a href=\"/vstream-legal\">Vstream terms</a>).</span></div></main><script src=\"/alma.js\" defer></script></body></html>";
+                + "<title>Downloads - Memoryq</title><meta name=\"description\" content=\"Download the Memoryq apps for Android.\"><style>"
+                + ":root{--bg:#f4f4f4;--panel:#fff;--ink:#1a1a1a;--muted:#5c5c5c;--line:#b9b9b9;--soft:#e6e6e6;--link:#0b6e99;--red:#d0021b;--head:#16202a}"
+                + "@media (prefers-color-scheme:dark){:root{--bg:#121417;--panel:#1b1f24;--ink:#e8e8e8;--muted:#a0a0a0;--line:#3a4048;--soft:#262b31;--link:#5fb4dc;--red:#ff4d5e}}"
+                + "*{box-sizing:border-box}body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);line-height:1.45}"
+                + "a{color:var(--link);text-decoration:none}a:hover{text-decoration:underline}"
+                + "header{background:var(--head);border-bottom:4px solid var(--red)}header div{max-width:980px;margin:0 auto;padding:14px 18px;display:flex;align-items:center;gap:22px}"
+                + "header .logo{color:#fff;font-weight:800;font-size:22px;letter-spacing:.3px}header nav a{color:#c9d4dd;font-size:14px;margin-right:16px}"
+                + "main{max-width:980px;margin:26px auto 60px;padding:0 18px}h1{font-weight:400;font-size:30px;margin:0 0 4px}.lead{color:var(--muted);margin:0 0 22px;font-size:16px}"
+                + "section{margin:0 0 26px}.bar{background:var(--soft);border:1px solid var(--line);border-bottom:0;padding:10px 14px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}"
+                + ".bar .os{font-size:19px;font-weight:600}.bar .which{font-size:15px}"
+                + "table{width:100%;border-collapse:collapse;background:var(--panel)}td,th{border:1px solid var(--line);padding:12px 14px;vertical-align:middle;text-align:left}"
+                + "th{background:var(--soft);font-weight:600;font-size:14px}"
+                + "td.ico{width:52px;text-align:center}.arrow{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--red);color:#fff;font-size:13px;"
+                + "align-items:center;justify-content:center;font-weight:700}.arrow.off{background:var(--line)}"
+                + ".name{font-size:20px}.name.off{color:var(--muted)}.desc{color:var(--muted);font-size:14px;margin:2px 0 4px}.meta{font-size:14px}"
+                + ".new{font-size:14px;margin-top:4px}td.inst{width:150px;font-size:18px}td.side{width:250px;font-size:17px;line-height:1.4}"
+                + "td.foot{font-size:15px;padding:14px 18px}td.foot ol{margin:6px 0 4px;padding-left:22px}td.foot li{margin:2px 0}"
+                + ".sha summary{cursor:pointer;color:var(--link);margin-top:6px}.sha div{font-size:13px;margin:4px 0;word-break:break-all}.sha span{color:var(--muted)}"
+                + "code{font-family:Consolas,Menlo,monospace;font-size:12px}"
+                + "table.hist td,table.hist th{padding:8px 12px;font-size:14px}.r{text-align:right}.muted{color:var(--muted)}"
+                + ".scroll{overflow-x:auto}.scroll table{min-width:520px}.legal{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}"
+                + "@media (max-width:720px){td.side{display:none}td.inst{width:auto;font-size:15px}.name{font-size:17px}td,th{padding:10px}}"
+                + "</style></head><body><header><div><a class=\"logo\" href=\"/\">Memoryq</a><nav><a href=\"/\">Home</a><a href=\"/me\">Web app</a>"
+                + "<a href=\"/tv\">Memoryq TV</a><a href=\"/radio\">Radio</a></nav></div></header><main>"
+                + "<h1>Download Memoryq</h1><p class=\"lead\">The apps for your phone. On a computer, use <a href=\"/me\">the web app</a> - nothing to install.</p>"
+                + body + history
+                + "<p class=\"legal\">By installing you accept the <a href=\"/terms\">Terms</a> and the <a href=\"/privacy\">Privacy Policy</a>"
+                + " (Vstream: <a href=\"/vstream-legal\">Vstream terms</a>). Only download Memoryq apps from memoryq.com or an official app store.</p>"
+                + "</main><script src=\"/alma.js\" defer></script></body></html>";
     }
 
     // ---- The admin ----
@@ -288,6 +632,39 @@ public final class DownloadApi {
                 return head[0] == 'M' && head[1] == 'Z';
             default:
                 return false;
+        }
+    }
+
+    /** "2026-10-24" (or milliseconds) -> milliseconds; null when not given or not a date. */
+    static Long releasedParam(String s) {
+        if (s == null || s.trim().isEmpty()) {
+            return null;
+        }
+        String t = s.trim();
+        if (t.matches("\\d{11,14}")) {
+            return Long.parseLong(t);
+        }
+        try {
+            return java.time.LocalDate.parse(t).atTime(12, 0).toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static void applyText(Item it, String note, String version, String released) {
+        if (version != null) {
+            it.version = clean(version, 30).replaceFirst("(?i)^(version\\s*|v)(?=\\d)", "");
+        }
+        if (note != null) {
+            it.note = clean(note, 120);
+            if (version == null) {
+                it.version = "";
+                splitNote(it);
+            }
+        }
+        Long r = releasedParam(released);
+        if (r != null) {
+            it.released = r;
         }
     }
 
@@ -315,16 +692,14 @@ public final class DownloadApi {
                         if (it.id.equals(app)) {
                             String n = MediaAuthHttpServer.queryParam(body, "name");
                             String d = MediaAuthHttpServer.queryParam(body, "desc");
-                            String v = MediaAuthHttpServer.queryParam(body, "note");
                             if (n != null && !n.trim().isEmpty()) {
                                 it.name = clean(n, 40);
                             }
                             if (d != null) {
                                 it.desc = clean(d, 300);
                             }
-                            if (v != null) {
-                                it.note = clean(v, 80);
-                            }
+                            applyText(it, MediaAuthHttpServer.queryParam(body, "note"), MediaAuthHttpServer.queryParam(body, "version"),
+                                    MediaAuthHttpServer.queryParam(body, "released"));
                         }
                     }
                     saveItems(list);
@@ -337,6 +712,9 @@ public final class DownloadApi {
                             Files.deleteIfExists(dir.resolve(it.id + ".txt"));
                             if (it.builtin) {
                                 it.note = "";
+                                it.version = "";
+                                it.released = 0;
+                                it.sha = "";
                             } else {
                                 list.remove(it);
                             }
@@ -355,7 +733,9 @@ public final class DownloadApi {
                         .append(",\"builtin\":").append(it.builtin)
                         .append(",\"have\":").append(have).append(",\"sizeMb\":").append(have ? Files.size(f) / 1048576 : 0)
                         .append(",\"updated\":").append(have ? Files.getLastModifiedTime(f).toMillis() : 0)
-                        .append(",\"note\":").append(VideoApi.jq(it.note)).append('}');
+                        .append(",\"note\":").append(VideoApi.jq(it.note)).append(",\"version\":").append(VideoApi.jq(it.version))
+                        .append(",\"released\":").append(it.released).append(",\"downloads\":").append(downloads(it.id))
+                        .append(",\"thisVersion\":").append(stat(it.id)[1]).append('}');
             }
             SuperAgent.send(ex, 200, "application/json", sb.append("]}").toString());
         } finally {
@@ -434,12 +814,21 @@ public final class DownloadApi {
             return total > MAX ? "the file is too big (300 MB at most)"
                     : "apk".equals(it.ext) ? "that is not an Android app file (.apk)" : "that file is not a real ." + it.ext + " file";
         }
-        Files.move(tmp, fileOf(it), StandardCopyOption.REPLACE_EXISTING);
-        String note = MediaAuthHttpServer.queryParam(query, "note");
-        it.note = note == null ? "" : clean(note, 80);
+        String sha = sha256(tmp);
+        if (!sha.isEmpty() && sha.equals(it.sha) && Files.isRegularFile(fileOf(it))) {
+            Files.deleteIfExists(tmp); // the same file again: only the text changes
+        } else {
+            archive(it);
+            Files.move(tmp, fileOf(it), StandardCopyOption.REPLACE_EXISTING);
+            it.sha = sha;
+            it.released = clock.getAsLong();
+            it.version = "";
+            it.note = "";
+        }
+        applyText(it, MediaAuthHttpServer.queryParam(query, "note"), MediaAuthHttpServer.queryParam(query, "version"), MediaAuthHttpServer.queryParam(query, "released"));
         Files.deleteIfExists(dir.resolve(it.id + ".txt"));
         saveItems(list);
-        System.out.println("[downloads] " + it.name + " uploaded (" + total / 1024 + " KB)");
+        System.out.println("[downloads] " + it.name + (it.version.isEmpty() ? "" : " " + it.version) + " uploaded (" + total / 1024 + " KB)");
         return null;
     }
 
