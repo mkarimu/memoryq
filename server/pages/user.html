@@ -678,8 +678,8 @@ $('loginForm').addEventListener('submit', async (e) => {
   afterSignIn(r.data);
 });
 async function afterSignIn(d) {
-  if (NEXT) { location.href = NEXT; return; }
-  if (d.role === 'ADMIN') { location.href = '/admin'; return; } // the super-admin's main page is the admin panel
+  if (NEXT) { location.replace(NEXT); return; }
+  if (d.role === 'ADMIN') { location.replace('/admin'); return; } // the super-admin's main page is the admin panel
   await start();
 }
 $('remember').checked = MQAuth.rememberDefault();
@@ -898,7 +898,33 @@ function drawNav() {
   const nb = badges.notify || 0;
   $('bellBadge').hidden = nb <= 0; $('bellBadge').textContent = String(nb);
 }
-async function show(cat, tab) {
+// Back / Forward go through the pages you opened (News feed is the parent of everything); only Sign out leaves Memoryq.
+let navFirst = true;
+function remember(hash, how) {
+  try {
+    if (how === 'pop' || AS_MODE) { history.replaceState({ mq: 1 }, '', hash); return; }
+    if (navFirst) {
+      navFirst = false;
+      if (hash !== '#home/feed') { history.replaceState({ mq: 1 }, '', '#home/feed'); history.pushState({ mq: 1 }, '', hash); }
+      else { history.replaceState({ mq: 1 }, '', hash); }
+    } else if (location.hash !== hash) { history.pushState({ mq: 1 }, '', hash); }
+  } catch (e) { }
+}
+function readHash() {
+  const h = (location.hash || '').replace('#', '').split('/');
+  if (h[1] === 'person' && h[2]) { dyn.person = decodeURIComponent(h[2]); dyn.personName = dyn.person; }
+  if (h[1] === 'post' && h[2]) { dyn.post = Number(h[2]) || 0; }
+  if (h[0] === 'videos' && h[1] === 'play' && h[2]) { dyn.video = Number(h[2]) || 0; }
+  return h;
+}
+window.addEventListener('popstate', () => {
+  if (!me || $('app').hidden) { return; }
+  const h = readHash();
+  show(h[0] || 'home', h[1] || 'feed', 'pop');
+});
+// coming back to this page with the browser's Back button: still signed in, never the sign-in box
+window.addEventListener('pageshow', e => { if (e.persisted && recall('vs_token') && !$('login').hidden) { token = recall('vs_token'); start(); } });
+async function show(cat, tab, how) {
   if (!allowed(cat)) { const first = NAV.find(c => allowed(c.id)); cat = first.id; tab = first.tabs[0].id; }
   let ft = findTab(cat, tab);
   if (ft.t.dynamic && !dynAllowed(ft.c.id, ft.t.id)) { ft = findTab(ft.c.id, ft.c.tabs[0].id); }
@@ -911,7 +937,7 @@ async function show(cat, tab) {
   if (current.tab === 'post') { hash += '/' + dyn.post; }
   if (current.cat === 'videos' && current.tab === 'play') { hash += '/' + dyn.video; }
   if (!(current.cat === 'videos' && current.tab === 'play')) { const pv = $('videoPlay'); if (pv) { pv.textContent = ''; } }
-  try { history.replaceState(null, '', hash); } catch (e) { }
+  remember(hash, how);
   document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'panel-' + current.cat + '-' + current.tab; });
   drawNav();
   window.scrollTo(0, 0);
@@ -1435,7 +1461,7 @@ function startRoomPoll() {
   roomPoll = setInterval(loadMessages, 3000);
 }
 async function loadMessages() {
-  if (!roomId) { return; }
+  if (!roomId || document.hidden) { return; }
   const id = roomId;
   const r = await api('/api/chat/messages?room=' + enc(id) + '&limit=50');
   if (id !== roomId) { return; }
@@ -1602,8 +1628,10 @@ async function startCall(user, video) {
   drawCall();
   mediaSync(r.data);
 }
+let callSkip = 0;
 async function pollCalls() {
   if (!callsOn || !token) { return; }
+  if (document.hidden && (callSkip++ % 4) !== 0) { return; } // a tab in the background asks every 10 seconds, not every 2.5
   const r = await api('/api/calls/poll');
   if (!r.ok) { return; }
   const inc = (r.data.incoming || [])[0] || null;
@@ -2289,7 +2317,7 @@ $('delCancel').addEventListener('click', async () => {
 let pollTimer = null;
 let badgeTimer = null;
 async function updateBadges() {
-  if (!token) { return; }
+  if (!token || document.hidden) { return; }
   const [n, inv] = await Promise.all([api('/api/notify/count'), api('/api/chat/invitations')]);
   badges.notify = n.ok ? (n.data.unread || 0) : 0;
   badges.invites = inv.ok ? (inv.data.invitations || []).length : 0;
@@ -2322,10 +2350,7 @@ async function start() {
   $('hdrName').textContent = (myProfile && myProfile.stageName) || me.username;
   const f = await api('/api/calls/features');
   callsOn = !!(f.ok && f.data.calls);
-  const h = (location.hash || '').replace('#', '').split('/');
-  if (h[1] === 'person' && h[2]) { dyn.person = decodeURIComponent(h[2]); dyn.personName = dyn.person; }
-  if (h[1] === 'post' && h[2]) { dyn.post = Number(h[2]) || 0; }
-  if (h[0] === 'videos' && h[1] === 'play' && h[2]) { dyn.video = Number(h[2]) || 0; }
+  const h = readHash();
   await show(h[0] || 'home', h[1] || 'feed');
   checkEmail();
   updateBadges();
@@ -2334,7 +2359,7 @@ async function start() {
   if (callsOn) { pollCalls(); callTimer = setInterval(pollCalls, 2500); }
   clearInterval(pollTimer);
   pollTimer = setInterval(() => {
-    if (current.cat === 'chat' && current.tab === 'rooms') { loadRooms(); }
+    if (current.cat === 'chat' && current.tab === 'rooms' && !document.hidden) { loadRooms(); }
     if (call) { drawCall(); }
   }, 10000);
 }

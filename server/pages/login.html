@@ -117,11 +117,11 @@ async function done(data, remember) {
     $('goOn').textContent = APPS[app][2];
     $('goOn').onclick = () => { location.href = r.data.url; };
     $('other').hidden = true;
-    location.href = r.data.url;
+    location.replace(r.data.url);
     return;
   }
-  if (next && next.charAt(0) === '/' && next.charAt(1) !== '/' && next.charAt(1) !== '\\') { location.href = next; return; }
-  location.href = data.role === 'ADMIN' ? '/admin' : '/me';
+  if (next && next.charAt(0) === '/' && next.charAt(1) !== '/' && next.charAt(1) !== '\\') { location.replace(next); return; }
+  location.replace(data.role === 'ADMIN' ? '/admin' : '/me');
 }
 
 $('pwForm').addEventListener('submit', async e => {

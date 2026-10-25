@@ -438,7 +438,7 @@
   audio.addEventListener('error', function () { if (wantPlay) { wantPlay = false; setPlaying(false); render(); } });
 
   loadStations();
-  setInterval(loadStations, 10000);
+  setInterval(() => { if (!document.hidden) { loadStations(); } }, 10000);
 })();
 </script>
 <script src="/alma.js" defer></script>

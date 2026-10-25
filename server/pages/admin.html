@@ -1499,7 +1499,7 @@ const NAV = [
     { id: 'create', label: 'Create user' },
     { id: 'suspended', label: 'Suspended', load: async () => { await loadSuspensions(); await loadAudit(); } },
     { id: 'deletion', label: 'Deletion requests', load: loadProfiler, badge: 'deletions' },
-    { id: 'signin', label: 'Sign-in (Google)', load: loadSignin },
+    { id: 'signin', label: 'Sign-in (Google)', load: loadSignin, noAuto: true },
     { id: 'photos', label: 'Profile photos', load: loadPhotos },
     { id: 'detail', label: 'Account details', load: loadUserDetail, noAuto: true } ] },
   { id: 'server', label: 'Server', icon: '\uD83E\uDD16', tabs: [
@@ -1530,19 +1530,19 @@ const NAV = [
     { id: 'calls', label: 'Calls add-on', load: loadCalls } ] },
   { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
     { id: 'people', label: 'Test people', load: loadProfiler },
-    { id: 'services', label: 'Services per member', load: loadServices },
-    { id: 'vistr', label: 'Vistr players', load: loadVistrPlayers } ] },
+    { id: 'services', label: 'Services per member', load: loadServices, noAuto: true },
+    { id: 'vistr', label: 'Vistr players', load: loadVistrPlayers, noAuto: true } ] },
   { id: 'games', label: 'Games', icon: '\uD83C\uDFAE', tabs: [
-    { id: 'vistr', label: 'Vistr', load: loadGames } ] },
+    { id: 'vistr', label: 'Vistr', load: loadGames, noAuto: true } ] },
   { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
     { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
   { id: 'world', label: 'Global Radio', icon: '\uD83C\uDF0D', tabs: [
-    { id: 'stations', label: 'All stations', load: loadWorld },
-    { id: 'countries', label: 'By country', load: loadWorldCountries },
-    { id: 'review', label: 'Needs attention', load: loadWorldReview },
-    { id: 'bot', label: 'Station finder bot', load: loadWorldBot } ] },
+    { id: 'stations', label: 'All stations', load: loadWorld, noAuto: true },
+    { id: 'countries', label: 'By country', load: loadWorldCountries, noAuto: true },
+    { id: 'review', label: 'Needs attention', load: loadWorldReview, noAuto: true },
+    { id: 'bot', label: 'Station finder bot', load: loadWorldBot, noAuto: true } ] },
   { id: 'radio', label: 'Radio', icon: '\uD83D\uDCFB', tabs: [
     { id: 'onair', label: 'On air', load: loadRadioLive },
     { id: 'stations', label: 'Stations', load: loadRadioStations, noAuto: true },
@@ -1593,10 +1593,29 @@ function drawNav() {
   });
 }
 
-async function show(cat, tab) {
+// Back / Forward go through the pages you opened here (the Overview is the parent of everything); only Sign out leaves.
+let navFirst = true;
+function remember(hash, how) {
+  try {
+    if (how === 'pop') { return; }
+    if (navFirst) {
+      navFirst = false;
+      if (hash !== '#overview/summary') { history.replaceState({ mq: 1 }, '', '#overview/summary'); history.pushState({ mq: 1 }, '', hash); }
+      else { history.replaceState({ mq: 1 }, '', hash); }
+    } else if (location.hash !== hash) { history.pushState({ mq: 1 }, '', hash); }
+  } catch (e) { }
+}
+// back here with the browser's Back button while signed in: straight in, never the sign-in box again
+window.addEventListener('pageshow', e => { if (e.persisted && !token && MQAuth.token()) { location.reload(); } });
+window.addEventListener('popstate', () => {
+  if ($('app').hidden) { return; }
+  const h = (location.hash || '').replace('#', '').split('/');
+  show(h[0] || 'overview', h[1] || 'summary', 'pop');
+});
+async function show(cat, tab, how) {
   const ft = findTab(cat, tab);
   current = { cat: ft.c.id, tab: ft.t.id };
-  try { history.replaceState(null, '', '#' + current.cat + '/' + current.tab); } catch (e) { }
+  remember('#' + current.cat + '/' + current.tab, how);
   document.querySelectorAll('.panel').forEach(p => { p.hidden = p.id !== 'panel-' + current.cat + '-' + current.tab; });
   $('flash').textContent = '';
   drawNav();
@@ -1645,7 +1664,17 @@ async function loadSummary() {
   });
 }
 
+// The page refreshes itself every 10 seconds - but never in a tab you are not looking at, and never while you type or edit.
+let lastTyping = 0;
+document.addEventListener('input', () => { lastTyping = Date.now(); }, true);
+document.addEventListener('keydown', () => { lastTyping = Date.now(); }, true);
+function busyEditing() {
+  const a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.closest('#app')) { return true; }
+  return Date.now() - lastTyping < 60000;
+}
 async function refresh() {
+  if (document.hidden || busyEditing()) { return; }
   const ft = findTab(current.cat, current.tab);
   if (ft.t.load && !ft.t.noAuto) { await ft.t.load(); }
   if (tick++ % 3 === 0) { await updateBadges(); }
@@ -1656,7 +1685,7 @@ function startDashboard() {
   show(h[0] || 'overview', h[1] || 'summary');
   updateBadges();
   clearInterval(timer);
-  timer = setInterval(refresh, 5000);
+  timer = setInterval(refresh, 10000);
 }
 
 function renderPool(data) {

@@ -532,7 +532,7 @@ document.addEventListener('keydown', e => {
 
 drawPlay(); applySound(); drawFull();
 load();
-setInterval(load, 10000);
+setInterval(() => { if (!document.hidden) { load(); } }, 10000);
 </script>
 <script src="/alma.js" defer></script>
 </body>
