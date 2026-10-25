@@ -911,7 +911,7 @@ public final class AccountApi {
                     .replace("live on Memoryq right now", "live on Mkarimu TV right now")
                     .replace("href=\"/me#", "href=\"https://" + main + "/me#")
                     .replace("href=\"/vstream-legal\"", "href=\"https://" + main + "/vstream-legal\"");
-            byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
+            byte[] bytes = AdSense.inject(html, "/tv").getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
             ex.getResponseHeaders().set("Cache-Control", "no-store");
             ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
@@ -972,6 +972,7 @@ public final class AccountApi {
             if (sc != null && (route.equals("/") || route.equals("/terms") || route.equals("/privacy") || route.equals("/vstream-legal"))) {
                 bytes = sc.apply(new String(bytes, StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
             }
+            bytes = AdSense.inject(bytes, route); // Google AdSense in the head (not on admin / Studio / DJ Pro / sign-in)
             ex.getResponseHeaders().set("Content-Type", "text/html; charset=utf-8");
             ex.getResponseHeaders().set("Cache-Control", "no-store");
             ex.getResponseHeaders().set("X-Content-Type-Options", "nosniff");

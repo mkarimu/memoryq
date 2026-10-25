@@ -400,7 +400,7 @@ public final class DownloadApi {
         try {
             String path = ex.getRequestURI().getPath();
             if (path.equals("/download") || path.equals("/download/")) {
-                SuperAgent.send(ex, 200, "text/html; charset=utf-8", page());
+                SuperAgent.send(ex, 200, "text/html; charset=utf-8", AdSense.inject(page(), "/download"));
                 return;
             }
             for (Item it : items()) {

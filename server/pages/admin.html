@@ -416,6 +416,7 @@
         </div>
         <table id="adsTable"></table>
       </div>
+      <div class="panel" id="panel-ads-adsense" hidden><div id="asBox"></div></div>
 
       <div class="panel" id="panel-calls-calls" hidden>
         <h2>Calls add-on <span id="callsInfo" class="muted"></span></h2>
@@ -1632,7 +1633,8 @@ const NAV = [
     { id: 'feed', label: 'Sources and stories', load: loadNews } ] },
   { id: 'ads', label: 'Ads', icon: '\uD83D\uDCB0', tabs: [
     { id: 'settings', label: 'Slider settings', load: loadAds },
-    { id: 'paid', label: 'Paid ads', load: loadAds } ] },
+    { id: 'paid', label: 'Paid ads', load: loadAds },
+    { id: 'adsense', label: 'Google AdSense', load: loadAdSense, noAuto: true } ] },
   { id: 'calls', label: 'Calls', icon: '\uD83D\uDCDE', tabs: [
     { id: 'calls', label: 'Calls add-on', load: loadCalls } ] },
   { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
@@ -3133,6 +3135,33 @@ async function loadMailBlocked() {
   box.appendChild(list.length ? h('table', {}, h('tr', {}, h('th', {}, 'Blocked'), h('th', {}, '')),
     list.map(b => h('tr', {}, h('td', {}, b), h('td', {}, h('button', { on: { click: async () => { await api('/api/admin/mail/unblock', { entry: b }); loadMailBlocked(); } } }, 'Unblock')))))
     : h('p', { class: 'muted' }, 'Nobody is blocked.'));
+}
+
+// ---- Google AdSense on the website ----
+async function loadAdSense() {
+  const box = $('asBox');
+  const r = await api('/api/admin/adsense');
+  box.textContent = '';
+  if (!r.ok) { box.textContent = r.data.error || 'Could not load'; return; }
+  const a = r.data;
+  const on = h('input', { type: 'checkbox', checked: a.on });
+  const client = h('input', { value: a.client, style: 'width:260px', placeholder: 'ca-pub-1234567890123456' });
+  const pages = a.pages.map(p => ({ p: p, c: h('input', { type: 'checkbox', checked: p.ads, disabled: p.route === '/admin' }) }));
+  box.appendChild(h('div', { class: 'box' },
+    h('label', { style: 'display:block;margin-bottom:8px' }, on, ' Show Google AdSense ads on memoryq.com (Auto ads: Google picks the places)'),
+    h('label', { style: 'display:block' }, 'Publisher ID ', client),
+    h('h3', {}, 'Pages with ads'),
+    h('div', { class: 'fgrid' }, pages.map(x => h('label', {}, x.c, ' ' + (x.p.route === '/' ? '/ (home)' : x.p.route)))),
+    h('p', { class: 'small muted' }, 'Admin, Studio, DJ Pro and sign-in have no ads by default (AdSense does not allow ads on pages without content, and they would get in the way). The code goes into the <head> of each page by itself - nothing to paste.'),
+    h('button', { class: 'pri', on: { click: async () => {
+      const off = pages.filter(x => !x.c.checked).map(x => x.p.route).join(',');
+      const q = await api('/api/admin/adsense', { on: on.checked ? '1' : '0', client: client.value.trim(), off: off });
+      flash(q.ok ? 'Saved - pages show it on their next load' : (q.data.error || 'Could not save'), q.ok);
+      if (q.ok) { loadAdSense(); }
+    } } }, 'Save')));
+  box.appendChild(h('div', { class: 'box' }, h('b', {}, 'ads.txt'), ' - served at ', h('a', { href: '/ads.txt', target: '_blank' }, 'memoryq.com/ads.txt'),
+    h('pre', { class: 'creds' }, a.adsTxt),
+    h('p', { class: 'small muted' }, 'AdSense checks this file. In AdSense: Sites -> memoryq.com -> "I placed the code" -> Request review.')));
 }
 
 // ---- Global Radio (memoryq.com/world): every station on the globe, editing, the station finder bot ----

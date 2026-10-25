@@ -146,6 +146,9 @@ public class VideoServerMain {
         adStore.init();
         Runtime.getRuntime().addShutdownHook(new Thread(adStore::flushIfDirty));
         api.setAdFree(adStore::adFree); // the team's accounts never get Google ads
+        // Google AdSense on the website (Admin -> Ads -> Google AdSense) and https://memoryq.com/ads.txt
+        AdSense adSense = new AdSense(Paths.get(System.getProperty("vstream.adsenseFile", "adsense.txt")), sessions).init();
+        api.addModule(adSense::register);
         listServer.setFeedApi(new FeedApi(adStore, profiles, users, sessions, new Limiter(),
                 System::currentTimeMillis, new java.security.SecureRandom()));
         WallStore wall = new WallStore(Paths.get(System.getProperty("vstream.wallFile", "wall.txt")),
