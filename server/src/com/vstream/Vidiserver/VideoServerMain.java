@@ -304,6 +304,11 @@ public class VideoServerMain {
         signIn.init();
         api.setGoogleOf(signIn::googleOf);
         api.addModule(signIn::register);
+        // Profiler -> Vistr players (every game player gets a Memoryq account) and editing any member's whole profile
+        VistrImport vistrImport = new VistrImport(Paths.get(System.getProperty("vstream.vistrImportFile", "vistr-import.txt")), users, sessions,
+                profiles, emails, services, signIn, System::currentTimeMillis);
+        vistrImport.init();
+        api.addModule(vistrImport::register);
         // World Radio (memoryq.com/world): stations from all over the world on a spinning globe; members add their own
         WorldRadio world = new WorldRadio(Paths.get(System.getProperty("vstream.worldFile", "world-radio.txt")), users, sessions,
                 System::currentTimeMillis);

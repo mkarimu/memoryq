@@ -359,6 +359,7 @@
       </div>
 
       <div class="panel" id="panel-profiler-services" hidden><div id="svList"></div></div>
+      <div class="panel" id="panel-profiler-vistr" hidden><div id="viList"></div></div>
       <div class="panel" id="panel-users-signin" hidden><div id="siBox"></div></div>
       <div class="panel" id="panel-games-vistr" hidden><div id="gmBox"></div></div>
       <div class="panel" id="panel-profiler-people" hidden>
@@ -1529,7 +1530,8 @@ const NAV = [
     { id: 'calls', label: 'Calls add-on', load: loadCalls } ] },
   { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
     { id: 'people', label: 'Test people', load: loadProfiler },
-    { id: 'services', label: 'Services per member', load: loadServices } ] },
+    { id: 'services', label: 'Services per member', load: loadServices },
+    { id: 'vistr', label: 'Vistr players', load: loadVistrPlayers } ] },
   { id: 'games', label: 'Games', icon: '\uD83C\uDFAE', tabs: [
     { id: 'vistr', label: 'Vistr', load: loadGames } ] },
   { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
@@ -2980,6 +2982,83 @@ async function loadGames() {
       h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, (d.today || 0).toLocaleString()), h('div', { class: 'muted small' }, 'today')));
   } catch (e) { nums.textContent = 'The game server did not answer (vistr.memoryq.com).'; }
 }
+// ---- Every part of a member's profile, for the super-admin (Users -> Account details, Profiler -> Vistr players) ----
+async function memberEditor(username, after) {
+  const box = h('div', { class: 'box', style: 'border-color:var(--accent)' }, h('span', { class: 'muted' }, 'Loading ' + username + '...'));
+  const r = await api('/api/admin/member?u=' + encodeURIComponent(username));
+  box.textContent = '';
+  if (!r.ok) { box.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return box; }
+  const d = r.data, f = {};
+  const field = (k, label, attrs) => { f[k] = h('input', Object.assign({ value: d[k] == null ? '' : d[k] }, attrs || {})); return h('label', {}, label, f[k]); };
+  box.appendChild(h('b', { style: 'font-size:16px' }, 'Edit ' + d.username), );
+  box.appendChild(h('span', { class: 'muted small' }, '  ' + d.role + (d.vistrCode ? ' \u00b7 Vistr player ' + d.vistrCode : '') + (d.email ? ' \u00b7 email ' + (d.emailVerified ? 'confirmed' : 'not confirmed') : '')));
+  box.appendChild(h('div', { class: 'fgrid' },
+    field('username', d.renamable ? 'Username (from Vistr - can be changed)' : 'Username (fixed: chats, posts and friends use it)', d.renamable ? { maxlength: 24 } : { disabled: true }),
+    field('firstName', 'First name', { maxlength: 40 }), field('lastName', 'Last name', { maxlength: 40 }), field('stageName', 'Stage name / shown name', { maxlength: 40 }),
+    field('city', 'City / town', { maxlength: 60 }), field('country', 'Country', { maxlength: 60 }), field('education', 'Education', { maxlength: 120 }),
+    field('hobbies', 'Hobbies (comma between)', { maxlength: 300 }), field('color', 'Card colour (#2f6fed, empty = automatic)', { maxlength: 7 }),
+    field('email', 'Email (saved as confirmed)', { type: 'email', maxlength: 200 }),
+    h('label', {}, 'New password (empty = keep it)', f.password = h('input', { type: 'text', autocomplete: 'new-password', placeholder: '8+ characters' }))));
+  const msg = h('span', { class: 'small', style: 'margin-left:8px' });
+  box.appendChild(h('div', {}, h('button', { class: 'pri', on: { click: async () => {
+    const form = { u: d.username };
+    ['firstName', 'lastName', 'stageName', 'city', 'country', 'education', 'hobbies', 'color', 'email', 'password'].forEach(k => { form[k] = f[k].value.trim(); });
+    if (d.renamable) { form.username = f.username.value.trim(); }
+    const q = await api('/api/admin/member/edit', form);
+    msg.className = q.ok ? 'ok small' : 'error small'; msg.textContent = q.ok ? 'Saved' : (q.data.error || 'Could not save');
+    if (q.ok) { flash('Saved: ' + q.data.username, true); if (after) { after(q.data); } }
+  } } }, 'Save everything'), msg));
+  return box;
+}
+
+// ---- Profiler -> Vistr players: every game player gets a Memoryq account ----
+const VI_STATUS = { waiting: ['waiting for you', '#b26a00'], new: ['new account', '#2e7d32'], linked: ['same person', '#2f6fed'], named: ['done', '#6b7a88'], error: ['problem', '#c62828'] };
+async function loadVistrPlayers() {
+  const root = $('viList'); root.textContent = '';
+  const r = await api('/api/admin/vistr/players');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data;
+  const go = h('button', { class: 'pri', on: { click: async () => {
+    go.disabled = true; go.textContent = 'Bringing them in...';
+    const q = await api('/api/admin/vistr/import', {});
+    flash(q.ok ? q.data.note : (q.data.error || 'Could not reach the game'), q.ok); loadVistrPlayers();
+  } } }, d.lastImport ? 'Bring in new Vistr players' : 'Bring in all Vistr players');
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Vistr players on Memoryq'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Every Vistr player gets a Memoryq account (one account everywhere) and stays the same player in the game. A free name becomes the username; '
+      + 'a name another member already has gets MQ in front (e.g. MQmkarimu) and waits here for you: give it a new name or keep it. Players with the same email as a member, or already signed in with Memoryq, are linked to that member. '
+      + 'New accounts get a random password - the player keeps playing with the Player ID; set a password or email in "Edit profile". Last time: ' + (d.lastImport ? when(d.lastImport) + ' - ' + d.note : 'never') + '.'),
+    go, d.waiting ? h('span', { class: 'error', style: 'margin-left:10px;font-weight:600' }, d.waiting + ' waiting for a name') : null));
+  if (!d.rows.length) { return; }
+  const tbl = h('table', {}, h('tr', {}, h('th', {}, 'Vistr player'), h('th', {}, 'Memoryq account'), h('th', {}, 'State'), h('th', {}, '')));
+  d.rows.forEach(row => {
+    const code = h('input', { value: row.code, maxlength: 4, inputmode: 'numeric', style: 'width:64px' });
+    const name = h('input', { value: row.name, maxlength: 40, placeholder: 'name in the game', style: 'width:150px' });
+    const mq = h('input', { value: row.mq, maxlength: 24, style: 'width:150px;' + (row.status === 'waiting' ? 'border-color:#b26a00;background:#fff7e6' : ''), disabled: !row.made });
+    const holder = h('td', { colspan: 4, style: 'padding:0 10px' }); const extra = h('tr', {}, holder); extra.hidden = true;
+    const st = VI_STATUS[row.status] || [row.status, '#6b7a88'];
+    tbl.appendChild(h('tr', {},
+      h('td', {}, h('div', {}, 'ID ', code, ' ', name), h('div', { class: 'muted small' }, row.email || 'no email'),
+        h('button', { on: { click: async () => {
+          const q = await api('/api/admin/vistr/player', { code: row.code, newCode: code.value.trim(), name: name.value.trim() });
+          flash(q.ok ? 'Saved in the game: player ' + q.data.code : (q.data.error || 'Could not save'), q.ok); if (q.ok) { loadVistrPlayers(); }
+        } } }, 'Save in the game')),
+      h('td', {}, mq, row.exists ? null : h('div', { class: 'error small' }, 'account not found'),
+        row.made ? h('div', {}, h('button', { on: { click: async () => {
+          const q = await api('/api/admin/vistr/rename', { code: row.code, username: mq.value.trim() });
+          flash(q.ok ? 'Now called ' + q.data.mq : (q.data.error || 'Could not rename'), q.ok); if (q.ok) { loadVistrPlayers(); }
+        } } }, 'Rename'), row.status === 'waiting' ? h('button', { on: { click: async () => {
+          const q = await api('/api/admin/vistr/keep', { code: row.code }); flash(q.ok ? 'Kept ' + row.mq : 'Could not', q.ok); loadVistrPlayers();
+        } } }, 'Keep ' + row.mq) : null) : h('div', { class: 'muted small' }, 'an existing member (name fixed)'),
+        row.mqEmail ? h('div', { class: 'muted small' }, 'email ' + row.mqEmail) : null),
+      h('td', {}, h('span', { class: 'pill', style: 'background:' + st[1] }, st[0]), h('div', { class: 'muted small', style: 'max-width:260px' }, row.note)),
+      h('td', {}, h('button', { on: { click: async () => { holder.textContent = ''; extra.hidden = false; holder.appendChild(await memberEditor(row.mq, () => {})); } } }, 'Edit profile'),
+        row.email && !row.mqEmail && row.email.indexOf('@users.memoryq.com') < 0 ? h('button', { on: { click: async () => {
+          const q = await api('/api/admin/vistr/email', { code: row.code }); flash(q.ok ? 'Email set: ' + row.email : (q.data.error || 'Could not'), q.ok); loadVistrPlayers();
+        } } }, 'Use the game email') : null)));
+    tbl.appendChild(extra);
+  });
+  root.appendChild(tbl);
+}
 async function loadMarketReports() {
   const root = $('mkReports'); root.textContent = '';
   const r = await api('/api/admin/market/reports');
@@ -3055,6 +3134,9 @@ async function loadUserDetail() {
         if (await vAct('/api/admin/chat/accounts/delete', { username: a.username }, a.username + ' deleted')) { userDetail = ''; show('users', 'all'); }
       } } }, 'Delete account')))));
 
+  // the super-admin edits every part of the profile
+  const edHold = h('div');
+  root.appendChild(h('div', {}, h('button', { class: 'pri', on: { click: async () => { edHold.textContent = ''; edHold.appendChild(await memberEditor(a.username, d2 => { if (d2.username !== a.username) { userDetail = d2.username; } loadUserDetail(); })); } } }, 'Edit everything (profile, email, password)'), edHold));
   // profile
   if (p) {
     root.appendChild(section('Profile', null, h('div', {},

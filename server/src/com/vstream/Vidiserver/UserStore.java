@@ -344,6 +344,32 @@ public final class UserStore {
         return true;
     }
 
+    /** A new username for a member account (chatters only; the password stays). Used for accounts brought in from Vistr. */
+    public synchronized Info rename(String from, String to) throws UserException {
+        User u = require(from);
+        checkUsername(to);
+        if (u.role != Role.CHATTER) {
+            throw new UserException("only member accounts can be renamed");
+        }
+        String nk = to.toLowerCase(Locale.ROOT);
+        if (users.containsKey(nk) && !nk.equals(u.username.toLowerCase(Locale.ROOT))) {
+            throw new UserException("that username is already taken");
+        }
+        User n = new User(to, u.role);
+        n.salt = u.salt;
+        n.hash = u.hash;
+        n.disabled = u.disabled;
+        String ok = u.username.toLowerCase(Locale.ROOT);
+        users.remove(ok);
+        users.put(nk, n);
+        Long la = lastActive.remove(ok);
+        if (la != null) {
+            lastActive.put(nk, la);
+        }
+        saveOrThrow();
+        return info(n);
+    }
+
     private User find(String username) {
         return username == null ? null : users.get(username.toLowerCase(Locale.ROOT));
     }
@@ -358,6 +384,10 @@ public final class UserStore {
 
     private static Info info(User u) {
         return new Info(u.username, u.role, u.channelId, u.disabled, u.hasPassword());
+    }
+
+    public static boolean validUsername(String username) {
+        return username != null && USERNAME.matcher(username).matches();
     }
 
     /** Checks a new username and password the same way createUser does, without creating anything. */

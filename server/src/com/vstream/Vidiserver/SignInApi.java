@@ -142,6 +142,30 @@ public final class SignInApi {
         }
     }
 
+    public synchronized void rename(String from, String to) {
+        for (String[] v : links.values()) {
+            if (v[0].equalsIgnoreCase(from)) {
+                v[0] = to;
+            }
+        }
+        save();
+    }
+
+    /** A one-time code for a member, made by the server itself (the Profiler asks the Vistr game for its player list). */
+    String codeFor(String username, String app, long ttlMs) {
+        Code c = new Code();
+        c.username = username;
+        c.app = app;
+        c.remember = false;
+        c.ttl = ttlMs;
+        c.expires = clock.getAsLong() + 120000L;
+        String code = newCode();
+        synchronized (codes) {
+            codes.put(code, c);
+        }
+        return code;
+    }
+
     public synchronized String googleOf(String username) {
         for (String[] v : links.values()) {
             if (v[0].equalsIgnoreCase(username)) {

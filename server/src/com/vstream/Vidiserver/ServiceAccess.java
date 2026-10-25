@@ -143,6 +143,14 @@ public final class ServiceAccess {
         save();
     }
 
+    public synchronized void rename(String from, String to) {
+        List<String> o = own.remove(from.toLowerCase(Locale.ROOT));
+        if (o != null) {
+            own.put(to.toLowerCase(Locale.ROOT), o);
+            save();
+        }
+    }
+
     public synchronized boolean hasOwn(String username) {
         return own.containsKey(username.toLowerCase(Locale.ROOT));
     }

@@ -134,6 +134,16 @@ public final class EmailService {
         dirty = true;
     }
 
+    /** The member's username changed: the email address follows. */
+    public synchronized void rename(String from, String to) {
+        Entry e = entries.remove(key(from));
+        if (e != null) {
+            entries.put(key(to), new Entry(to, e.email, e.verified, e.at));
+            dirty = true;
+            flushIfDirty();
+        }
+    }
+
     public synchronized void remove(String username) {
         if (entries.remove(key(username)) != null) {
             dirty = true;

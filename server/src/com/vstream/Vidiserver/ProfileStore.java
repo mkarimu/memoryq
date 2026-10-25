@@ -440,6 +440,23 @@ public final class ProfileStore {
     }
 
     /** Forgets a person: their profile and their place in everyone's friend list. */
+    /** The member's username changed: the profile (and friends' lists) follow. */
+    public synchronized void rename(String from, String to) {
+        Profile p = profiles.remove(key(from));
+        if (p != null) {
+            p.username = to;
+            profiles.put(key(to), p);
+        }
+        for (Profile x : profiles.values()) {
+            for (int i = 0; i < x.friends.size(); i++) {
+                if (x.friends.get(i).equalsIgnoreCase(from)) {
+                    x.friends.set(i, to);
+                }
+            }
+        }
+        dirty = true;
+    }
+
     public synchronized void remove(String username) {
         Profile gone = profiles.remove(key(username));
         if (gone != null) {
