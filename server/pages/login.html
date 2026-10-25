@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in - Memoryq</title>
+<meta name="description" content="One Memoryq account for memoryq.com, the Memoryq app, World Radio, DJ Pro and the Vistr word game.">
+<style>
+  :root { --bg: #eef2f7; --card: #ffffff; --ink: #17202a; --muted: #66768a; --line: #dfe5ec; --accent: #2f6fed; --bad: #c62828; --good: #2e7d32; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d131b; --card: #16202b; --ink: #e8eef5; --muted: #8fa0b3; --line: #2a3644; --accent: #5b8cff; --bad: #ff7a7a; --good: #5fd08a; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+  .card { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px 22px;
+          box-shadow: 0 10px 40px rgba(10, 30, 60, .08); }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; color: var(--ink); text-decoration: none; }
+  .brand svg { width: 34px; height: 34px; }
+  h1 { font-size: 21px; margin: 18px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 18px; font-size: 14px; line-height: 1.45; }
+  #gWrap { display: flex; justify-content: center; min-height: 44px; }
+  .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 16px 0 10px; }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=password] { width: 100%; font: inherit; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px;
+    background: transparent; color: var(--ink); }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  .rem { display: flex; align-items: center; gap: 8px; margin: 14px 0 4px; font-size: 14px; color: var(--ink); cursor: pointer; }
+  .rem input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 0 14px 26px; }
+  button { font: inherit; cursor: pointer; border-radius: 10px; padding: 11px 14px; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+  button.primary { width: 100%; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+  button:disabled { opacity: .6; cursor: default; }
+  .err { color: var(--bad); font-size: 14px; min-height: 1.2em; margin: 8px 0 0; }
+  .who { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+  .who b { font-size: 16px; }
+  .row { display: flex; gap: 8px; margin-top: 10px; }
+  .row button { flex: 1; }
+  .foot { margin-top: 18px; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.6; }
+  .foot a { color: var(--accent); }
+  .apps { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<main class="card">
+  <a class="brand" href="/">
+    <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#2f6fed"/><path d="M16 46V20l16 15 16-15v26" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    Memoryq
+  </a>
+  <h1 id="title">Sign in</h1>
+  <p class="sub" id="sub">One Memoryq account for everything.</p>
+
+  <div class="who" id="whoBox" hidden>
+    <div class="sub" style="margin:0 0 4px">You are signed in as</div>
+    <b id="whoName"></b>
+    <div class="row"><button class="primary" id="goOn">Continue</button></div>
+    <div class="row"><button id="other">Use another account</button></div>
+  </div>
+
+  <div id="signBox">
+    <div id="gWrap"><div id="gBtn"></div></div>
+    <p class="sub" id="inAppNote" hidden style="text-align:center;margin:0">Google sign-in works in a normal browser (Chrome). Here, use your Memoryq password.</p>
+    <div class="or" id="orLine">or with your Memoryq password</div>
+    <form id="pwForm" autocomplete="on">
+      <label for="u">Username</label>
+      <input type="text" id="u" autocomplete="username" required autocapitalize="off" spellcheck="false">
+      <label for="p">Password</label>
+      <input type="password" id="p" autocomplete="current-password" required>
+      <label class="rem"><input type="checkbox" id="remember"> Remember me for 30 days</label>
+      <p class="hint">Not on a shared computer? Tick it and stay signed in on this device. Untick it and you are signed out when the browser closes.</p>
+      <button class="primary" id="go">Sign in</button>
+      <p class="err" id="err" role="alert"></p>
+    </form>
+  </div>
+
+  <div class="foot">
+    New to Memoryq? <a href="/me" id="joinLink">Create a free account</a><br>
+    <div class="apps"><span>memoryq.com</span><span>Memoryq app</span><span>World Radio</span><span>DJ Pro</span><span>Vistr</span></div>
+  </div>
+</main>
+<script src="/mq-auth.js"></script>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const app = (qs.get('app') || '').replace(/[^a-z-]/g, '');
+const ret = qs.get('return') || '';
+const next = qs.get('next') || '';
+const APPS = {
+  'vistr': ['Sign in to play Vistr', 'Your Memoryq account is your Vistr player too - your scores stay with you.', 'Back to Vistr'],
+  'vistr-admin': ['Vistr game statistics', 'For the Memoryq super-admin: sign in to open the Vistr admin page.', 'Open the Vistr admin page'],
+  'memoryq-app': ['Sign in to the Memoryq app', 'After signing in, the Memoryq app opens again by itself.', 'Open the Memoryq app'],
+};
+if (APPS[app]) { $('title').textContent = APPS[app][0]; $('sub').textContent = APPS[app][1]; document.title = APPS[app][0] + ' - Memoryq'; }
+$('remember').checked = MQAuth.rememberDefault();
+if (MQAuth.inApp) { $('inAppNote').hidden = false; }
+$('joinLink').href = '/me' + (next ? '?next=' + encodeURIComponent(next) : '');
+
+async function api(path) {
+  const t = MQAuth.token();
+  try {
+    const r = await fetch(path, { headers: t ? { Authorization: 'Bearer ' + t } : {} });
+    let d = {}; try { d = await r.json(); } catch (e) { }
+    return { ok: r.ok, status: r.status, data: d };
+  } catch (e) { return { ok: false, status: 0, data: {} }; }
+}
+
+/** After signing in: back to the game / the app, or on to the page that sent you here. */
+async function done(data, remember) {
+  if (APPS[app] && ret) {
+    const r = await MQAuth.post('/api/auth/handoff', { app: app, return: ret, remember: remember ? '1' : '0' });
+    if (!r.ok) { $('err').textContent = r.data.error || 'Could not hand the sign-in over - try again.'; return; }
+    $('signBox').hidden = true; $('whoBox').hidden = false;
+    $('whoName').textContent = data.username || '';
+    $('goOn').textContent = APPS[app][2];
+    $('goOn').onclick = () => { location.href = r.data.url; };
+    $('other').hidden = true;
+    location.href = r.data.url;
+    return;
+  }
+  if (next && next.charAt(0) === '/' && next.charAt(1) !== '/' && next.charAt(1) !== '\\') { location.href = next; return; }
+  location.href = data.role === 'ADMIN' ? '/admin' : '/me';
+}
+
+$('pwForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  $('err').textContent = ''; $('go').disabled = true;
+  const remember = $('remember').checked;
+  const r = await MQAuth.post('/api/login', { username: $('u').value.trim(), password: $('p').value, remember: remember ? '1' : '0' });
+  $('go').disabled = false;
+  if (!r.ok || !r.data.token) { $('err').textContent = r.data.error || 'Wrong username or password.'; return; }
+  MQAuth.save(r.data.token, remember);
+  $('p').value = '';
+  done(r.data, remember);
+});
+
+MQAuth.google($('gBtn'), {
+  remember: () => $('remember').checked,
+  onDone: data => done(data, $('remember').checked),
+  onError: msg => { $('err').textContent = msg; },
+}).then(shown => { if (!shown) { $('gWrap').hidden = true; $('orLine').hidden = true; } });
+
+(async function () {
+  if (!MQAuth.token()) { return; }
+  const r = await api('/api/me');
+  if (!r.ok) { if (r.status === 401) { MQAuth.clear(); } return; }
+  $('whoBox').hidden = false; $('signBox').hidden = true;
+  $('whoName').textContent = r.data.username;
+  if (APPS[app] && ret) { $('goOn').textContent = APPS[app][2]; }
+  $('goOn').onclick = () => done(r.data, MQAuth.rememberDefault());
+  $('other').onclick = async () => {
+    await MQAuth.post('/api/logout', {});
+    MQAuth.clear(); $('whoBox').hidden = true; $('signBox').hidden = false; $('u').focus();
+  };
+})();
+</script>
+</body>
+</html>

@@ -134,10 +134,12 @@
         <form id="signForm">
           <label for="lu">Memoryq username</label><input id="lu" autocomplete="username" required>
           <label for="lp">Password</label><input id="lp" type="password" autocomplete="current-password" required>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);margin:10px 0 4px"><input type="checkbox" id="lRem" style="width:auto;accent-color:var(--accent)"> Remember me for 30 days</label>
           <p id="lErr" class="err"></p>
           <button class="primary" id="lBtn" style="width:100%">Sign in</button>
         </form>
-        <p class="small muted">No account yet? <a href="/me">Join Memoryq</a> (free), then come back to memoryq.com/world.</p>
+        <div id="gArea" hidden style="margin-top:10px"><p class="small muted" style="margin:0 0 6px;text-align:center">or</p><div id="gBtn" style="display:flex;justify-content:center"></div></div>
+        <p class="small muted">No account yet? <a href="/me?next=/world">Join Memoryq</a> (free), then come back to memoryq.com/world.</p>
       </div>
       <p id="whoAmI" class="small muted" hidden style="margin-top:0"></p>
       <form id="addForm" hidden>
@@ -177,10 +179,11 @@
 </div>
 <audio id="audio" preload="none"></audio>
 
+<script src="/mq-auth.js"></script>
 <script>
 'use strict';
-function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
-function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); sessionStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } }
 (function () { const m = /[#&]token=([0-9a-f]+)/.exec(location.hash); if (m) { store('vs_token', m[1]); history.replaceState(null, '', location.pathname + location.search); } })();
 let token = recall('vs_token');
 const $ = id => document.getElementById(id);
@@ -442,12 +445,17 @@ function signedOut(why) { token = null; store('vs_token', null); $('signWhy').te
 $('signForm').onsubmit = async e => {
   e.preventDefault();
   $('lErr').textContent = ''; $('lBtn').disabled = true;
-  const r = await api('/api/login', { username: $('lu').value.trim(), password: $('lp').value });
+  const remember = $('lRem').checked;
+  const r = await api('/api/login', { username: $('lu').value.trim(), password: $('lp').value, remember: remember ? '1' : '0' });
   $('lBtn').disabled = false;
   if (!r.ok || !r.data.token) { $('lErr').textContent = (r.data && r.data.error) || 'Wrong username or password.'; return; }
-  token = r.data.token; store('vs_token', token); $('lp').value = '';
+  token = r.data.token; MQAuth.save(token, remember); $('lp').value = '';
   tab('add');
 };
+$('lRem').checked = MQAuth.rememberDefault();
+MQAuth.google($('gBtn'), { remember: () => $('lRem').checked,
+  onDone: d => { token = d.token; tab('add'); },
+  onError: msg => { $('lErr').textContent = msg; } }).then(ok => { $('gArea').hidden = !ok; });
 $('grab').onclick = () => $('side').classList.toggle('small-sheet');
 
 function place(s) { return [s.city, s.country].filter(Boolean).join(', ') || 'Somewhere on Earth'; }

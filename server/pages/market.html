@@ -107,7 +107,7 @@
     <button class="hb sell" id="sellBtn">+ Sell</button>
     <button class="hb" id="msgBtn" title="Messages">&#9993;<span class="txt"> Messages</span><span class="badge" id="msgBadge" hidden></span></button>
     <button class="hb" id="mineBtn" title="My listings">&#9776;<span class="txt"> My listings</span></button>
-    <a class="hb" id="signIn" href="/me">Sign in</a>
+    <a class="hb" id="signIn" href="/login?next=/market">Sign in</a>
     <a class="hb txt" href="/me" id="meLink" hidden>Memoryq</a>
   </div>
 </header>
@@ -126,8 +126,8 @@ function h(tag, attrs, ...kids) {
   kids.flat().forEach(c => { if (c !== null && c !== undefined && c !== false) { e.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c); } });
   return e;
 }
-function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
-function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); sessionStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } }
 // the Memoryq app opens this page with #token=...: remember it (the same sign-in as memoryq.com/me)
 (function () {
   const m = location.hash.match(/token=([0-9a-f]{20,})/);

@@ -49,6 +49,15 @@ final class Account {
             }
             e.putBoolean("keyManaged", false).remove("claimChannel").remove("hoursLeft").remove("warning");
         }
+        // the services the super-admin gave this member (Admin -> Profiler -> Services); none = everything
+        org.json.JSONArray sv = me.optJSONArray("services");
+        if (sv != null) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < sv.length(); i++) {
+                sb.append(i > 0 ? "," : "").append(sv.optString(i));
+            }
+            e.putString("services", sb.toString()).putBoolean("servicesKnown", true);
+        }
         String notice = me.optString("notice", "");
         if (notice.isEmpty()) {
             e.remove("notice");
@@ -58,13 +67,21 @@ final class Account {
         e.apply();
     }
 
+    /** Does this member see a service (home, chat, radio, live, tv, market, people ...)? Everything until the server says. */
+    static boolean allows(SharedPreferences p, String service) {
+        if (!p.getBoolean("servicesKnown", false) || "ADMIN".equals(p.getString("role", ""))) {
+            return true;
+        }
+        return ("," + p.getString("services", "") + ",").contains("," + service + ",");
+    }
+
     /** Local sign-out: forgets the session and any key that came from the account. */
     static void clear(SharedPreferences p) {
         SharedPreferences.Editor e = p.edit();
         if (p.getBoolean("keyManaged", false)) {
             e.remove("key");
         }
-        e.remove("session").remove("username").remove("role").remove("claimChannel")
+        e.remove("session").remove("username").remove("role").remove("claimChannel").remove("services").remove("servicesKnown")
                 .remove("hoursLeft").remove("warning").remove("notice")
                 .putBoolean("keyManaged", false);
         e.apply();

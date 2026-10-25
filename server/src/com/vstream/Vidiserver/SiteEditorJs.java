@@ -12,7 +12,7 @@ final class SiteEditorJs {
             + "(function () {\n"
             + "  'use strict';\n"
             + "  var token = null;\n"
-            + "  try { token = localStorage.getItem('vs_token'); } catch (e) { }\n"
+            + "  try { token = localStorage.getItem('vs_token') || sessionStorage.getItem('vs_token'); } catch (e) { }\n"
             + "  if (!token) { return; }\n"
             + "  var editing = null, mode = false, pens = [], bar = null, box = null, before = '';\n"
             + "  function api(path, form) {\n"
@@ -134,6 +134,5 @@ final class SiteEditorJs {
             + "    setMode(on);\n"
             + "    setInterval(place, 1000);\n"
             + "  });\n"
-            + "})();\n"
-            + "\n";
+            + "})();\n";
 }

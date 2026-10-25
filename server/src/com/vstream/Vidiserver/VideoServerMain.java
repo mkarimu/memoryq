@@ -55,6 +55,9 @@ public class VideoServerMain {
         news.init();
 
         SessionStore sessions = new SessionStore();
+        // sign-ins survive restarts and updates ("remember me for 30 days"); only fingerprints are kept
+        sessions.persistTo(Paths.get(System.getProperty("vstream.sessionsFile", "sessions.txt")));
+        Runtime.getRuntime().addShutdownHook(new Thread(sessions::flushIfDirty));
         Restreamer restreamer = new Restreamer(Paths.get(System.getProperty("vstream.restreamFile", "restream.txt")),
                 sessions, users, claims);
         restreamer.init();
@@ -211,6 +214,7 @@ public class VideoServerMain {
         radioApi.oldLinks().start(); // old Centova / Azuracast listening addresses play the moved stations
         radioApi.setClaims(claims);
         radioApi.djPro().setSettingsFile(Paths.get(System.getProperty("vstream.djproFile", "djpro.txt")));
+        radioApi.djPro().setDjTokenFile(Paths.get(System.getProperty("vstream.djproSessionsFile", "djpro-sessions.txt")));
         radioApi.startBillingTimer();
         listServer.setRadioApi(radioApi);
         // "Try the Studio": a radio station anyone may run with a public login; back to its starting point every 2 hours
@@ -289,6 +293,17 @@ public class VideoServerMain {
         siteContent.init();
         api.setSiteContent(siteContent);
         api.addModule(siteContent::register);
+        // which services each member sees (Admin -> Profiler -> Services)
+        ServiceAccess services = new ServiceAccess(Paths.get(System.getProperty("vstream.servicesFile", "services.txt")), users, sessions);
+        services.init();
+        api.setServices(services::json);
+        api.addModule(services::register);
+        // one sign-in everywhere: Google, and handing the sign-in to the Vistr game and the Memoryq app
+        SignInApi signIn = new SignInApi(Paths.get(System.getProperty("vstream.signinFile", "signin.txt")), users, sessions, emails, api.issuer(),
+                System::currentTimeMillis);
+        signIn.init();
+        api.setGoogleOf(signIn::googleOf);
+        api.addModule(signIn::register);
         // World Radio (memoryq.com/world): stations from all over the world on a spinning globe; members add their own
         WorldRadio world = new WorldRadio(Paths.get(System.getProperty("vstream.worldFile", "world-radio.txt")), users, sessions,
                 System::currentTimeMillis);

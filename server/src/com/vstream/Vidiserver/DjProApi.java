@@ -89,7 +89,56 @@ public final class DjProApi {
         }
     }
 
-    private final Map<String, DjLogin> djTokens = new HashMap<String, DjLogin>();
+    private final Map<String, DjLogin> djTokens = new HashMap<String, DjLogin>(); // fingerprint of the DJ's sign-in -> who
+    private volatile java.nio.file.Path djTokenFile;
+
+    /** DJ sign-ins survive restarts (only their fingerprints are kept in the file). */
+    public void setDjTokenFile(java.nio.file.Path f) {
+        djTokenFile = f;
+        if (f == null || !java.nio.file.Files.isRegularFile(f)) {
+            return;
+        }
+        try {
+            long now = clock.getAsLong();
+            for (String line : java.nio.file.Files.readAllLines(f, java.nio.charset.StandardCharsets.UTF_8)) {
+                String[] p = line.split("\t", -1);
+                if (p.length >= 5 && Long.parseLong(p[4]) > now) {
+                    DjLogin l = new DjLogin();
+                    l.station = Long.parseLong(p[1]);
+                    l.djId = Long.parseLong(p[2]);
+                    l.name = p[3];
+                    l.expires = Long.parseLong(p[4]);
+                    synchronized (this) {
+                        djTokens.put(p[0], l);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("[djpro] could not read the DJ sign-ins: " + e.getMessage());
+        }
+    }
+
+    private void saveDjTokens() {
+        java.nio.file.Path f = djTokenFile;
+        if (f == null) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        synchronized (this) {
+            for (Map.Entry<String, DjLogin> e : djTokens.entrySet()) {
+                DjLogin l = e.getValue();
+                sb.append(e.getKey()).append('\t').append(l.station).append('\t').append(l.djId).append('\t')
+                        .append(l.name.replaceAll("[\\t\\r\\n]", " ")).append('\t').append(l.expires).append('\n');
+            }
+        }
+        try {
+            java.nio.file.Path part = f.resolveSibling(f.getFileName() + ".part");
+            java.nio.file.Files.write(part, sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            java.nio.file.Files.move(part, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (java.io.IOException e) {
+            System.out.println("[djpro] could not save the DJ sign-ins: " + e.getMessage());
+        }
+    }
     private final Map<String, Live> lives = new HashMap<String, Live>();
 
     public DjProApi(RadioService radio, UserStore users, SessionStore sessions, LongSupplier clock) {
@@ -348,13 +397,15 @@ public final class DjProApi {
         l.station = station;
         l.djId = d.id;
         l.name = d.name;
-        l.expires = clock.getAsLong() + DJ_TOKEN_MS;
+        boolean remember = "1".equals(param(body, "remember"));
+        l.expires = clock.getAsLong() + (remember ? SessionStore.REMEMBER_MS : DJ_TOKEN_MS); // "remember me": 30 days
         String token = "djp_" + token();
         synchronized (this) {
             djTokens.values().removeIf(x -> x.expires < clock.getAsLong());
-            djTokens.put(token, l);
+            djTokens.put(SessionStore.fingerprint(token), l);
         }
-        send(ex, 200, "{\"token\":" + q(token) + ",\"station\":" + station + ",\"name\":" + q(d.name) + "}");
+        saveDjTokens();
+        send(ex, 200, "{\"token\":" + q(token) + ",\"station\":" + station + ",\"name\":" + q(d.name) + ",\"remember\":" + remember + "}");
     }
 
     private Who who(HttpExchange ex) {
@@ -366,7 +417,7 @@ public final class DjProApi {
         Who w = new Who();
         if (token.startsWith("djp_")) {
             synchronized (this) {
-                DjLogin d = djTokens.get(token);
+                DjLogin d = djTokens.get(SessionStore.fingerprint(token));
                 if (d == null || d.expires < clock.getAsLong()) {
                     return null;
                 }

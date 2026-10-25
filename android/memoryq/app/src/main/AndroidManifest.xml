@@ -59,7 +59,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-    <activity android:name=".SettingsActivity" android:exported="false" android:label="Settings" />
+    <activity android:name=".SettingsActivity" android:exported="true" android:label="Settings"
+            android:launchMode="singleTop">
+            <!-- memoryq.com/login hands the sign-in back to the app (Sign in with Google) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="memoryq-app" android:host="signin" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".ChatListActivity"
             android:exported="true"

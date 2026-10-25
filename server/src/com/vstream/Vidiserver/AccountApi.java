@@ -183,6 +183,13 @@ public final class AccountApi {
                 servePage(ex, "/market", sibling("market.html"));
             }
         });
+        // The one sign-in page (password or Google) - also for the Vistr game and the Memoryq app
+        server.createContext("/login", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange ex) throws IOException {
+                servePage(ex, "/login", sibling("login.html"));
+            }
+        });
         // World Radio: the globe of radio stations
         server.createContext("/world", new HttpHandler() {
             @Override
@@ -343,7 +350,7 @@ public final class AccountApi {
             return;
         }
         limiter.clear(userKey);
-        send(ex, 200, loginJson(sessions.create(info.username, info.role), info));
+        send(ex, 200, loginJson(sessions.create(info.username, info.role, SessionStore.ttlFor(MediaAuthHttpServer.queryParam(body, "remember"))), info));
     }
 
     private void registerChatter(HttpExchange ex) throws Exception {
@@ -400,7 +407,7 @@ public final class AccountApi {
         try {
             UserStore.Info info = es.finishSignup(username, MediaAuthHttpServer.queryParam(body, "code"));
             System.out.println("[accounts] new account " + info.username + " (email confirmed)");
-            send(ex, 200, loginJson(sessions.create(info.username, info.role), info));
+            send(ex, 200, loginJson(sessions.create(info.username, info.role, SessionStore.ttlFor(MediaAuthHttpServer.queryParam(body, "remember"))), info));
         } catch (EmailService.EmailException e) {
             send(ex, e.status, error(e.getMessage()));
         }
@@ -998,7 +1005,46 @@ public final class AccountApi {
             }
         }
         appendClaim(sb, info.username);
+        java.util.function.BiFunction<String, UserStore.Role, String> sv = servicesJson;
+        if (sv != null) {
+            sb.append(",\"services\":").append(sv.apply(info.username, info.role)); // the services menu this member sees
+        }
+        java.util.function.Function<String, String> g = googleOf;
+        String gm = g == null ? null : g.apply(info.username);
+        if (gm != null) {
+            sb.append(",\"google\":").append(quote(EmailService.mask(gm)));
+        }
+        if (token != null) {
+            sb.append(",\"days\":").append(Math.max(1, Math.round(sessions.remaining(token) / (double) SessionStore.DAY_MS)));
+        }
         return sb.append('}').toString();
+    }
+
+    private volatile java.util.function.BiFunction<String, UserStore.Role, String> servicesJson;
+    private volatile java.util.function.Function<String, String> googleOf;
+
+    public void setServices(java.util.function.BiFunction<String, UserStore.Role, String> s) {
+        this.servicesJson = s;
+    }
+
+    public void setGoogleOf(java.util.function.Function<String, String> g) {
+        this.googleOf = g;
+    }
+
+    /** For Google sign-in and the Vistr game / app hand-over: the same checks and answer as a password sign-in. */
+    public SignInApi.Issuer issuer() {
+        return new SignInApi.Issuer() {
+            @Override
+            public String issue(UserStore.Info info, long ttlMs) {
+                return loginJson(sessions.create(info.username, info.role, ttlMs), info);
+            }
+
+            @Override
+            public String refusal(UserStore.Info info) {
+                ModerationService mod = moderation;
+                return mod == null ? null : mod.suspensionMessage(info.username);
+            }
+        };
     }
 
     private SessionStore.Session session(HttpExchange ex) {

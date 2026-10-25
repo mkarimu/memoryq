@@ -313,9 +313,11 @@
     <form id="ownForm">
       <label>Login user<input id="ownU" type="text" autocomplete="username" required></label>
       <label>Password<input id="ownP" type="password" autocomplete="current-password" required></label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px"><input type="checkbox" id="ownRem" style="width:auto;margin:0"> Remember me for 30 days</label>
       <div class="row" style="margin-top:12px"><button type="submit">Sign in</button></div>
       <div class="err" id="ownErr"></div>
     </form>
+    <div id="gArea" hidden style="margin-top:12px"><p class="muted small" style="margin:0 0 6px">or</p><div id="gBtn"></div></div>
   </div>
   <div class="card">
     <h2>Remote DJ</h2>
@@ -324,6 +326,7 @@
       <label>Station number<input id="djS" type="text" inputmode="numeric" required></label>
       <label>DJ login<input id="djU" type="text" autocomplete="username" required></label>
       <label>DJ password<input id="djP" type="password" autocomplete="current-password" required></label>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px"><input type="checkbox" id="djRem" style="width:auto;margin:0"> Remember me for 30 days</label>
       <div class="row" style="margin-top:12px"><button type="submit">Sign in</button></div>
       <div class="err" id="djErr"></div>
     </form>
@@ -435,6 +438,7 @@
   <iframe id="studioFrame" title="Studio"></iframe>
 </div>
 
+<script src="/mq-auth.js"></script>
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
@@ -456,9 +460,9 @@ document.querySelectorAll('#themeSeg button').forEach(b => b.addEventListener('c
 setTheme(recall('djp_theme') || 'black');
 
 // ---------- sign in ----------
-let token = recall('djp_token', true) || recall('vs_token');
+let token = recall('djp_token', true) || recall('djp_token') || MQAuth.token();
 let isDj = !!(token && token.indexOf('djp_') === 0);
-let stationId = Number(recall('djp_station', true) || 0);
+let stationId = Number(recall('djp_station', true) || recall('djp_station') || 0);
 let stations = [];
 let state = null;
 
@@ -476,23 +480,32 @@ async function api(path, form, raw) {
 
 $('ownForm').addEventListener('submit', async (e) => {
   e.preventDefault(); $('ownErr').textContent = '';
-  const r = await api('/api/login', { username: $('ownU').value.trim(), password: $('ownP').value });
+  const remember = $('ownRem').checked;
+  const r = await api('/api/login', { username: $('ownU').value.trim(), password: $('ownP').value, remember: remember ? '1' : '0' });
   if (!r.ok) { $('ownErr').textContent = r.error; return; }
-  token = r.data.token; isDj = false; store('vs_token', token); store('djp_token', null, true);
+  token = r.data.token; isDj = false; MQAuth.save(token, remember); forgetDj();
   boot();
 });
+function forgetDj() { store('djp_token', null, true); store('djp_station', null, true); store('djp_token', null); store('djp_station', null); }
+$('ownRem').checked = MQAuth.rememberDefault();
+$('djRem').checked = MQAuth.rememberDefault();
+MQAuth.google($('gBtn'), { remember: () => $('ownRem').checked,
+  onDone: d => { token = d.token; isDj = false; forgetDj(); boot(); },
+  onError: msg => { $('ownErr').textContent = msg; } }).then(ok => { $('gArea').hidden = !ok; });
 $('djForm').addEventListener('submit', async (e) => {
   e.preventDefault(); $('djErr').textContent = '';
-  const r = await api('/api/djpro/login', { station: $('djS').value.trim(), login: $('djU').value.trim(), password: $('djP').value });
+  const remember = $('djRem').checked;
+  const r = await api('/api/djpro/login', { station: $('djS').value.trim(), login: $('djU').value.trim(), password: $('djP').value, remember: remember ? '1' : '0' });
   if (!r.ok) { $('djErr').textContent = r.error; return; }
   token = r.data.token; isDj = true; stationId = r.data.station;
-  store('djp_token', token, true); store('djp_station', String(stationId), true);
+  forgetDj();
+  store('djp_token', token, !remember); store('djp_station', String(stationId), !remember); // remembered: kept for 30 days
   boot();
 });
 $('outBtn').addEventListener('click', () => {
   if (onAir) { if (!confirm('You are ON AIR. Stop and sign out?')) { return; } goOffAir(); }
-  store('djp_token', null, true); store('djp_station', null, true);
-  if (!isDj && token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); store('vs_token', null); }
+  forgetDj();
+  if (!isDj && token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); MQAuth.clear(); }
   location.reload();
 });
 
@@ -502,7 +515,7 @@ async function boot() {
   if (!token) { showGate(); return; }
   if (!isDj) {
     const r = await api('/api/studio/status');
-    if (!r.ok) { if (r.status === 401) { store('vs_token', null); token = null; } showGate(); return; }
+    if (!r.ok) { if (r.status === 401) { MQAuth.clear(); token = null; } showGate(); return; }
     stations = (r.data.stations || []).map(s => ({ id: s.id, name: s.name }));
     if (!stations.length) { showGate('You have no radio station yet - create one in the Studio first.'); return; }
     if (!stations.some(s => s.id === stationId)) { stationId = stations[0].id; }
@@ -522,7 +535,7 @@ function showGate(msg) {
 async function loadState() {
   const r = await api('/api/djpro/state?station=' + stationId);
   if (!r.ok) {
-    if (r.status === 401) { store('djp_token', null, true); token = null; showGate(isDj ? 'Your DJ sign-in ended - sign in again.' : ''); return null; }
+    if (r.status === 401) { forgetDj(); token = null; showGate(isDj ? 'Your DJ sign-in ended - sign in again.' : ''); return null; }
     showGate(r.error); $('gate').hidden = false; $('djErr').textContent = r.error; return null;
   }
   state = r.data;

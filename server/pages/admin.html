@@ -112,9 +112,11 @@
   <form id="loginForm">
     <label>Username<input id="u" autocomplete="username" required></label>
     <label>Password<input id="p" type="password" autocomplete="current-password" required></label>
+    <label style="display:flex;align-items:center;gap:8px;margin:4px 0 10px"><input type="checkbox" id="remember" style="width:auto;display:inline-block;margin:0"> Remember me for 30 days</label>
     <button type="submit">Sign in</button>
   </form>
   <div id="loginError" class="error"></div>
+  <div id="gArea" hidden style="margin-top:10px"><div class="muted" style="font-size:12px;margin-bottom:6px">or</div><div id="gBtn"></div></div>
 </div>
 
 <div id="app" hidden>
@@ -356,6 +358,9 @@
         <table id="callsActive"></table>
       </div>
 
+      <div class="panel" id="panel-profiler-services" hidden><div id="svList"></div></div>
+      <div class="panel" id="panel-users-signin" hidden><div id="siBox"></div></div>
+      <div class="panel" id="panel-games-vistr" hidden><div id="gmBox"></div></div>
       <div class="panel" id="panel-profiler-people" hidden>
         <h2>Profiler <span id="profInfo" class="muted"></span></h2>
         <div class="muted">Test people for trying out the app: real accounts, marked as test, with invented profiles
@@ -545,6 +550,7 @@
   </div>
 </div>
 
+<script src="/mq-auth.js"></script>
 <script>
 let token = null;
 let timer = null;
@@ -581,7 +587,7 @@ function flash(text, good) {
 function signOut(message) {
   if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
   token = null;
-  try { localStorage.removeItem('vs_token'); } catch (e) { }
+  MQAuth.clear();
   clearInterval(timer);
   hideKey();
   $('app').hidden = true;
@@ -594,14 +600,19 @@ $('signOut').addEventListener('click', () => signOut(''));
 $('loginForm').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   $('loginError').textContent = '';
-  const r = await api('/api/login', { username: $('u').value, password: $('p').value });
+  const remember = $('remember').checked;
+  const r = await api('/api/login', { username: $('u').value, password: $('p').value, remember: remember ? '1' : '0' });
   if (!r.ok) { $('loginError').textContent = r.data.error || 'Sign in failed'; return; }
   if (r.data.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; }
   token = r.data.token;
-  try { localStorage.setItem('vs_token', token); } catch (e) { } // the same sign-in for memoryq.com/me and the page editor
+  MQAuth.save(token, remember); // the same sign-in for memoryq.com/me and the page editor
   $('p').value = '';
   enterAdmin(r.data.username || 'admin');
 });
+$('remember').checked = MQAuth.rememberDefault();
+MQAuth.google($('gBtn'), { remember: () => $('remember').checked,
+  onDone: d => { if (d.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; } token = d.token; enterAdmin(d.username); },
+  onError: msg => { $('loginError').textContent = msg; } }).then(ok => { $('gArea').hidden = !ok; });
 function enterAdmin(name) {
   $('login').hidden = true;
   $('app').hidden = false;
@@ -610,8 +621,7 @@ function enterAdmin(name) {
 }
 // signed in already (memoryq.com/me or an earlier visit): straight in - the super-admin's main page is this panel
 (async () => {
-  let t = null;
-  try { t = localStorage.getItem('vs_token'); } catch (e) { }
+  const t = MQAuth.token();
   if (!t) { return; }
   const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + t } }).catch(() => null);
   if (!r || !r.ok) { return; }
@@ -1488,6 +1498,7 @@ const NAV = [
     { id: 'create', label: 'Create user' },
     { id: 'suspended', label: 'Suspended', load: async () => { await loadSuspensions(); await loadAudit(); } },
     { id: 'deletion', label: 'Deletion requests', load: loadProfiler, badge: 'deletions' },
+    { id: 'signin', label: 'Sign-in (Google)', load: loadSignin },
     { id: 'photos', label: 'Profile photos', load: loadPhotos },
     { id: 'detail', label: 'Account details', load: loadUserDetail, noAuto: true } ] },
   { id: 'server', label: 'Server', icon: '\uD83E\uDD16', tabs: [
@@ -1517,7 +1528,10 @@ const NAV = [
   { id: 'calls', label: 'Calls', icon: '\uD83D\uDCDE', tabs: [
     { id: 'calls', label: 'Calls add-on', load: loadCalls } ] },
   { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
-    { id: 'people', label: 'Test people', load: loadProfiler } ] },
+    { id: 'people', label: 'Test people', load: loadProfiler },
+    { id: 'services', label: 'Services per member', load: loadServices } ] },
+  { id: 'games', label: 'Games', icon: '\uD83C\uDFAE', tabs: [
+    { id: 'vistr', label: 'Vistr', load: loadGames } ] },
   { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
@@ -2869,6 +2883,102 @@ async function loadWorldBot() {
     b.log.length ? b.log.slice().reverse().join('\n') : 'Nothing yet - the first jobs start a minute after the server starts.')));
   clearTimeout(wrBotTimer);
   if (b.running) { wrBotTimer = setTimeout(() => { if (!$('panel-world-bot').hidden) { loadWorldBot(); } }, 4000); }
+}
+// ---- Profiler -> Services: which services each member sees (the menu at the top of memoryq.com/me and the app) ----
+let svPage = 0, svQuery = '';
+async function loadServices() {
+  const root = $('svList'); root.textContent = '';
+  const r = await api('/api/admin/services?q=' + encodeURIComponent(svQuery) + '&page=' + svPage);
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data, cat = d.catalog;
+  // the template
+  const tChecks = {};
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Template - what new members get'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Members without their own ticks (below) follow the template - change it and they all change. Admin accounts always see everything; Notifications and Profile are always there.'),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:4px 16px' }, ...cat.map(c => { const x = h('input', { type: 'checkbox' }); x.checked = d.template.indexOf(c.key) >= 0; tChecks[c.key] = x; return h('label', { style: 'white-space:nowrap' }, x, ' ' + c.name); })),
+    h('div', { style: 'margin-top:10px' },
+      h('button', { class: 'pri', on: { click: async () => {
+        const keys = cat.filter(c => tChecks[c.key].checked).map(c => c.key).join(',');
+        const q = await api('/api/admin/services/template', { keys: keys }); flash(q.ok ? 'Template saved' : (q.data.error || 'Could not save'), q.ok); loadServices();
+      } } }, 'Save the template'),
+      h('button', { on: { click: async () => {
+        if (!confirm('Put EVERY member back on the template (their own ticks are removed)?')) { return; }
+        const q = await api('/api/admin/services/everyone', {}); flash(q.ok ? 'Everyone follows the template now' : 'Could not', q.ok); loadServices();
+      } } }, 'Everyone back to the template'))));
+  // the members
+  const search = h('input', { type: 'search', placeholder: 'Find a member', value: svQuery, style: 'width:220px' });
+  search.addEventListener('keydown', e => { if (e.key === 'Enter') { svQuery = search.value.trim(); svPage = 0; loadServices(); } });
+  root.appendChild(h('div', { class: 'box' }, search, h('button', { on: { click: () => { svQuery = search.value.trim(); svPage = 0; loadServices(); } } }, 'Search'),
+    h('span', { class: 'muted small', style: 'margin-left:8px' }, d.count + ' members - tick or untick: it saves at once and the member sees it the next time the page or app opens')));
+  const tbl = h('table', {}, h('tr', {}, h('th', {}, 'Member'), ...cat.map(c => h('th', { style: 'font-size:12px;text-align:center;white-space:nowrap' }, c.name)), h('th', {}, '')));
+  d.users.forEach(u => {
+    const checks = {};
+    const state = h('div', { class: 'muted small' }, u.role === 'ADMIN' ? 'admin: everything' : (u.own ? 'own ticks' : 'template'));
+    const save = async () => {
+      const keys = cat.filter(c => checks[c.key].checked).map(c => c.key).join(',');
+      const q = await api('/api/admin/services/user', { username: u.username, keys: keys });
+      if (q.ok) { state.textContent = 'own ticks'; reset.hidden = false; flash('Saved for ' + u.username, true); } else { flash(q.data.error || 'Could not save', false); }
+    };
+    const reset = h('button', { on: { click: async () => {
+      const q = await api('/api/admin/services/user', { username: u.username, reset: '1' });
+      if (q.ok) { flash(u.username + ' follows the template again', true); loadServices(); }
+    } } }, 'Use template');
+    reset.hidden = !u.own;
+    tbl.appendChild(h('tr', {}, h('td', {}, userLink(u.username), state),
+      ...cat.map(c => { const x = h('input', { type: 'checkbox', title: c.name }); x.checked = u.services.indexOf(c.key) >= 0; x.disabled = u.role === 'ADMIN'; checks[c.key] = x; x.addEventListener('change', save); return h('td', { style: 'text-align:center' }, x); }),
+      h('td', {}, u.role === 'ADMIN' ? null : reset)));
+  });
+  root.appendChild(tbl);
+  root.appendChild(h('div', { class: 'muted small', style: 'margin:6px 0' }, 'Page ' + (d.page + 1) + ' of ' + Math.max(1, d.pages) + ' ',
+    d.page > 0 ? h('button', { on: { click: () => { svPage--; loadServices(); } } }, '< Previous') : null,
+    d.page + 1 < d.pages ? h('button', { on: { click: () => { svPage++; loadServices(); } } }, 'Next >') : null));
+}
+
+// ---- Users -> Sign-in: Google, remember me ----
+async function loadSignin() {
+  const root = $('siBox'); root.textContent = '';
+  const r = await api('/api/admin/auth/settings');
+  if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); return; }
+  const id = h('input', { value: r.data.googleClientId || '', placeholder: '1234567890-abc123.apps.googleusercontent.com', style: 'width:100%;max-width:560px;font-family:monospace' });
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Sign in with Google'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, r.data.googleClientId ? 'On: the Google button shows on memoryq.com/login, /me, /admin, DJ Pro, World Radio and Vistr. ' + r.data.linked + ' account(s) linked to Google.' : 'Off: paste the Google client ID to switch it on.'),
+    h('label', { class: 'small' }, 'Google OAuth client ID', h('br'), id), ' ',
+    h('button', { class: 'pri', on: { click: async () => {
+      const q = await api('/api/admin/auth/settings', { googleClientId: id.value.trim() }); flash(q.ok ? (id.value.trim() ? 'Google sign-in is on' : 'Google sign-in is off') : (q.data.error || 'Could not save'), q.ok); loadSignin();
+    } } }, 'Save'),
+    h('div', { class: 'md small', style: 'margin-top:10px' },
+      h('b', {}, 'Getting the client ID (free, once):'),
+      h('ol', {},
+        h('li', {}, 'console.cloud.google.com -> create a project "Memoryq".'),
+        h('li', {}, 'APIs & Services -> OAuth consent screen: External, app name Memoryq, your email, logo optional -> Publish.'),
+        h('li', {}, 'APIs & Services -> Credentials -> Create credentials -> OAuth client ID -> Web application.'),
+        h('li', {}, 'Authorized JavaScript origins: https://memoryq.com, https://www.memoryq.com and https://vistr.memoryq.com (no redirect URIs needed).'),
+        h('li', {}, 'Create -> copy the Client ID (ends with .apps.googleusercontent.com) -> paste it above -> Save. It is not a secret.')),
+      h('div', { class: 'muted' }, 'Your super-admin account is never linked by email alone: sign in with your password once, then memoryq.com/me -> Profile -> Account -> Sign in with Google.'))));
+  root.appendChild(h('div', { class: 'box muted small' }, h('b', {}, 'Remember me for 30 days: '), 'every sign-in box has it (memoryq.com, admin, DJ Pro, World Radio, the Memoryq app, Vistr). Ticked: signed in on that device for 30 days, also across server updates. Not ticked: signed out when the browser closes (1 day at most).'));
+}
+
+// ---- Games -> Vistr: the word game's numbers and its admin page ----
+async function loadGames() {
+  const root = $('gmBox'); root.textContent = '';
+  const box = h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Vistr word game'), h('span', { class: 'muted' }, '  vistr.memoryq.com'));
+  root.appendChild(box);
+  const nums = h('div', { style: 'display:flex;gap:24px;margin:10px 0;flex-wrap:wrap' }, h('span', { class: 'muted' }, 'Loading the game numbers...'));
+  box.appendChild(nums);
+  box.appendChild(h('div', {},
+    h('button', { class: 'pri', on: { click: async () => {
+      const q = await api('/api/auth/handoff', { app: 'vistr-admin', return: 'https://vistr.memoryq.com/admin.html', remember: '1' });
+      if (!q.ok) { flash(q.data.error || 'Could not open the Vistr admin page', false); return; }
+      window.open(q.data.url, '_blank', 'noopener');
+    } } }, 'Open the Vistr admin page (game statistics, players, messages, reviews)'),
+    h('div', { class: 'muted small', style: 'margin-top:6px' }, 'You are signed in there with this super-admin account - no Vistr admin key needed.')));
+  try {
+    const r = await fetch('https://vistr.memoryq.com/api/stats');
+    const d = await r.json();
+    nums.textContent = '';
+    nums.append(h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, (d.total || 0).toLocaleString()), h('div', { class: 'muted small' }, 'games played')),
+      h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, (d.today || 0).toLocaleString()), h('div', { class: 'muted small' }, 'today')));
+  } catch (e) { nums.textContent = 'The game server did not answer (vistr.memoryq.com).'; }
 }
 async function loadMarketReports() {
   const root = $('mkReports'); root.textContent = '';

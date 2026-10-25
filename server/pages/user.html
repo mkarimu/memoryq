@@ -25,6 +25,13 @@
   header .hbtn .badge { position: absolute; top: 0; right: -2px; }
   header .who { display: flex; align-items: center; gap: 8px; color: #dfe7ee; font-size: 14px; cursor: pointer; }
   header .who img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
+  .svcbar { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 12px; margin-bottom: 4px; scrollbar-width: thin; }
+  .svcbar button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; border-radius: 18px; padding: 6px 12px; font-size: 14px; }
+  .svcbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .remrow { display: flex; align-items: center; gap: 8px; margin: 8px 0; font-size: 14px; cursor: pointer; }
+  .remrow input { width: 18px; height: 18px; margin: 0; }
+  .gsep { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin: 12px 0 8px; }
+  .gsep::before, .gsep::after { content: ""; flex: 1; height: 1px; background: var(--line, #ddd); }
   .shell { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 52px); }
   nav#side { background: var(--side); padding: 12px 8px; position: sticky; top: 52px; height: calc(100vh - 52px); overflow-y: auto; }
   nav#side button { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0; color: var(--side-ink);
@@ -157,6 +164,8 @@
   .lvl.on { background: var(--good); }
   .card.login { max-width: 360px; margin: 70px auto; padding: 26px; }
   .card.login input { display: block; width: 100%; margin: 6px 0 12px; }
+  .card.login .remrow input { display: inline-block; width: 18px; height: 18px; margin: 0; flex: 0 0 18px; }
+  .card.login .remrow { justify-content: flex-start; margin: 0 0 12px; }
   .error { color: var(--bad); min-height: 1.2em; }
   .ok { color: var(--good); }
   video { width: 100%; max-height: 70vh; background: #000; border-radius: 10px; }
@@ -210,9 +219,11 @@
     <input id="p" type="password" placeholder="password" autocomplete="current-password" required>
     <input id="p2" type="password" placeholder="password again" autocomplete="new-password" hidden>
     <input id="em" type="email" placeholder="email address" autocomplete="email" hidden>
+    <label class="remrow"><input type="checkbox" id="remember"> Remember me for 30 days</label>
     <button type="submit" class="primary" id="loginBtn">Sign in</button>
     <div class="error" id="loginError"></div>
   </form>
+  <div id="gArea" hidden><div class="gsep">or</div><div id="gBtn"></div></div>
   <form id="codeForm" hidden>
     <p id="codeNote" style="margin:0 0 10px"></p>
     <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="6-digit code" required>
@@ -237,6 +248,7 @@
   <div class="shell">
     <nav id="side"></nav>
     <section class="content">
+      <div class="svcbar" id="svcBar" aria-label="Your services"></div>
       <div class="box" id="emailBanner" hidden style="border-color:var(--accent);background:var(--accent-soft)">
         <div class="row" style="flex-wrap:wrap">
           <div class="grow" id="ebText" style="min-width:220px"><b>Add your email address</b> - it keeps your account safe and lets us reach you.</div>
@@ -462,6 +474,12 @@
       </div>
 
       <div class="panel" id="panel-profile-account" hidden>
+        <div class="box" id="gLinkBox">
+          <b>Sign in with Google</b>
+          <div class="muted small" id="gLinkState" style="margin:6px 0"></div>
+          <div id="gLinkBtn"></div>
+          <button id="gUnlink" class="link" hidden>Stop using Google for this account</button>
+        </div>
         <div class="box">
           <b>Change password</b>
           <label class="field">Current password<input id="pwOld" type="password" autocomplete="current-password"></label>
@@ -529,6 +547,7 @@
 
 <div id="toast" hidden></div>
 
+<script src="/mq-auth.js"></script>
 <script>
 'use strict';
 // ---------- basics ----------
@@ -539,8 +558,10 @@ function el(tag, text, cls) {
   if (cls) { e.className = cls; }
   return e;
 }
-function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
-function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); sessionStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } }
+// where to go after signing in (memoryq.com/me?next=/world) - only pages of this website
+const NEXT = (() => { const n = new URLSearchParams(location.search).get('next') || ''; return n.charAt(0) === '/' && n.charAt(1) !== '/' && n.charAt(1) !== '\\' ? n : ''; })();
 const enc = encodeURIComponent;
 
 // "View as a user": the super-admin opens /me#as=TOKEN - that sign-in lives in this tab only
@@ -649,14 +670,26 @@ $('loginForm').addEventListener('submit', async (e) => {
   if (signUp && $('p').value !== $('p2').value) { $('loginError').textContent = 'The two passwords are different.'; return; }
   const r = await api(signUp ? '/api/register' : '/api/login',
     signUp ? { username: $('u').value.trim(), password: $('p').value, type: 'chatter', email: $('em').value.trim() }
-           : { username: $('u').value.trim(), password: $('p').value });
+           : { username: $('u').value.trim(), password: $('p').value, remember: $('remember').checked ? '1' : '0' });
   if (!r.ok) { $('loginError').textContent = r.error; return; }
   if (r.data.verify) { showCodeStep(r.data.username, r.data.email); return; }
-  token = r.data.token; store('vs_token', token);
+  token = r.data.token; MQAuth.save(token, signUp || $('remember').checked);
   $('p').value = ''; $('p2').value = '';
-  if (r.data.role === 'ADMIN') { location.href = '/admin'; return; } // the super-admin's main page is the admin panel
-  await start();
+  afterSignIn(r.data);
 });
+async function afterSignIn(d) {
+  if (NEXT) { location.href = NEXT; return; }
+  if (d.role === 'ADMIN') { location.href = '/admin'; return; } // the super-admin's main page is the admin panel
+  await start();
+}
+$('remember').checked = MQAuth.rememberDefault();
+function showGoogle() {
+  MQAuth.google($('gBtn'), {
+    remember: () => $('remember').checked,
+    onDone: d => { token = d.token; afterSignIn(d); },
+    onError: msg => { $('loginError').textContent = msg; },
+  }).then(ok => { $('gArea').hidden = !ok; });
+}
 // New accounts: the account is created when the code from the email comes back.
 let codeUser = '';
 function showCodeStep(user, masked) {
@@ -733,6 +766,7 @@ function signedOut(msg) {
   radioStop(); radio.station = null; $('radioBar').hidden = true; document.body.classList.remove('radio-on');
   $('login').hidden = false;
   $('loginError').textContent = msg || '';
+  showGoogle();
 }
 $('signOut').addEventListener('click', async () => {
   if (token) { fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }).catch(() => {}); }
@@ -792,10 +826,49 @@ function dynAllowed(cat, tab) {
   if (cat === 'videos' && tab === 'play') { return !!dyn.video; }
   return true;
 }
+// Services the super-admin gave this member (Admin -> Profiler -> Services); Notifications and Profile are always there.
+const SERVICE_OF = { home: 'home', wall: 'wall', people: 'people', chat: 'chat', calls: 'calls', radio: 'radio', videos: 'videos', market: 'market', world: 'world', live: 'live' };
+function allowed(cat) { return !SERVICE_OF[cat] || !me || !Array.isArray(me.services) || me.services.indexOf(SERVICE_OF[cat]) >= 0; }
+const SVC = [
+  { key: 'home', icon: '\ud83c\udfe0', label: 'News feed', go: () => show('home', 'feed') },
+  { key: 'wall', icon: '\ud83e\uddf1', label: 'My wall', go: () => show('wall', 'mine') },
+  { key: 'people', icon: '\ud83d\udc65', label: 'People', go: () => show('people', 'find') },
+  { key: 'chat', icon: '\ud83d\udcac', label: 'Chats', go: () => show('chat', 'rooms') },
+  { key: 'calls', icon: '\ud83d\udcde', label: 'Calls', go: () => show('calls', 'history') },
+  { key: 'radio', icon: '\ud83d\udcfb', label: 'Radio', go: () => show('radio', 'stations') },
+  { key: 'world', icon: '\ud83c\udf0d', label: 'World Radio', go: () => { location.href = '/world'; } },
+  { key: 'videos', icon: '\ud83c\udfac', label: 'Videos', go: () => show('videos', 'watch') },
+  { key: 'tv', icon: '\ud83d\udcfa', label: 'Memoryq TV', go: () => { location.href = '/tv'; } },
+  { key: 'live', icon: '\ud83d\udce1', label: 'On air', go: () => show('live', 'onair') },
+  { key: 'market', icon: '\ud83d\uded2', label: 'Marketplace', go: () => { location.href = '/market'; } },
+  { key: 'vistr', icon: '\ud83c\udfae', label: 'Vistr game', go: () => openVistr() },
+];
+/** Vistr signs you in with this Memoryq account (no second password). */
+async function openVistr() {
+  const r = await api('/api/auth/handoff', { app: 'vistr', return: 'https://vistr.memoryq.com/', remember: MQAuth.rememberDefault() ? '1' : '0' });
+  location.href = r.ok ? r.data.url : 'https://vistr.memoryq.com/';
+}
+function drawServices() {
+  const bar = $('svcBar');
+  bar.textContent = '';
+  const mine = me && Array.isArray(me.services) ? me.services : SVC.map(s => s.key);
+  SVC.forEach(s => {
+    if (mine.indexOf(s.key) < 0) { return; }
+    const b = el('button');
+    b.appendChild(el('span', s.icon));
+    b.appendChild(el('span', s.label));
+    if (SERVICE_OF[current.cat] === s.key) { b.className = 'on'; }
+    b.addEventListener('click', s.go);
+    bar.appendChild(b);
+  });
+  bar.hidden = !bar.children.length;
+}
 function drawNav() {
   const side = $('side');
   side.textContent = '';
+  drawServices();
   NAV.forEach(c => {
+    if (!allowed(c.id)) { return; }
     const b = el('button');
     b.className = c.id === current.cat ? 'active' : '';
     b.appendChild(el('span', c.icon, 'ico'));
@@ -826,6 +899,7 @@ function drawNav() {
   $('bellBadge').hidden = nb <= 0; $('bellBadge').textContent = String(nb);
 }
 async function show(cat, tab) {
+  if (!allowed(cat)) { const first = NAV.find(c => allowed(c.id)); cat = first.id; tab = first.tabs[0].id; }
   let ft = findTab(cat, tab);
   if (ft.t.dynamic && !dynAllowed(ft.c.id, ft.t.id)) { ft = findTab(ft.c.id, ft.c.tabs[0].id); }
   const leaving = current;
@@ -2170,6 +2244,14 @@ $('photoRemove').addEventListener('click', async () => {
 });
 async function loadAccount() {
   await refreshMe();
+  const m = await api('/api/me');
+  const linked = m.ok && m.data.google;
+  $('gLinkState').textContent = linked ? 'Linked to the Google account ' + m.data.google + ' - you can sign in with Google or with your password.'
+    : 'Link your Google account once, then sign in with one tap (your password keeps working).';
+  $('gUnlink').hidden = !linked;
+  MQAuth.google($('gLinkBtn'), { link: true, remember: () => MQAuth.rememberDefault(),
+    onDone: () => { toast('Google is linked to your account'); loadAccount(); }, onError: msg => toast(msg) })
+    .then(ok => { $('gLinkBox').hidden = !ok && !linked; $('gLinkBtn').hidden = !!linked || !ok; });
   $('pwMsg').textContent = '';
   const d = (myProfile && myProfile.deletion) || {};
   const pending = d.status === 'pending';
@@ -2178,6 +2260,11 @@ async function loadAccount() {
   $('delAsk').hidden = pending || me.role === 'BROADCASTER';
   $('delCancel').hidden = !pending;
 }
+$('gUnlink').addEventListener('click', async () => {
+  if (!confirm('Stop signing in with Google? Your password keeps working.')) { return; }
+  const r = await api('/api/auth/google/unlink', {});
+  toast(r.ok ? 'Google is no longer linked' : r.error); loadAccount();
+});
 $('pwSave').addEventListener('click', async () => {
   const r = await api('/api/password', { old: $('pwOld').value, new: $('pwNew').value });
   $('pwMsg').className = r.ok ? 'ok' : 'error';
@@ -2251,7 +2338,7 @@ async function start() {
     if (call) { drawCall(); }
   }, 10000);
 }
-if (token) { start(); } else { $('login').hidden = false; }
+if (token) { start(); } else { $('login').hidden = false; showGoogle(); }
 
 // ================= Videos: watch, comment, and add / manage your own =================
 function vh(tag, attrs, ...kids) {

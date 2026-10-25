@@ -131,18 +131,29 @@ public class HomeActivity extends AppCompatActivity {
     private void showOptions(View anchor) {
         final java.util.List<String> items = new java.util.ArrayList<>();
         final java.util.List<Class<?>> targets = new java.util.ArrayList<>();
-        items.add("\uD83D\uDD34  Go Live  -  broadcast from this phone");
-        targets.add(MainActivity.class);
-        items.add("\uD83D\uDCFA  On-Air  -  watch who is live" + (liveCount > 0 ? " (" + liveCount + " live)" : ""));
-        targets.add(ViewerActivity.class);
+        // only the services the super-admin gave this member (Admin -> Profiler -> Services)
+        if (Account.allows(prefs, "live")) {
+            items.add("\uD83D\uDD34  Go Live  -  broadcast from this phone");
+            targets.add(MainActivity.class);
+        }
+        if (Account.allows(prefs, "tv")) {
+            items.add("\uD83D\uDCFA  On-Air  -  watch who is live" + (liveCount > 0 ? " (" + liveCount + " live)" : ""));
+            targets.add(ViewerActivity.class);
+        }
         long radioOn = RadioPlayer.stationId();
-        items.add("\uD83D\uDCFB  Radio" + (radioOn != 0 ? "  -  playing " + RadioPlayer.stationName() : ""));
-        targets.add(RadioActivity.class);
-        items.add("\uD83D\uDCAC  Chats" + (unreadChats > 0 ? "  -  " + unreadChats + " new" : ""));
-        targets.add(ChatListActivity.class);
-        items.add("\uD83D\uDED2  Marketplace  -  buy and sell");
-        targets.add(MarketActivity.class);
-        if (Account.signedIn(prefs)) {
+        if (Account.allows(prefs, "radio")) {
+            items.add("\uD83D\uDCFB  Radio" + (radioOn != 0 ? "  -  playing " + RadioPlayer.stationName() : ""));
+            targets.add(RadioActivity.class);
+        }
+        if (Account.allows(prefs, "chat")) {
+            items.add("\uD83D\uDCAC  Chats" + (unreadChats > 0 ? "  -  " + unreadChats + " new" : ""));
+            targets.add(ChatListActivity.class);
+        }
+        if (Account.allows(prefs, "market")) {
+            items.add("\uD83D\uDED2  Marketplace  -  buy and sell");
+            targets.add(MarketActivity.class);
+        }
+        if (Account.signedIn(prefs) && Account.allows(prefs, "people")) {
             items.add("\uD83D\uDC65  People");
             targets.add(PeopleActivity.class);
         }

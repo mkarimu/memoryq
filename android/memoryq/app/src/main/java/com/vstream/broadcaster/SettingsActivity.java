@@ -2,6 +2,7 @@ package com.vstream.broadcaster;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.HideReturnsTransformationMethod;
 import android.text.method.PasswordTransformationMethod;
@@ -56,6 +57,7 @@ public class SettingsActivity extends AppCompatActivity {
     private View keySection;
     private View noticeRow;
     private LinearLayout poolList;
+    private CheckBox rememberBox;
     private volatile boolean searching = false;
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -101,6 +103,7 @@ public class SettingsActivity extends AppCompatActivity {
         final View serverSection = findViewById(R.id.serverSection);
         status.setOnClickListener(v -> serverSection.setVisibility(
                 serverSection.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+        addSignInExtras();
         signInBtn.setOnClickListener(v -> signIn(LOGIN));
         registerBtn.setOnClickListener(v -> signIn(REGISTER));
         guestBtn.setOnClickListener(v -> signIn(GUEST));
@@ -117,6 +120,92 @@ public class SettingsActivity extends AppCompatActivity {
             i.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(i);
             finish();
+        });
+        takeWebSignIn(getIntent());
+    }
+
+    /** "Remember me for 30 days" and "Sign in with Google" next to the Sign in button. */
+    private void addSignInExtras() {
+        if (!(signInBtn.getParent() instanceof LinearLayout)) {
+            return;
+        }
+        LinearLayout box = (LinearLayout) signInBtn.getParent();
+        int at = box.indexOfChild(signInBtn);
+        rememberBox = new CheckBox(this);
+        rememberBox.setText("Remember me for 30 days");
+        rememberBox.setChecked(prefs.getBoolean("remember", true));
+        rememberBox.setOnCheckedChangeListener((b, on) -> prefs.edit().putBoolean("remember", on).apply());
+        box.addView(rememberBox, at);
+        Button google = new Button(this);
+        google.setText("Sign in with Google");
+        google.setAllCaps(false);
+        google.setOnClickListener(v -> openWebSignIn());
+        box.addView(google, box.indexOfChild(signInBtn) + 1);
+    }
+
+    /** Google (and any Memoryq sign-in) happens on memoryq.com in the browser; it comes back with a one-time code. */
+    private void openWebSignIn() {
+        String h = host();
+        String base = h.isEmpty() ? "https://memoryq.com" : Api.base(h);
+        String url = base + "/login?app=memoryq-app&return=" + Uri.encode("memoryq-app://signin");
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            message("Sign in on the page that opened - the app comes back by itself.");
+        } catch (Exception e) {
+            message("No web browser was found on this phone.");
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        takeWebSignIn(intent);
+    }
+
+    /** memoryq-app://signin#mq=CODE: swaps the one-time code for this app's own sign-in. */
+    private void takeWebSignIn(Intent intent) {
+        Uri data = intent == null ? null : intent.getData();
+        if (data == null || !"memoryq-app".equals(data.getScheme())) {
+            return;
+        }
+        String frag = data.getEncodedFragment();
+        String code = null;
+        if (frag != null) {
+            for (String part : frag.split("&")) {
+                if (part.startsWith("mq=")) {
+                    code = part.substring(3);
+                }
+            }
+        }
+        intent.setData(null);
+        if (code == null || code.isEmpty()) {
+            return;
+        }
+        final String theCode = code;
+        setBusy(true);
+        message("Signing in...");
+        executor.execute(() -> {
+            String host = host();
+            if (host.isEmpty()) {
+                String found = ServerFinder.ensure(prefs, true);
+                host = found == null ? "memoryq.com" : found;
+                prefs.edit().putString("host", host).apply();
+            }
+            Api.Result r = Api.post(host, "/api/auth/exchange", Api.form("code", theCode), null);
+            JSONObject me = r.json();
+            ui(() -> {
+                setBusy(false);
+                if (r.code == 200 && !me.optString("token", "").isEmpty()) {
+                    Account.apply(prefs, me, me.optString("token"));
+                    message("");
+                    render();
+                    loadPool();
+                    Toast.makeText(this, "Signed in as " + me.optString("username"), Toast.LENGTH_SHORT).show();
+                } else {
+                    message(r.code == 401 ? "That sign-in link has expired - press Sign in with Google again." : r.error());
+                }
+            });
         });
     }
 
@@ -385,9 +474,10 @@ public class SettingsActivity extends AppCompatActivity {
                 });
                 return;
             }
+            String remember = rememberBox == null || rememberBox.isChecked() ? "1" : "0";
             String body = mode == GUEST
                     ? Api.form("username", user, "password", pass, "type", "guest")
-                    : Api.form("username", user, "password", pass);
+                    : Api.form("username", user, "password", pass, "remember", remember);
             Api.Result r = Api.post(host, mode == LOGIN ? "/api/login" : "/api/register", body, null);
             JSONObject me = r.json();
             if (r.code == 200 && !me.optString("token", "").isEmpty()) {

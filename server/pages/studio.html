@@ -280,9 +280,11 @@
         <form id="loginForm">
           <label class="f">Login user<input id="u" autocomplete="username" required></label>
           <label class="f">Password<input id="p" type="password" autocomplete="current-password" required></label>
+          <label style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;font-size:14px"><input type="checkbox" id="remember" style="width:auto;margin:0"> Remember me for 30 days</label>
           <button class="primary" type="submit">Sign in</button>
           <div class="error" id="loginErr"></div>
         </form>
+        <div id="gArea" hidden style="margin-top:10px"><div class="muted" style="font-size:12px;margin-bottom:6px">or</div><div id="gBtn"></div></div>
       </div>
       </div>
     </div>
@@ -631,12 +633,13 @@
 </main>
 <div class="tip" id="tip" hidden></div>
 
+<script src="/mq-auth.js"></script>
 <script>
 'use strict';
 const $ = (id) => document.getElementById(id);
 const enc = encodeURIComponent;
-function store(k, v) { try { if (v === null) { localStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
-function recall(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function store(k, v) { try { if (v === null) { localStorage.removeItem(k); sessionStorage.removeItem(k); } else { localStorage.setItem(k, v); } } catch (e) { } }
+function recall(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k); } catch (e) { return null; } }
 // The Memoryq admin can open an owner's Studio ("Login to this account"): that token lives only in this tab.
 const AS = (() => {
   const m = /[#&]as=([A-Za-z0-9_\-]+)/.exec(location.hash || '');
@@ -674,11 +677,15 @@ function dur(ms) { const s = Math.round((ms || 0) / 1000); return Math.floor(s /
 $('loginForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   $('loginErr').textContent = '';
-  const r = await api('/api/login', { username: $('u').value.trim(), password: $('p').value });
+  const remember = $('remember').checked;
+  const r = await api('/api/login', { username: $('u').value.trim(), password: $('p').value, remember: remember ? '1' : '0' });
   if (!r.ok) { $('loginErr').textContent = r.error; return; }
-  token = r.data.token; store('vs_token', token); $('p').value = '';
+  token = r.data.token; MQAuth.save(token, remember); $('p').value = '';
   start();
 });
+$('remember').checked = MQAuth.rememberDefault();
+MQAuth.google($('gBtn'), { remember: () => $('remember').checked, onDone: d => { token = d.token; start(); },
+  onError: msg => { $('loginErr').textContent = msg; } }).then(ok => { $('gArea').hidden = !ok; });
 // ---------- try it first (the shared trial login) ----------
 let tryInfo = null;
 function clock(ms) { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
