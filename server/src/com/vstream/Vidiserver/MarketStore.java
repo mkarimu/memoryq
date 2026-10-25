@@ -383,6 +383,11 @@ public final class MarketStore {
         return m;
     }
 
+    /** Every message on the marketplace, oldest first (Admin -> Mail -> Marketplace). */
+    public synchronized List<Message> allMessages() {
+        return new ArrayList<Message>(messages);
+    }
+
     /** The conversation between this buyer and the seller about a listing, oldest first. */
     public synchronized List<Message> thread(long listing, String buyer) {
         List<Message> out = new ArrayList<Message>();

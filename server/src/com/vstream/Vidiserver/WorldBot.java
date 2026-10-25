@@ -157,6 +157,7 @@ public final class WorldBot {
             }
         }, 60, 600, TimeUnit.SECONDS);
         timer.scheduleWithFixedDelay(wr::flushIfDirty, 2, 2, TimeUnit.MINUTES);
+        timer.scheduleWithFixedDelay(wr::syncMemoryq, 20, 120, TimeUnit.SECONDS); // Memoryq's own stations
     }
 
     static long period(String job) {

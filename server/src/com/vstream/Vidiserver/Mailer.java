@@ -65,6 +65,14 @@ public final class Mailer {
         }
         try {
             deliver(to, subject, text);
+            java.util.function.Consumer<String[]> log = sentLog;
+            if (log != null) {
+                try {
+                    log.accept(new String[]{to, subject, text});
+                } catch (RuntimeException e) {
+                    // the mail centre's copy is not important enough to fail a send
+                }
+            }
             return null;
         } catch (IOException e) {
             if (consoleFallback && (e instanceof java.net.ConnectException)) {
@@ -78,6 +86,57 @@ public final class Mailer {
             }
             System.out.println("[mail] could not send to " + to + ": " + e.getMessage());
             return "the email could not be sent right now - try again in a few minutes";
+        }
+    }
+
+    /** Every email Memoryq sends by itself (sign-up codes, alerts...) is copied to the admin's mail centre (System folder). */
+    static volatile java.util.function.Consumer<String[]> sentLog;
+
+    public String from() {
+        return from;
+    }
+
+    /** Sends a whole message made elsewhere (the mail centre's replies, forwards, attachments). Null = handed over. */
+    public String sendRaw(String envelopeFrom, java.util.List<String> rcpts, String raw) {
+        try (Socket s = new Socket()) {
+            s.connect(new InetSocketAddress(host, port), 5000);
+            s.setSoTimeout(30000);
+            BufferedReader in = new BufferedReader(new InputStreamReader(s.getInputStream(), StandardCharsets.US_ASCII));
+            OutputStream out = s.getOutputStream();
+            expect(in, 220);
+            cmd(out, "EHLO " + envelopeFrom.substring(envelopeFrom.indexOf('@') + 1));
+            expect(in, 250);
+            cmd(out, "MAIL FROM:<" + envelopeFrom + ">");
+            expect(in, 250);
+            for (String r : rcpts) {
+                if (!validAddress(r)) {
+                    return "\"" + r + "\" is not an email address";
+                }
+                cmd(out, "RCPT TO:<" + r + ">");
+                expect(in, 250);
+            }
+            cmd(out, "DATA");
+            expect(in, 354);
+            StringBuilder sb = new StringBuilder();
+            for (String line : raw.split("\r\n", -1)) {
+                sb.append(line.startsWith(".") ? "." + line : line).append("\r\n");
+            }
+            String data = sb.toString();
+            if (data.endsWith("\r\n\r\n")) {
+                data = data.substring(0, data.length() - 2);
+            }
+            out.write(data.getBytes(StandardCharsets.UTF_8));
+            out.write(".\r\n".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            expect(in, 250);
+            cmd(out, "QUIT");
+            return null;
+        } catch (IOException e) {
+            if (consoleFallback && (e instanceof java.net.ConnectException)) {
+                System.out.println("[mail] no mail server on this PC - not sent: " + rcpts);
+                return null;
+            }
+            return "the mail server did not take it: " + e.getMessage();
         }
     }
 

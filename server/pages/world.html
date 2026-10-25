@@ -65,6 +65,11 @@
   .row .p { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .muted { color: var(--muted); } .small { font-size: 12px; } .err { color: var(--bad); font-size: 13px; } .ok { color: var(--accent); font-size: 13px; }
   .place { margin-top: 8px; padding: 9px 10px; border: 1px dashed var(--line); border-radius: 9px; font-size: 13px; }
+  #pAdd input { padding: 6px 9px; font-size: 14px; }
+  #pAdd label { margin: 7px 0 3px; }
+  .pgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+  .pgrid label { margin-top: 6px; }
+  .pslogan { font-size: 12px; color: var(--accent2); font-style: italic; margin: 1px 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .locbtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
   .locbtns button { font-size: 13px; padding: 6px 10px; }
   .player { border-top: 1px solid var(--line); padding: 12px; background: rgba(6, 14, 26, .96); }
@@ -104,7 +109,7 @@
     <div class="tip" id="tip" hidden></div>
     <div class="zoom"><button id="zin" title="Closer">+</button><button id="zout" title="Further">&minus;</button></div>
     <div class="count"><span id="count">Loading the world&hellip;</span>
-      <span class="legend"><span><i style="background:var(--dot)"></i>stations</span><span><i style="background:var(--mine)"></i>added by members</span></span></div>
+      <span class="legend"><span><i style="background:var(--dot)"></i>stations</span><span><i style="background:var(--mine)"></i>added by members</span><span><i style="background:#7fb0ff"></i>Memoryq stations</span></span></div>
   </div>
 
   <aside id="side">
@@ -148,6 +153,8 @@
         <input id="aUrl" placeholder="https://stream.example.com/live.mp3" required>
         <label for="aName">Station name</label>
         <input id="aName" placeholder="e.g. Radio Mwangaza FM" maxlength="80" required>
+        <label for="aSlogan">Slogan</label>
+        <input id="aSlogan" placeholder="e.g. The voice of the lake zone" maxlength="160">
         <label for="aTags">Genre or type</label>
         <input id="aTags" placeholder="e.g. gospel, bongo flava, news" maxlength="160">
         <label for="aLang">Language</label>
@@ -157,7 +164,13 @@
         <label for="aWhere">Where is the station?</label>
         <div class="ask"><input id="aWhere" placeholder="Town, country - e.g. Mwanza, Tanzania"><button type="button" id="aFind">Find</button></div>
         <div class="locbtns"><button type="button" id="aGeo">Use my location</button><button type="button" id="aPick">Pick on the globe</button></div>
-        <div class="place" id="aPlace">No place yet.</div>
+        <div class="place" id="aPlace">No place yet - find it above, or type it below.</div>
+        <div class="pgrid">
+          <div><label for="aCity">City / town</label><input id="aCity" maxlength="60"></div>
+          <div><label for="aCountry">Country</label><input id="aCountry" maxlength="60"></div>
+          <div><label for="aLat">Latitude</label><input id="aLat" inputmode="decimal" placeholder="-2.5164" maxlength="12"></div>
+          <div><label for="aLon">Longitude</label><input id="aLon" inputmode="decimal" placeholder="32.9175" maxlength="12"></div>
+        </div>
         <p id="aMsg" class="small"></p>
         <button class="primary" id="aSend" style="width:100%">Check the stream and add it</button>
       </form>
@@ -165,6 +178,7 @@
 
     <div class="player" id="player" hidden>
       <div class="nm" id="pName"></div>
+      <div class="pslogan" id="pSlogan" hidden></div>
       <div class="pl" id="pPlace"></div>
       <div class="ctl">
         <button class="play" id="pBtn" title="Play">&#9654;</button>
@@ -270,7 +284,7 @@ function draw() {
   st.scr = st.scr || new Float32Array(0);
   if (st.scr.length !== st.n * 2) { st.scr = new Float32Array(st.n * 2); }
   const r = Math.max(1.3, Math.min(3.4, R / 230));
-  const paths = [new Path2D(), new Path2D()];
+  const paths = [new Path2D(), new Path2D(), new Path2D()];
   for (let i = 0; i < st.n; i++) {
     const p = project(st.sl[i], st.cl[i], st.lon[i], s0, c0, sL, cL, R, cx, cy);
     if (p[2] > 0.01) {
@@ -280,6 +294,7 @@ function draw() {
   }
   ctx.shadowBlur = 6; ctx.shadowColor = 'rgba(255,211,77,.8)'; ctx.fillStyle = '#ffd34d'; ctx.fill(paths[0]);
   ctx.shadowColor = 'rgba(255,111,174,.9)'; ctx.fillStyle = '#ff6fae'; ctx.fill(paths[1]);
+  ctx.shadowColor = 'rgba(120,170,255,1)'; ctx.fillStyle = '#7fb0ff'; ctx.fill(paths[2]); // Memoryq's own stations
   ctx.shadowBlur = 0;
   if (hover >= 0 && st.scr[hover * 2] > -9000) {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(st.scr[hover * 2], st.scr[hover * 2 + 1], r + 4, 0, 7); ctx.stroke();
@@ -424,7 +439,7 @@ async function loadDots(fresh) {
   const ids = new Array(n), sl = new Float32Array(n), cl = new Float32Array(n), lon = new Float32Array(n), kind = new Uint8Array(n);
   for (let i = 0; i < n; i++) {
     const f = parts[i].split(','); ids[i] = +f[0]; const la = +f[1] * D;
-    sl[i] = Math.sin(la); cl[i] = Math.cos(la); lon[i] = +f[2] * D; kind[i] = +f[3] ? 1 : 0;
+    sl[i] = Math.sin(la); cl[i] = Math.cos(la); lon[i] = +f[2] * D; kind[i] = Math.min(2, Math.max(0, +f[3] || 0));
   }
   st = { ids, sl, cl, lon, kind, n, scr: new Float32Array(n * 2) };
   $('count').textContent = n.toLocaleString() + ' radio stations on the map';
@@ -468,7 +483,7 @@ function rows(list) {
   if (!list.length) { el.innerHTML = '<p class="muted small">No stations found.</p>'; return; }
   el.innerHTML = list.map((s, i) => '<div class="row' + (picked && picked.id === s.id ? ' on' : '') + '" data-i="' + i + '"><div class="ic">'
     + esc((s.cc || s.name.slice(0, 2)).toUpperCase()) + '</div><div class="tx"><div class="n">' + esc(s.name) + (s.source === 'member' ? ' <span class="small" style="color:var(--mine)">&#9679;</span>' : '')
-    + '</div><div class="p">' + esc(place(s)) + (s.tags ? ' &middot; ' + esc(s.tags.split(',').slice(0, 3).join(', ')) : '') + '</div></div></div>').join('');
+    + '</div>' + (s.slogan ? '<div class="pslogan">' + esc(s.slogan) + '</div>' : '') + '<div class="p">' + esc(place(s)) + (s.tags ? ' &middot; ' + esc(s.tags.split(',').slice(0, 3).join(', ')) : '') + '</div></div></div>').join('');
   el.querySelectorAll('.row').forEach(r => { r.onclick = () => choose(list[+r.dataset.i], true); });
   results = list;
 }
@@ -520,6 +535,8 @@ $('vol').oninput = () => { audio.volume = +$('vol').value; store('wr_vol', Strin
 function choose(s, play) {
   picked = s; pickMark = { lat: s.lat, lon: s.lon };
   $('player').hidden = false; $('pName').textContent = s.name;
+  $('pName').title = s.slogan || '';
+  $('pSlogan').textContent = s.slogan || ''; $('pSlogan').hidden = !s.slogan;
   $('pPlace').textContent = place(s) + (s.tags ? ' \u00b7 ' + s.tags.split(',').slice(0, 3).join(', ') : '') + (s.source === 'member' ? ' \u00b7 added by ' + s.addedBy : '');
   $('pHome').hidden = !s.home; if (s.home) { $('pHome').href = s.home; }
   document.querySelectorAll('#list .row').forEach((r, i) => r.classList.toggle('on', results[i] && results[i].id === s.id));
@@ -556,6 +573,9 @@ $('pReport').onclick = async () => {
 let newPlace = null;
 function setPlace(lat, lon, city, country, cc) {
   newPlace = { lat, lon, city: city || '', country: country || '', cc: cc || '' };
+  $('aLat').value = lat; $('aLon').value = lon;
+  if (city) { $('aCity').value = city; }
+  if (country) { $('aCountry').value = country; }
   pickMark = { lat, lon, kind: 'new' };
   flyTo(lat, lon, Math.max(view.zoom, 3));
   $('aPlace').innerHTML = '<b>' + esc([city, country].filter(Boolean).join(', ') || 'The place you picked') + '</b><br><span class="muted">'
@@ -575,7 +595,26 @@ async function findPlace() {
   return false;
 }
 $('aFind').onclick = () => { findPlace(); };
-$('aWhere').addEventListener('input', () => { if (newPlace && newPlace.typed) { newPlace = null; } });
+function typedPlace() {
+  const lat = parseFloat($('aLat').value), lon = parseFloat($('aLon').value);
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { return null; }
+  return { lat: Math.round(lat * 10000) / 10000, lon: Math.round(lon * 10000) / 10000 };
+}
+['aLat', 'aLon'].forEach(id => $(id).addEventListener('change', () => {
+  const p = typedPlace();
+  if (p) { newPlace = Object.assign(newPlace || {}, p); pickMark = { lat: p.lat, lon: p.lon, kind: 'new' }; flyTo(p.lat, p.lon, Math.max(view.zoom, 3)); $('aPlace').textContent = 'Place: ' + p.lat + ', ' + p.lon; }
+}));
+/** Degrees from a point to the nearest land on the map (a dot in the sea gets a warning). */
+function landDistance(lat, lon) {
+  if (!land) { return 0; }
+  const sa = Math.sin(lat * D), ca = Math.cos(lat * D), lo = lon * D;
+  let best = -2;
+  for (let i = 0; i < land.length; i += 3) {
+    const c = land[i] * sa + land[i + 1] * ca * Math.cos(land[i + 2] - lo);
+    if (c > best) { best = c; }
+  }
+  return Math.acos(Math.min(1, best)) / D;
+}
 $('aWhere').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('aFind').click(); } });
 $('aGeo').onclick = () => {
   if (!navigator.geolocation) { $('aPlace').textContent = 'This browser cannot tell where you are - type the town instead.'; return; }
@@ -593,18 +632,24 @@ $('aPick').onclick = () => {
 $('addForm').onsubmit = async e => {
   e.preventDefault();
   const msg = $('aMsg');
+  const typed = typedPlace();
+  if (typed) { newPlace = Object.assign(newPlace || {}, typed); }
+  else if (($('aLat').value.trim() || $('aLon').value.trim())) { msg.className = 'err'; msg.textContent = 'Latitude is -90 to 90 and longitude -180 to 180, e.g. -6.8160 and 39.2803.'; return; }
   if (!newPlace && $('aWhere').value.trim()) { msg.className = 'small muted'; msg.textContent = 'Finding the place first...'; await findPlace(); }
+  if (newPlace && landDistance(newPlace.lat, newPlace.lon) > 1.2
+    && !confirm('That place is out in the sea, ' + Math.round(landDistance(newPlace.lat, newPlace.lon) * 111) + ' km from land. Add the station there anyway?')) { return; }
   if (!newPlace) { msg.className = 'err'; msg.textContent = 'Where is the station? Type the town and country (e.g. "Dar es Salaam, Tanzania"), or press Use my location, or Pick on the globe.'; $('aWhere').focus(); return; }
   msg.textContent = '';
   $('aSend').disabled = true; msg.className = 'small muted'; msg.textContent = 'Checking that the stream plays (up to 15 seconds)...';
-  const r = await api('/api/world/add', { url: $('aUrl').value.trim(), name: $('aName').value.trim(), tags: $('aTags').value.trim(),
-    lang: $('aLang').value.trim(), home: $('aHome').value.trim(), lat: newPlace.lat, lon: newPlace.lon, city: newPlace.city,
-    country: newPlace.country, cc: newPlace.cc });
+  const country = $('aCountry').value.trim();
+  const r = await api('/api/world/add', { url: $('aUrl').value.trim(), name: $('aName').value.trim(), slogan: $('aSlogan').value.trim(), tags: $('aTags').value.trim(),
+    lang: $('aLang').value.trim(), home: $('aHome').value.trim(), lat: newPlace.lat, lon: newPlace.lon, city: $('aCity').value.trim() || newPlace.city || '',
+    country: country, cc: country && country === (newPlace.country || '') ? (newPlace.cc || '') : '' });
   $('aSend').disabled = false;
   if (r.status === 401) { signedOut('Your sign-in has ended - sign in again, then press the button once more (what you typed is kept).'); return; }
   if (!r.ok) { msg.className = 'err'; msg.textContent = r.data.error || 'That did not work.'; return; }
   msg.className = 'ok'; msg.textContent = r.data.name + ' is on the map now. Thank you!';
-  $('addForm').reset(); newPlace = null; $('aPlace').textContent = 'No place yet.';
+  $('addForm').reset(); newPlace = null; $('aPlace').textContent = 'No place yet - find it above, or type it below.';
   await loadDots(true);
   choose(r.data, false);
   tab('search'); rows([r.data]);

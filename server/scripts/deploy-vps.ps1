@@ -328,6 +328,63 @@ fi
 ufw --force enable >/dev/null
 ufw status | sed 's/^/  /'
 
+say "Mail centre (Admin -> Mail): email to @memoryq.com..."
+# Postfix takes email for @memoryq.com from the internet and hands a copy to the Memoryq server (127.0.0.1:2525),
+# which shows it in Admin -> Mail. Mailboxes made with memoryq-mail-setup.sh (support@...) keep working as before.
+MAILNOTE=""
+if ! command -v postconf >/dev/null 2>&1; then
+  echo "postfix postfix/main_mailer_type select Internet Site" | debconf-set-selections
+  echo "postfix postfix/mailname string $DOMAIN" | debconf-set-selections
+  apt-get install -y -q postfix >/dev/null
+  echo "$DOMAIN" > /etc/mailname
+  postconf -e "myhostname = $DOMAIN" "myorigin = /etc/mailname" "mydestination = localhost" "inet_protocols = ipv4" \
+    "smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination" "message_size_limit = 26214400"
+  echo "  Postfix installed"
+fi
+[ -f /etc/postfix/main.cf.before-mailcentre ] || cp /etc/postfix/main.cf /etc/postfix/main.cf.before-mailcentre
+printf 'mailcentre.internal smtp:[127.0.0.1]:2525\n' > /etc/postfix/memoryq-transport
+if [ -f /etc/memoryq-mail-main ] && postconf -x -h mydestination | tr ', ' '\n\n' | grep -qix "$DOMAIN"; then
+  # memoryq-mail-setup.sh made mailboxes here (support@...): keep them, and copy every email to the mail centre too
+  printf '/@%s$/ centre@mailcentre.internal\n' "$(printf '%s' "$DOMAIN" | sed 's/\./\\./g')" > /etc/postfix/memoryq-centre-bcc
+  postconf -e "recipient_bcc_maps = regexp:/etc/postfix/memoryq-centre-bcc"
+  MAILNOTE="your mailboxes keep their email; Admin -> Mail gets a copy of each"
+else
+  # no mailboxes here: all email for the domain goes straight to the mail centre (the domain is not "local" any more)
+  MD="$(postconf -x -h mydestination | tr ',' ' ' | tr -s ' ' '\n' | grep -vix "$DOMAIN" | grep -v '^$' | paste -sd, - | sed 's/,/, /g')"
+  postconf -e "mydestination = ${MD:-localhost}"
+  postconf -X recipient_bcc_maps 2>/dev/null || true
+  printf '%s smtp:[127.0.0.1]:2525\n' "$DOMAIN" >> /etc/postfix/memoryq-transport
+  RD="$(postconf -h relay_domains 2>/dev/null || true)"
+  if ! printf '%s' "$RD" | tr ', ' '\n\n' | grep -qix "$DOMAIN"; then
+    RD="$(printf '%s' "$RD" | sed 's/\$mydestination//g; s/^[ ,]*//; s/[ ,]*$//')"
+    postconf -e "relay_domains = ${RD:+$RD, }$DOMAIN"
+  fi
+  MAILNOTE="all email for @$DOMAIN goes to Admin -> Mail"
+fi
+postmap /etc/postfix/memoryq-transport
+TM="$(postconf -h transport_maps 2>/dev/null || true)"
+if ! printf '%s' "$TM" | grep -q memoryq-transport; then postconf -e "transport_maps = hash:/etc/postfix/memoryq-transport${TM:+, $TM}"; fi
+postconf -e "inet_interfaces = all" "smtpd_helo_required = yes" "disable_vrfy_command = yes"
+# the root mailbox's mail (cron, system warnings) is server mail: send it to the domain so it reaches Admin -> Mail
+if ! grep -q '^root:' /etc/aliases 2>/dev/null; then echo "root: server@$DOMAIN" >> /etc/aliases; newaliases; fi
+ufw allow 25/tcp >/dev/null
+systemctl enable postfix >/dev/null 2>&1
+systemctl restart postfix
+sleep 2
+if ss -ltn 2>/dev/null | grep -q '127.0.0.1:2525'; then echo "  the mail centre is listening (Admin -> Mail) - $MAILNOTE"; else echo "  WARNING: the mail centre is not listening yet - see: journalctl -u vstream -n 50 | grep mail"; fi
+printf 'Subject: Mail centre test\nFrom: postmaster@%s\nTo: server@%s\n\nThis test email shows that %s can receive email into Admin -> Mail.\n' "$DOMAIN" "$DOMAIN" "$DOMAIN" | /usr/sbin/sendmail -f "postmaster@$DOMAIN" "server@$DOMAIN" 2>/dev/null || true
+MX="$( (command -v dig >/dev/null && dig +short MX "$DOMAIN") || (command -v host >/dev/null && host -t MX "$DOMAIN" | awk '/mail is handled/{print $NF}') || true)"
+MAILHOST_IP="$(getent ahostsv4 "mail.$DOMAIN" 2>/dev/null | awk 'NR==1{print $1}' || true)"
+if [ -n "$MX" ] && [ "$MAILHOST_IP" = "$PUBLIC_IP" ]; then
+  echo "  DNS is ready: MX for $DOMAIN -> $(echo $MX | tr '\n' ' ') and mail.$DOMAIN -> this server"
+else
+  echo "  TO RECEIVE EMAIL, add these two records in Cloudflare (DNS -> Records -> Add record):"
+  echo "     Type A    Name mail   IPv4 $PUBLIC_IP   Proxy status: DNS only (grey cloud)"
+  echo "     Type MX   Name @      Mail server mail.$DOMAIN   Priority 10"
+  [ -n "$MX" ] && echo "     (now the MX record points to: $(echo $MX | tr '\n' ' ') - change it to mail.$DOMAIN if you want the mail here)"
+  echo "  Some VPS providers block port 25 for new servers - if no email arrives an hour after the records, ask them to open it."
+fi
+
 say "Checking..."
 sleep 6
 for s in mediamtx vstream caddy; do echo "  $s: $(systemctl is-active $s)"; done

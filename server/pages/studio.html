@@ -229,6 +229,39 @@
   .djbar .dot.live { background: #e5484d; box-shadow: 0 0 0 4px rgba(229,72,77,.3); }
   .djbar span.t { color: #cbd5e1; font-size: 14px; }
   body.embedded #signOut, body.embedded header a.hl { display: none !important; }
+  /* Media manager */
+  .mmcard { padding: 12px 14px; }
+  .mmtool { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .mmtool button, .mmtool .btn { padding: 5px 11px; font-size: 13px; border-radius: 6px; }
+  .mmtool .sep { width: 1px; height: 22px; background: var(--line); margin: 0 4px; }
+  .mmtool .grow, .mmpath .grow { flex: 1; }
+  .mmtool input[type=search] { padding: 5px 9px; font-size: 13px; width: 200px; }
+  .mmpath { display: flex; align-items: center; gap: 4px; padding: 6px 0; font-size: 14px; }
+  .mmpath button.link { background: none; border: 0; padding: 2px; color: var(--accent); font-weight: 600; }
+  button.sm { padding: 3px 9px; font-size: 12px; border-radius: 6px; }
+  .mmpick { border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 10px 12px; margin: 4px 0 8px; }
+  .mmpick input, .mmpick select { padding: 5px 8px; font-size: 13px; }
+  .mmwrap { display: grid; grid-template-columns: 210px 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; min-height: 340px; }
+  .mmtree { background: var(--soft); border-right: 1px solid var(--line); padding: 6px 4px; overflow-y: auto; max-height: 64vh; }
+  .mmf { display: flex; width: 100%; gap: 6px; border: 0; background: none; text-align: left; padding: 5px 8px; font-size: 13px; border-radius: 5px; }
+  .mmf .grow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mmf.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .mmf.drop, .mmtable tr.drop td, .mmlist.drop { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .mmlist { overflow: auto; max-height: 64vh; }
+  .mmtable { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .mmtable th { position: sticky; top: 0; background: var(--soft); text-align: left; font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .mmtable th.sort { cursor: pointer; user-select: none; }
+  .mmtable td { padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  .mmtable .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .mmtable tr.sel td { background: var(--accent-soft); }
+  .mmtable tr:hover td { background: var(--soft); }
+  .mmtable tr.mmdir td { cursor: pointer; font-weight: 600; }
+  .mmtable .mmname { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mmtable tr.mmedit td { background: var(--soft); padding: 10px 12px; }
+  .mmplay { padding: 1px 7px; font-size: 11px; border-radius: 50%; }
+  .mmgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0 12px; }
+  .mmgrid label.f { margin-bottom: 4px; } .mmgrid input { width: 100%; padding: 5px 8px; font-size: 13px; margin-top: 2px; }
+  @media (max-width: 720px) { .mmwrap { grid-template-columns: 1fr; } .mmtree { max-height: 150px; border-right: 0; border-bottom: 1px solid var(--line); } }
 </style>
 </head>
 <body>
@@ -420,20 +453,37 @@
       </div>
     </section>
 
-    <!-- Music -->
+    <!-- Media manager -->
     <section data-tab="music" hidden>
-      <div class="card">
-        <div class="row">
-          <label class="btn primary" style="background:var(--accent);color:#fff;border-color:var(--accent)">Add songs
+      <div class="card mmcard">
+        <div class="mmtool">
+          <label class="btn primary" style="background:var(--accent);color:#fff;border-color:var(--accent)">&#x2B06; Upload
             <input type="file" id="files" multiple accept=".mp3,.m4a,.aac,.ogg,.opus,.flac,.wav,audio/*" hidden></label>
-          <label class="small muted">and put them in <select id="upInto"><option value="">(no playlist)</option></select></label>
-          <span id="upMsg" class="muted small"></span>
+          <button id="mmNew">&#x1F4C1; New folder</button>
+          <span class="sep"></span>
+          <button id="mmDelSel" class="danger">Delete Selected</button>
+          <button id="mmMoveSel">Move Selected</button>
+          <button id="mmEditSel">Edit Selected</button>
+          <button id="mmPlSel">Add to playlist</button>
+          <span class="grow"></span>
+          <input type="search" id="mmSearch" placeholder="Search all media">
         </div>
-        <div class="muted small" style="margin-top:8px">MP3, M4A, AAC, OGG, OPUS, FLAC or WAV, up to 60 MB each. Title and artist come from the
-          song's tags (or a file name like "Artist - Title.mp3"). Add a link (Spotify, YouTube, your shop) so listeners can tap "Get this song".
-          Only add music you own or have the rights to broadcast.</div>
+        <div class="mmpath"><span id="mmCrumb" class="grow"></span>
+          <button id="mmRen" class="sm" hidden>Rename / move folder</button><button id="mmDelF" class="sm danger" hidden>Delete folder</button></div>
+        <div id="mmPick" class="mmpick" hidden></div>
+        <div class="mmwrap">
+          <div id="mmTree" class="mmtree"></div>
+          <div id="mmList" class="mmlist"><table id="mmRows" class="mmtable"></table></div>
+        </div>
+        <div class="row small" style="margin-top:8px">
+          <span id="mmCount" class="muted grow"></span>
+          <label class="muted">New uploads also go in <select id="upInto"><option value="">(no playlist)</option></select></label>
+          <span id="upMsg" class="muted"></span>
+        </div>
+        <div class="muted small" style="margin-top:6px">Uploads go into the open folder - or drag files from your computer onto the list. Drag songs onto a folder to
+          move them. MP3, M4A, AAC, OGG, OPUS, FLAC or WAV, up to 60 MB each; title and artist come from the song's tags (or a file name like
+          "Artist - Title.mp3"). Only add music you own or have the rights to broadcast.</div>
       </div>
-      <div class="card" style="overflow-x:auto"><table id="tracks"></table></div>
     </section>
 
     <!-- Playlists -->
@@ -1235,47 +1285,238 @@ $('voiceBtn').addEventListener('click', async () => {
   else { $('saveMsg').textContent = (r.data && r.data.error) || r.error || 'No voice available'; $('saveMsg').className = 'small error'; }
 });
 
-// ---------- music ----------
+// ---------- media manager: the station's songs in folders, file-manager style ----------
+const media = { folder: '', sel: new Set(), q: '', sort: 'added', desc: true, tracks: [], folders: [], playlists: [], audio: null, playing: 0, edit: 0 };
+function mmName(x) { return (x.artist ? x.artist + ' - ' : '') + x.title + '.' + (x.ext || 'mp3'); }
+function mmIn(f, root) { return root === '' ? true : (f === root || f.indexOf(root + '/') === 0); }
 async function loadTracks() {
-  const pr = await api('/api/studio/playlists?station=' + current);
+  const [pr, r] = await Promise.all([api('/api/studio/playlists?station=' + current), api('/api/studio/tracks?station=' + current)]);
+  media.playlists = pr.ok ? (pr.data.playlists || []) : [];
   const sel = $('upInto'); const keep = sel.value; sel.innerHTML = '<option value="">(no playlist)</option>';
-  if (pr.ok) { (pr.data.playlists || []).forEach(p => { const o = el('option', p.name); o.value = p.id; sel.appendChild(o); }); }
+  media.playlists.forEach(p => { const o = el('option', p.name); o.value = p.id; sel.appendChild(o); });
   if ([...sel.options].some(o => o.value === keep)) { sel.value = keep; }
-  const r = await api('/api/studio/tracks?station=' + current);
-  const t = $('tracks'); t.innerHTML = '';
-  if (!r.ok) { t.appendChild(el('tr')).appendChild(el('td', r.error, 'error')); return; }
+  if (!r.ok) { $('mmRows').textContent = r.error; return; }
+  media.tracks = r.data.tracks;
+  media.folders = r.data.folders || [];
+  if (media.folder && !media.folders.some(f => f.path === media.folder)) { media.folder = ''; }
+  const ids = new Set(media.tracks.map(t => t.id));
+  [...media.sel].forEach(id => { if (!ids.has(id)) { media.sel.delete(id); } });
+  mmDraw();
+}
+function mmDraw() {
+  const presenter = myRole() === 'presenter';
+  // folders
+  const tree = $('mmTree'); tree.innerHTML = '';
+  const total = media.tracks.length;
+  const node = (path, label, depth, count) => {
+    const b = el('button', null, 'mmf' + (media.folder === path ? ' on' : ''));
+    b.style.paddingLeft = (8 + depth * 14) + 'px';
+    b.appendChild(el('span', (path === '' ? '\uD83C\uDFB5 ' : '\uD83D\uDCC1 ') + label, 'grow'));
+    b.appendChild(el('span', String(count), 'muted small'));
+    b.addEventListener('click', () => { media.folder = path; media.sel.clear(); media.edit = 0; mmDraw(); });
+    b.addEventListener('dragover', e => { e.preventDefault(); b.classList.add('drop'); });
+    b.addEventListener('dragleave', () => b.classList.remove('drop'));
+    b.addEventListener('drop', async e => {
+      e.preventDefault(); b.classList.remove('drop');
+      const ids = (e.dataTransfer.getData('text/plain') || '').split(',').filter(Boolean);
+      if (ids.length) { await mmBulk('move', { ids: ids.join(','), folder: path }, ids.length + ' song(s) moved to ' + (label)); }
+    });
+    tree.appendChild(b);
+  };
+  node('', 'All media (top)', 0, total);
+  media.folders.forEach(f => {
+    const parts = f.path.split('/');
+    const inAll = media.tracks.filter(t => mmIn(t.folder, f.path)).length;
+    node(f.path, parts[parts.length - 1], parts.length, inAll);
+  });
+  // the path and the folder's own buttons
+  const crumb = $('mmCrumb'); crumb.innerHTML = '';
+  const go = (p, label) => { const a = el('button', label, 'link'); a.addEventListener('click', () => { media.folder = p; media.sel.clear(); mmDraw(); }); crumb.appendChild(a); };
+  go('', 'Media');
+  let acc = '';
+  media.folder.split('/').filter(Boolean).forEach(part => { acc = acc ? acc + '/' + part : part; crumb.appendChild(el('span', ' / ', 'muted')); go(acc, part); });
+  $('mmRen').hidden = $('mmDelF').hidden = !media.folder || presenter;
+  $('mmDelSel').hidden = presenter;
+  // the files here: this folder's songs (and, with a search, every folder's)
+  const q = media.q.toLowerCase();
+  let list = media.tracks.filter(t => q ? (t.title + ' ' + t.artist + ' ' + t.album + ' ' + t.folder).toLowerCase().includes(q) : t.folder === media.folder);
+  const key = { name: t => mmName(t).toLowerCase(), artist: t => (t.artist || '').toLowerCase(), album: t => (t.album || '').toLowerCase(), length: t => t.durationMs,
+    plays: t => t.plays, likes: t => t.likes, size: t => t.size, added: t => t.added }[media.sort];
+  list.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * (media.desc ? -1 : 1); });
+  const subs = q ? [] : media.folders.filter(f => { const k = f.path.lastIndexOf('/'); return (k < 0 ? '' : f.path.slice(0, k)) === media.folder; });
+  const t = $('mmRows'); t.innerHTML = '';
   const head = el('tr');
-  ['Title', 'Artist', 'Link ("Get this song")', 'Length', 'Plays', 'Likes', 'Requests', 'Taps', ''].forEach((h, i) => head.appendChild(el('th', h, i >= 3 && i <= 7 ? 'num' : '')));
+  const all = el('input'); all.type = 'checkbox'; all.checked = list.length > 0 && list.every(x => media.sel.has(x.id));
+  all.addEventListener('change', () => { list.forEach(x => all.checked ? media.sel.add(x.id) : media.sel.delete(x.id)); mmDraw(); });
+  const th0 = el('th'); th0.appendChild(all); head.appendChild(th0);
+  head.appendChild(el('th'));
+  [['name', 'File'], ['artist', 'Artist'], ['album', 'Album'], ['length', 'Length'], ['plays', 'Plays'], ['likes', 'Likes'], ['size', 'Size']].forEach(([k, label], i) => {
+    const th = el('th', label + (media.sort === k ? (media.desc ? ' \u25BE' : ' \u25B4') : ''), i >= 3 ? 'num sort' : 'sort');
+    th.addEventListener('click', () => { if (media.sort === k) { media.desc = !media.desc; } else { media.sort = k; media.desc = k !== 'name' && k !== 'artist' && k !== 'album'; } mmDraw(); });
+    head.appendChild(th);
+  });
+  head.appendChild(el('th'));
   t.appendChild(head);
-  if (!r.data.tracks.length) { const tr = el('tr'); const td = el('td', 'No songs yet - add some above.', 'muted'); td.colSpan = 9; tr.appendChild(td); t.appendChild(tr); }
-  r.data.tracks.forEach(x => {
-    const tr = el('tr');
-    const ti = el('input'); ti.value = x.title; ti.maxLength = 120;
-    const ar = el('input'); ar.value = x.artist; ar.maxLength = 120;
-    const li = el('input'); li.value = x.link || ''; li.placeholder = 'https://...';
-    [ti, ar, li].forEach(i => { const td = el('td'); td.appendChild(i); tr.appendChild(td); });
-    [dur(x.durationMs), fmt(x.plays), fmt(x.likes), fmt(x.requests), fmt(x.taps)].forEach(v => tr.appendChild(el('td', v, 'num')));
-    const act = el('td'); act.style.whiteSpace = 'nowrap';
-    const save = el('button', 'Save');
-    save.addEventListener('click', async () => {
-      const s = await api('/api/studio/track/save', { id: x.id, title: ti.value, artist: ar.value, link: li.value });
-      toast(s.ok ? 'Saved' : s.error);
-    });
-    const del = el('button', 'Delete', 'danger');
-    del.addEventListener('click', async () => {
-      if (!confirm('Delete "' + x.title + '"?')) { return; }
-      const s = await api('/api/studio/track/delete', { id: x.id });
-      toast(s.ok ? 'Deleted' : s.error); if (s.ok) { loadTracks(); refresh(true); }
-    });
-    act.appendChild(save); act.appendChild(document.createTextNode(' ')); act.appendChild(del);
-    tr.appendChild(act);
+  subs.forEach(f => {
+    const tr = el('tr', null, 'mmdir');
+    tr.appendChild(el('td')); tr.appendChild(el('td', '\uD83D\uDCC1'));
+    const td = el('td', f.path.split('/').pop()); td.colSpan = 8; tr.appendChild(td);
+    tr.addEventListener('click', () => { media.folder = f.path; media.sel.clear(); mmDraw(); });
+    tr.addEventListener('dragover', e => { e.preventDefault(); tr.classList.add('drop'); });
+    tr.addEventListener('dragleave', () => tr.classList.remove('drop'));
+    tr.addEventListener('drop', async e => { e.preventDefault(); const ids = e.dataTransfer.getData('text/plain'); if (ids) { await mmBulk('move', { ids: ids, folder: f.path }, 'Moved'); } });
     t.appendChild(tr);
   });
+  if (!list.length && !subs.length) {
+    const tr = el('tr'); const td = el('td', q ? 'Nothing matches "' + media.q + '".' : (total ? 'This folder is empty - upload songs here, or move some in.' : 'No songs yet - press Upload.'), 'muted');
+    td.colSpan = 10; td.style.padding = '18px'; tr.appendChild(td); t.appendChild(tr);
+  }
+  list.forEach(x => {
+    const tr = el('tr', null, media.sel.has(x.id) ? 'sel' : '');
+    tr.draggable = true;
+    tr.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', (media.sel.has(x.id) ? [...media.sel] : [x.id]).join(',')); });
+    const cb = el('input'); cb.type = 'checkbox'; cb.checked = media.sel.has(x.id);
+    cb.addEventListener('change', () => { cb.checked ? media.sel.add(x.id) : media.sel.delete(x.id); mmDraw(); });
+    const c0 = el('td'); c0.appendChild(cb); tr.appendChild(c0);
+    const pl = el('button', media.playing === x.id ? '\u25A0' : '\u25B6', 'mmplay'); pl.title = 'Listen';
+    pl.addEventListener('click', () => mmPlay(x));
+    const c1 = el('td'); c1.appendChild(pl); tr.appendChild(c1);
+    const name = el('td', null, 'mmname');
+    name.appendChild(el('span', '\uD83C\uDFB5 '));
+    name.appendChild(document.createTextNode(mmName(x)));
+    if (q && x.folder) { name.appendChild(el('span', '  in ' + x.folder, 'muted small')); }
+    if (x.link) { const a = el('a', ' \uD83D\uDD17'); a.href = x.link; a.target = '_blank'; a.rel = 'noopener'; a.title = x.link; name.appendChild(a); }
+    tr.appendChild(name);
+    tr.appendChild(el('td', x.artist || '-', x.artist ? '' : 'muted'));
+    tr.appendChild(el('td', x.album || '-', x.album ? '' : 'muted'));
+    [dur(x.durationMs), fmt(x.plays), fmt(x.likes), sizeText(x.size || 0)].forEach(v => tr.appendChild(el('td', v, 'num')));
+    const act = el('td'); act.style.whiteSpace = 'nowrap';
+    const ed = el('button', 'Edit', 'sm'); ed.addEventListener('click', () => { media.edit = media.edit === x.id ? 0 : x.id; mmDraw(); });
+    act.appendChild(ed);
+    tr.appendChild(act);
+    t.appendChild(tr);
+    if (media.edit === x.id) { t.appendChild(mmEditRow(x, presenter)); }
+  });
+  const n = media.sel.size;
+  $('mmCount').textContent = n ? n + ' selected' : list.length + ' song(s)' + (subs.length ? ', ' + subs.length + ' folder(s)' : '');
+  ['mmDelSel', 'mmMoveSel', 'mmEditSel', 'mmPlSel'].forEach(id => { $(id).disabled = n === 0; });
 }
+function mmEditRow(x, presenter) {
+  const tr = el('tr', null, 'mmedit');
+  const td = el('td'); td.colSpan = 10; tr.appendChild(td);
+  const g = el('div', null, 'mmgrid');
+  const f = (label, v, ph) => { const l = el('label', label, 'f'); const i = el('input'); i.value = v || ''; if (ph) { i.placeholder = ph; } l.appendChild(i); g.appendChild(l); return i; };
+  const ti = f('Title', x.title), ar = f('Artist', x.artist), li = f('Link ("Get this song")', x.link, 'https://...');
+  td.appendChild(g);
+  td.appendChild(el('div', 'Requests ' + fmt(x.requests) + ' \u00B7 taps on the link ' + fmt(x.taps) + ' \u00B7 added ' + new Date(x.added).toLocaleDateString(), 'muted small'));
+  const row = el('div', null, 'row'); row.style.marginTop = '8px';
+  const save = el('button', 'Save', 'primary');
+  save.addEventListener('click', async () => {
+    const s = await api('/api/studio/track/save', { id: x.id, title: ti.value, artist: ar.value, link: li.value });
+    toast(s.ok ? 'Saved' : s.error); if (s.ok) { media.edit = 0; loadTracks(); }
+  });
+  row.appendChild(save);
+  if (!presenter) {
+    const del = el('button', 'Delete', 'danger');
+    del.addEventListener('click', async () => { if (!confirm('Delete "' + x.title + '"?')) { return; } await mmBulk('delete', { ids: String(x.id) }, 'Deleted'); });
+    row.appendChild(del);
+  }
+  const cancel = el('button', 'Close'); cancel.addEventListener('click', () => { media.edit = 0; mmDraw(); }); row.appendChild(cancel);
+  td.appendChild(row);
+  return tr;
+}
+async function mmPlay(x) {
+  if (media.audio) { media.audio.pause(); URL.revokeObjectURL(media.audio.src); media.audio = null; }
+  if (media.playing === x.id) { media.playing = 0; mmDraw(); return; }
+  media.playing = x.id; mmDraw();
+  try {
+    const r = await fetch('/api/studio/track/audio?id=' + x.id, { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) { throw new Error(); }
+    if (media.playing !== x.id) { return; }
+    media.audio = new Audio(URL.createObjectURL(await r.blob()));
+    media.audio.onended = () => { media.playing = 0; mmDraw(); };
+    await media.audio.play();
+  } catch (e) { toast('Could not play it'); media.playing = 0; mmDraw(); }
+}
+async function mmBulk(action, form, said) {
+  const r = await api('/api/studio/track/bulk', Object.assign({ station: current, action: action }, form));
+  toast(r.ok ? said : r.error);
+  if (r.ok) { if (action === 'delete' || action === 'move') { media.sel.clear(); } await loadTracks(); if (action === 'delete') { refresh(true); } }
+  return r.ok;
+}
+function mmPicker(title, okLabel, build, run) {
+  const box = $('mmPick'); box.innerHTML = ''; box.hidden = false;
+  box.appendChild(el('b', title));
+  const body = el('div'); body.style.margin = '8px 0'; box.appendChild(body);
+  const get = build(body);
+  const row = el('div', null, 'row');
+  const ok = el('button', okLabel, 'primary');
+  ok.addEventListener('click', async () => { if (await run(get())) { box.hidden = true; } });
+  const no = el('button', 'Cancel'); no.addEventListener('click', () => { box.hidden = true; });
+  row.appendChild(ok); row.appendChild(no); box.appendChild(row);
+}
+function mmFolderSelect(value) {
+  const s = el('select');
+  [{ path: '' }].concat(media.folders).forEach(f => { const o = el('option', f.path ? '\uD83D\uDCC1 ' + f.path : '\uD83C\uDFB5 Media (top)'); o.value = f.path; s.appendChild(o); });
+  s.value = value;
+  return s;
+}
+$('mmSearch').addEventListener('input', e => { clearTimeout(media.qt); media.qt = setTimeout(() => { media.q = e.target.value.trim(); mmDraw(); }, 200); });
+$('mmNew').addEventListener('click', () => mmPicker('New folder' + (media.folder ? ' inside ' + media.folder : ''), 'Create', body => {
+  const i = el('input'); i.placeholder = 'e.g. Jingles, Gospel, Adverts'; i.maxLength = 60; body.appendChild(i); setTimeout(() => i.focus(), 0); return () => i.value;
+}, async name => {
+  if (!name.trim()) { return false; }
+  const r = await api('/api/studio/folder/save', { station: current, path: (media.folder ? media.folder + '/' : '') + name });
+  toast(r.ok ? 'Folder made' : r.error); if (r.ok) { media.folder = r.data.path; await loadTracks(); } return r.ok;
+}));
+$('mmRen').addEventListener('click', () => mmPicker('Rename or move the folder ' + media.folder, 'Save', body => {
+  const i = el('input'); i.value = media.folder; i.maxLength = 180; i.style.width = '100%'; body.appendChild(i);
+  body.appendChild(el('div', 'Use / for a folder inside another, e.g. Music/Gospel', 'muted small')); return () => i.value;
+}, async to => {
+  const r = await api('/api/studio/folder/save', { station: current, from: media.folder, path: to });
+  toast(r.ok ? 'Saved' : r.error); if (r.ok) { media.folder = r.data.path; await loadTracks(); } return r.ok;
+}));
+$('mmDelF').addEventListener('click', () => mmPicker('Delete the folder ' + media.folder, 'Delete folder', body => {
+  const n = media.tracks.filter(t => mmIn(t.folder, media.folder)).length;
+  const l = el('label', null, 'small'); const c = el('input'); c.type = 'checkbox'; l.appendChild(c);
+  l.appendChild(document.createTextNode(' Delete its ' + n + ' song(s) too (otherwise they move up one folder)'));
+  body.appendChild(l); return () => c.checked;
+}, async songs => {
+  if (songs && !confirm('Delete the songs in ' + media.folder + ' for good?')) { return false; }
+  const r = await api('/api/studio/folder/delete', { station: current, path: media.folder, songs: songs ? '1' : '0' });
+  toast(r.ok ? 'Folder deleted' + (r.data.deleted ? ' with ' + r.data.deleted + ' song(s)' : '') : r.error);
+  if (r.ok) { const k = media.folder.lastIndexOf('/'); media.folder = k < 0 ? '' : media.folder.slice(0, k); await loadTracks(); refresh(true); } return r.ok;
+}));
+$('mmDelSel').addEventListener('click', async () => {
+  const n = media.sel.size;
+  if (!n || !confirm('Delete ' + n + ' song(s) for good? They also leave every playlist.')) { return; }
+  mmBulk('delete', { ids: [...media.sel].join(',') }, n + ' song(s) deleted');
+});
+$('mmMoveSel').addEventListener('click', () => mmPicker('Move ' + media.sel.size + ' song(s) to', 'Move', body => {
+  const s = mmFolderSelect(media.folder); body.appendChild(s); return () => s.value;
+}, to => mmBulk('move', { ids: [...media.sel].join(','), folder: to }, 'Moved to ' + (to || 'the top'))));
+$('mmEditSel').addEventListener('click', () => mmPicker('Edit ' + media.sel.size + ' song(s) - empty boxes are left as they are', 'Save', body => {
+  const g = el('div', null, 'mmgrid');
+  const f = (label, ph) => { const l = el('label', label, 'f'); const i = el('input'); i.placeholder = ph; l.appendChild(i); g.appendChild(l); return i; };
+  const ar = f('Artist', 'keep'), al = f('Album', 'keep'), li = f('Link ("Get this song")', 'keep');
+  body.appendChild(g); return () => ({ ar: ar.value.trim(), al: al.value.trim(), li: li.value.trim() });
+}, v => {
+  const form = { ids: [...media.sel].join(',') };
+  if (v.ar) { form.artist = v.ar; } if (v.al) { form.album = v.al; } if (v.li) { form.link = v.li; }
+  if (Object.keys(form).length === 1) { toast('Nothing to change'); return false; }
+  return mmBulk('edit', form, 'Saved');
+}));
+$('mmPlSel').addEventListener('click', () => {
+  if (!media.playlists.length) { toast('Make a playlist first (Playlists tab)'); return; }
+  mmPicker('Add ' + media.sel.size + ' song(s) to a playlist', 'Add', body => {
+    const s = el('select'); media.playlists.forEach(p => { const o = el('option', p.name); o.value = p.id; s.appendChild(o); }); body.appendChild(s); return () => s.value;
+  }, pl => mmBulk('playlist', { ids: [...media.sel].join(','), playlist: pl }, 'Added to the playlist'));
+});
 function uploadOne(file, onProgress) {
   return new Promise((resolve) => {
     const x = new XMLHttpRequest();
-    x.open('POST', '/api/studio/upload?station=' + current + '&name=' + enc(file.name) + ($('upInto').value ? '&playlist=' + $('upInto').value : ''));
+    x.open('POST', '/api/studio/upload?station=' + current + '&name=' + enc(file.name) + ($('upInto').value ? '&playlist=' + $('upInto').value : '')
+      + (media.folder ? '&folder=' + enc(media.folder) : ''));
     x.setRequestHeader('Authorization', 'Bearer ' + token);
     x.upload.onprogress = (e) => { if (e.lengthComputable) { onProgress(Math.round(100 * e.loaded / e.total)); } };
     x.onload = () => { let d = {}; try { d = JSON.parse(x.responseText); } catch (e) { } resolve({ ok: x.status === 200, data: d }); };
@@ -1283,8 +1524,7 @@ function uploadOne(file, onProgress) {
     x.send(file);
   });
 }
-$('files').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files || []); e.target.value = '';
+async function mmUpload(files) {
   if (!files.length) { return; }
   let ok = 0; const errors = [];
   for (let i = 0; i < files.length; i++) {
@@ -1292,8 +1532,17 @@ $('files').addEventListener('change', async (e) => {
     const r = await uploadOne(f, (p) => { $('upMsg').textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + ': ' + f.name + ' ' + p + '%'; });
     if (r.ok) { ok++; } else { errors.push(f.name + ': ' + (r.data.error || 'failed')); }
   }
-  $('upMsg').textContent = ok + ' song(s) added' + (errors.length ? '. Not added: ' + errors.join('; ') : '');
+  $('upMsg').textContent = ok + ' song(s) added' + (media.folder ? ' to ' + media.folder : '') + (errors.length ? '. Not added: ' + errors.join('; ') : '');
   await loadTracks(); refresh(true);
+}
+$('files').addEventListener('change', async (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; await mmUpload(files); });
+// files dropped from the computer onto the list are uploaded into the open folder
+$('mmList').addEventListener('dragover', e => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); $('mmList').classList.add('drop'); } });
+$('mmList').addEventListener('dragleave', () => $('mmList').classList.remove('drop'));
+$('mmList').addEventListener('drop', e => {
+  if (!e.dataTransfer.files.length) { return; }
+  e.preventDefault(); $('mmList').classList.remove('drop');
+  mmUpload(Array.from(e.dataTransfer.files).filter(f => /\.(mp3|m4a|aac|ogg|opus|flac|wav)$/i.test(f.name)));
 });
 
 // ---------- live DJ ----------

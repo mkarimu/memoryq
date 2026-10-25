@@ -100,6 +100,17 @@ public final class RadioStore {
         public boolean aiOn = true;
         /** Alma tells the heart of a song (its message, found in its words) about every ... songs (0 = never). */
         public int msgEvery;
+        /** Where the station is, for Global Radio (memoryq.com/world): shown there when it is on air and worldOn is ticked. */
+        public boolean worldOn = true;
+        public double lat;
+        public double lon;
+        public String city = "";
+        public String country = "";
+        public String cc = "";
+
+        public boolean hasPlace() {
+            return lat != 0 || lon != 0;
+        }
 
         public boolean hasOwnLimits() {
             return limListeners != 0 || limKbps != 0 || limStorageMb != 0 || limTransferGb != 0 || limDjs != 0;
@@ -153,6 +164,12 @@ public final class RadioStore {
             s.limTransferGb = limTransferGb;
             s.limDjs = limDjs;
             s.company = company;
+            s.worldOn = worldOn;
+            s.lat = lat;
+            s.lon = lon;
+            s.city = city;
+            s.country = country;
+            s.cc = cc;
             s.email = email;
             return s;
         }
@@ -174,6 +191,8 @@ public final class RadioStore {
         public long taps;
         public long requests;
         public int likes;
+        /** The folder in the station's media manager ("" = the top; "Jingles" or "Gospel/2024"). */
+        public String folder = "";
 
         Track copy() {
             Track t = new Track();
@@ -191,6 +210,7 @@ public final class RadioStore {
             t.taps = taps;
             t.requests = requests;
             t.likes = likes;
+            t.folder = folder;
             return t;
         }
 
@@ -473,6 +493,8 @@ public final class RadioStore {
     private final Path musicDir;
     private final Map<Long, Station> stations = new LinkedHashMap<Long, Station>();
     private final Map<Long, Track> tracks = new LinkedHashMap<Long, Track>();
+    /** Folders made in the media manager (also the empty ones), per station. */
+    private final Map<Long, java.util.TreeSet<String>> folders = new java.util.HashMap<Long, java.util.TreeSet<String>>();
     private final Map<Long, java.util.Set<String>> likers = new java.util.HashMap<Long, java.util.Set<String>>();
     private final Map<Long, Dj> djs = new LinkedHashMap<Long, Dj>();
     private final Map<Long, Playlist> playlists = new LinkedHashMap<Long, Playlist>();
@@ -492,6 +514,7 @@ public final class RadioStore {
     public synchronized void init() throws IOException {
         stations.clear();
         tracks.clear();
+        folders.clear();
         likers.clear();
         djs.clear();
         shows.clear();
@@ -692,6 +715,44 @@ public final class RadioStore {
             s.reminded = forUntil;
             dirty = true;
         }
+    }
+
+    /** Where the station is (Global Radio). Null = keep. Latitude -90..90, longitude -180..180; 0,0 = no place. */
+    public synchronized Station setPlace(long id, Boolean worldOn, Double lat, Double lon, String city, String country, String cc) {
+        Station s = stations.get(id);
+        if (s == null) {
+            throw new IllegalArgumentException("no such station");
+        }
+        if (lat != null && (lat.isNaN() || Math.abs(lat) > 90)) {
+            throw new IllegalArgumentException("the latitude must be between -90 and 90");
+        }
+        if (lon != null && (lon.isNaN() || Math.abs(lon) > 180)) {
+            throw new IllegalArgumentException("the longitude must be between -180 and 180");
+        }
+        if (worldOn != null) {
+            s.worldOn = worldOn;
+        }
+        if (lat != null) {
+            s.lat = Math.round(lat * 10000) / 10000.0;
+        }
+        if (lon != null) {
+            s.lon = Math.round(lon * 10000) / 10000.0;
+        }
+        if (city != null) {
+            s.city = clean(city, 60);
+        }
+        if (country != null) {
+            s.country = clean(country, 60);
+        }
+        if (cc != null) {
+            String c = clean(cc, 2).toUpperCase(java.util.Locale.ROOT);
+            if (!c.isEmpty() && !c.matches("[A-Z]{2}")) {
+                throw new IllegalArgumentException("the country code has 2 letters, e.g. TZ");
+            }
+            s.cc = c;
+        }
+        dirty = true;
+        return s.copy();
     }
 
     public synchronized Station setWebsite(long id, String website) {
@@ -1327,6 +1388,7 @@ public final class RadioStore {
             }
         }
         djs.values().removeIf(d -> d.station == id);
+        folders.remove(id);
         playlists.values().removeIf(p -> p.station == id);
         shows.removeIf(sh -> sh.station == id);
         staff.removeIf(f -> f.station == id);
@@ -1746,6 +1808,199 @@ public final class RadioStore {
         }
     }
 
+    // ---- The media manager: folders of songs, many songs at once ----
+
+    /** A clean folder path: up to 3 levels, letters, numbers, spaces and - _ . ( ) &; "" is the top. */
+    public static String cleanFolder(String path) {
+        if (path == null) {
+            return "";
+        }
+        StringBuilder out = new StringBuilder();
+        int depth = 0;
+        for (String part : path.replace('\\', '/').split("/")) {
+            String p = part.replaceAll("[^\\p{L}\\p{N} _.()&'-]", "").replaceAll("\\s+", " ").trim();
+            while (p.startsWith(".")) {
+                p = p.substring(1).trim();
+            }
+            if (p.isEmpty()) {
+                continue;
+            }
+            if (++depth > 3) {
+                throw new IllegalArgumentException("folders can go 3 levels deep");
+            }
+            out.append(out.length() > 0 ? "/" : "").append(p.length() > 60 ? p.substring(0, 60).trim() : p);
+        }
+        return out.toString();
+    }
+
+    /** Every folder of a station (made ones, and the ones songs are in, with their parents), with how many songs each holds. */
+    public synchronized Map<String, int[]> folders(long station) {
+        Map<String, int[]> out = new java.util.TreeMap<String, int[]>(String.CASE_INSENSITIVE_ORDER);
+        java.util.TreeSet<String> made = folders.get(station);
+        if (made != null) {
+            for (String f : made) {
+                addFolderPath(out, f);
+            }
+        }
+        for (Track t : tracks.values()) {
+            if (t.station == station && !t.folder.isEmpty()) {
+                addFolderPath(out, t.folder);
+                out.get(t.folder)[0]++;
+            }
+        }
+        return out;
+    }
+
+    private static void addFolderPath(Map<String, int[]> out, String f) {
+        String p = f;
+        while (!p.isEmpty()) {
+            out.putIfAbsent(p, new int[1]);
+            int k = p.lastIndexOf('/');
+            p = k < 0 ? "" : p.substring(0, k);
+        }
+    }
+
+    public synchronized String createFolder(long station, String path) {
+        if (!stations.containsKey(station)) {
+            throw new IllegalArgumentException("no such station");
+        }
+        String f = cleanFolder(path);
+        if (f.isEmpty()) {
+            throw new IllegalArgumentException("give the folder a name");
+        }
+        if (folders(station).size() >= 500) {
+            throw new IllegalArgumentException("a station can have 500 folders");
+        }
+        folders.computeIfAbsent(station, k -> new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER)).add(f);
+        dirty = true;
+        return f;
+    }
+
+    private static boolean inside(String folder, String root) {
+        return folder.equalsIgnoreCase(root) || folder.toLowerCase(Locale.ROOT).startsWith(root.toLowerCase(Locale.ROOT) + "/");
+    }
+
+    /** Renames (or moves) a folder with everything in it. Returns the new path. */
+    public synchronized String renameFolder(long station, String from, String to) {
+        String a = cleanFolder(from), b = cleanFolder(to);
+        if (a.isEmpty() || b.isEmpty()) {
+            throw new IllegalArgumentException("give the folder a name");
+        }
+        if (inside(b, a) && !b.equalsIgnoreCase(a)) {
+            throw new IllegalArgumentException("a folder cannot go inside itself");
+        }
+        if (!folders(station).containsKey(a)) {
+            throw new IllegalArgumentException("no such folder");
+        }
+        if (b.split("/").length + 0 > 3) {
+            throw new IllegalArgumentException("folders can go 3 levels deep");
+        }
+        for (Track t : tracks.values()) {
+            if (t.station == station && inside(t.folder, a)) {
+                t.folder = cleanFolder(b + t.folder.substring(a.length()));
+            }
+        }
+        java.util.TreeSet<String> made = folders.computeIfAbsent(station, k -> new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER));
+        List<String> moved = new ArrayList<String>();
+        for (String f : new ArrayList<String>(made)) {
+            if (inside(f, a)) {
+                made.remove(f);
+                moved.add(cleanFolder(b + f.substring(a.length())));
+            }
+        }
+        made.addAll(moved);
+        made.add(b);
+        dirty = true;
+        return b;
+    }
+
+    /**
+     * Deletes a folder. Its songs (and folders inside it) are deleted too when songsToo; otherwise they move up to
+     * the folder above. Returns how many songs were deleted.
+     */
+    public synchronized int deleteFolder(long station, String path, boolean songsToo) {
+        String a = cleanFolder(path);
+        if (a.isEmpty()) {
+            throw new IllegalArgumentException("which folder?");
+        }
+        int k = a.lastIndexOf('/');
+        String parent = k < 0 ? "" : a.substring(0, k);
+        int deleted = 0;
+        for (Track t : new ArrayList<Track>(tracks.values())) {
+            if (t.station == station && inside(t.folder, a)) {
+                if (songsToo) {
+                    removeTrack(t);
+                    for (Playlist p : playlists.values()) {
+                        p.tracks.remove(Long.valueOf(t.id));
+                    }
+                    deleted++;
+                } else {
+                    t.folder = parent;
+                }
+            }
+        }
+        java.util.TreeSet<String> made = folders.get(station);
+        if (made != null) {
+            made.removeIf(f -> inside(f, a));
+        }
+        dirty = true;
+        return deleted;
+    }
+
+    /** Moves songs of a station into a folder ("" = the top). Returns how many moved. */
+    public synchronized int moveTracks(long station, List<Long> ids, String folder) {
+        String f = cleanFolder(folder);
+        int n = 0;
+        for (long id : ids) {
+            Track t = tracks.get(id);
+            if (t != null && t.station == station) {
+                t.folder = f;
+                n++;
+            }
+        }
+        if (!f.isEmpty()) {
+            folders.computeIfAbsent(station, k -> new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER)).add(f);
+        }
+        dirty = true;
+        return n;
+    }
+
+    /** Puts a new song straight into a folder (used by uploads into a folder). */
+    public synchronized void setFolder(long trackId, String folder) {
+        Track t = tracks.get(trackId);
+        if (t != null) {
+            t.folder = cleanFolder(folder);
+            dirty = true;
+        }
+    }
+
+    /** Changes the artist, album and link of many songs at once (null = keep). Returns how many changed. */
+    public synchronized int editTracks(long station, List<Long> ids, String artist, String album, String link) {
+        String l = link == null ? null : clean(link, 300);
+        if (l != null && !l.isEmpty() && !l.matches("(?i)https?://\\S+")) {
+            throw new IllegalArgumentException("the link must start with https:// (for example https://open.spotify.com/...)");
+        }
+        int n = 0;
+        for (long id : ids) {
+            Track t = tracks.get(id);
+            if (t == null || t.station != station) {
+                continue;
+            }
+            if (artist != null) {
+                t.artist = clean(artist, 80);
+            }
+            if (album != null) {
+                t.album = clean(album, 120);
+            }
+            if (l != null) {
+                t.link = l;
+            }
+            n++;
+        }
+        dirty = true;
+        return n;
+    }
+
     public synchronized boolean deleteTrack(long id) {
         Track t = tracks.get(id);
         if (t == null) {
@@ -1854,6 +2109,14 @@ public final class RadioStore {
                     if (f.length >= 40) {
                         s.msgEvery = Integer.parseInt(f[38]);
                     }
+                    if (f.length >= 46) {
+                        s.worldOn = !"0".equals(f[39]);
+                        s.lat = Double.parseDouble(f[40]);
+                        s.lon = Double.parseDouble(f[41]);
+                        s.city = f[42];
+                        s.country = f[43];
+                        s.cc = f[44];
+                    }
                     stations.put(s.id, s);
                     nextStation = Math.max(nextStation, s.id + 1);
                 } else if ("T".equals(f[0]) && f.length >= 12) {
@@ -1873,8 +2136,13 @@ public final class RadioStore {
                         t.taps = Long.parseLong(f[12]);
                         t.requests = Long.parseLong(f[13]);
                     }
+                    if (f.length >= 16) {
+                        t.folder = f[14];
+                    }
                     tracks.put(t.id, t);
                     nextTrack = Math.max(nextTrack, t.id + 1);
+                } else if ("D".equals(f[0]) && f.length >= 3) {
+                    folders.computeIfAbsent(Long.parseLong(f[1]), k -> new java.util.TreeSet<String>(String.CASE_INSENSITIVE_ORDER)).add(f[2]);
                 } else if ("L".equals(f[0]) && f.length >= 3) {
                     likers.computeIfAbsent(Long.parseLong(f[1]), k -> new java.util.HashSet<String>()).add(f[2]);
                 } else if ("J".equals(f[0]) && f.length >= 13) {
@@ -1997,14 +2265,24 @@ public final class RadioStore {
                     .append('\t').append(s.limListeners).append(',').append(s.limKbps).append(',').append(s.limStorageMb).append(',')
                     .append(s.limTransferGb).append(',').append(s.limDjs).append('\t').append(s.company).append('\t').append(s.email)
                     .append('\t').append(s.sayArtist ? "1" : "0").append('\t').append(s.storyEvery).append('\t').append(s.idEvery)
-                    .append('\t').append(s.aiOn ? "1" : "0").append('\t').append(s.msgEvery).append("\tend\n");
+                    .append('\t').append(s.aiOn ? "1" : "0").append('\t').append(s.msgEvery)
+                    .append('\t').append(s.worldOn ? "1" : "0").append('\t').append(s.lat).append('\t').append(s.lon).append('\t').append(s.city)
+                    .append('\t').append(s.country).append('\t').append(s.cc).append("\tend\n");
         }
         for (Track t : tracks.values()) {
             sb.append("T\t").append(t.id).append('\t').append(t.station).append('\t').append(t.file).append('\t')
                     .append(t.title).append('\t').append(t.artist).append('\t').append(t.album).append('\t')
                     .append(t.durationMs).append('\t').append(t.added).append('\t').append(t.plays).append('\t')
                     .append(t.lastPlayed).append('\t').append(t.link).append('\t').append(t.taps).append('\t')
-                    .append(t.requests).append("\tend\n");
+                    .append(t.requests).append('\t').append(t.folder).append("\tend\n");
+        }
+        for (Map.Entry<Long, java.util.TreeSet<String>> e : folders.entrySet()) {
+            if (!stations.containsKey(e.getKey())) {
+                continue;
+            }
+            for (String f : e.getValue()) {
+                sb.append("D\t").append(e.getKey()).append('\t').append(f).append('\n');
+            }
         }
         for (Map.Entry<Long, java.util.Set<String>> e : likers.entrySet()) {
             if (!tracks.containsKey(e.getKey())) {

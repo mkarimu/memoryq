@@ -175,12 +175,25 @@ public final class RadioPlansTest {
             r = get(port, "/radio/" + id + ".mp3", null);
             checkTrue("the second listener is told the station is full (Starter: 1 listener)", got > 0 && r[0].equals("503")
                     && r[1].contains("full"));
-            for (int i = 0; i < 20; i++) {
-                in1.read(buf);
+            // read real listening data (a slow PC may hand it over in small pieces), then count it - a few tries
+            long readSoFar = Math.max(0, got), until = System.currentTimeMillis() + 10000;
+            while (readSoFar < 32768 && System.currentTimeMillis() < until) {
+                int k = in1.read(buf);
+                if (k < 0) {
+                    break;
+                }
+                readSoFar += k;
             }
             one.disconnect();
-            api.usageTick();
-            checkTrue("listening data is counted", store.station(id).monthBytes > 1000 && store.station(id).monthKey.equals("2026-01"));
+            for (int i = 0; i < 25 && store.station(id).monthBytes <= 1000; i++) {
+                api.usageTick();
+                if (store.station(id).monthBytes <= 1000) {
+                    Thread.sleep(200);
+                }
+            }
+            RadioStore.Station counted = store.station(id);
+            checkTrue("listening data is counted (read " + readSoFar + " bytes; counted " + counted.monthBytes + " for " + counted.monthKey + ")",
+                    counted.monthBytes > 1000 && counted.monthKey.equals("2026-01"));
         } else {
             System.out.println("  (FFmpeg not found - streaming part skipped)");
         }

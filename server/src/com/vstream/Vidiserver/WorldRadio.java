@@ -80,6 +80,7 @@ public final class WorldRadio {
         boolean edited;
         boolean exact = true;
         String note = "";
+        String slogan = "";
     }
 
     /** A station the bot found somewhere. */
@@ -285,6 +286,9 @@ public final class WorldRadio {
                         s.exact = !"0".equals(f[25]);
                         s.note = f[26];
                     }
+                    if (f.length >= 28) {
+                        s.slogan = f[27];
+                    }
                     stations.put(s.id, s);
                     index(s);
                     nextId = Math.max(nextId, s.id + 1);
@@ -315,7 +319,7 @@ public final class WorldRadio {
                     .append('\t').append(s.bitrate).append('\t').append(s.votes).append('\t').append(s.source).append('\t').append(s.addedBy)
                     .append('\t').append(s.status).append('\t').append(s.created).append('\t').append(s.plays).append('\t').append(s.reports)
                     .append('\t').append(s.lastCheck).append('\t').append(s.lastOk).append('\t').append(s.fails).append('\t').append(s.edited ? 1 : 0)
-                    .append('\t').append(s.exact ? 1 : 0).append('\t').append(c(s.note, 200)).append('\n');
+                    .append('\t').append(s.exact ? 1 : 0).append('\t').append(c(s.note, 200)).append('\t').append(c(s.slogan, 160)).append('\n');
         }
         try {
             Path part = file.resolveSibling(file.getFileName() + ".part");
@@ -498,6 +502,93 @@ public final class WorldRadio {
         return fresh ? ("noplace".equals(s.status) ? "noplace" : "added") : "updated";
     }
 
+    // ---- Memoryq's own radio stations (Admin -> Radio -> Stations -> Global Radio) ----
+
+    private volatile java.util.function.Supplier<List<RadioStore.Station>> memoryqStations;
+    private volatile String memoryqBase = "https://memoryq.com";
+
+    public void setMemoryqStations(java.util.function.Supplier<List<RadioStore.Station>> s, String base) {
+        this.memoryqStations = s;
+        if (base != null && !base.isEmpty()) {
+            this.memoryqBase = base.replaceAll("/+$", "");
+        }
+    }
+
+    /** Puts Memoryq's stations on the globe (on air, a place set, "show on Global Radio" ticked) - and takes them off again. */
+    public void syncMemoryq() {
+        java.util.function.Supplier<List<RadioStore.Station>> src = memoryqStations;
+        if (src == null) {
+            return;
+        }
+        List<RadioStore.Station> list;
+        try {
+            list = src.get();
+        } catch (RuntimeException e) {
+            return;
+        }
+        long now = now();
+        synchronized (this) {
+            java.util.Set<String> seen = new java.util.HashSet<String>();
+            for (RadioStore.Station r : list) {
+                String key = "mq:" + r.id;
+                seen.add(key);
+                boolean show = r.onAir() && r.worldOn && r.hasPlace();
+                Long id = byUuid.get(key);
+                Station s = id == null ? null : stations.get(id);
+                if (s == null) {
+                    if (!show) {
+                        continue;
+                    }
+                    s = new Station();
+                    s.id = nextId++;
+                    s.uuid = key;
+                    s.source = "memoryq";
+                    s.created = now;
+                    stations.put(s.id, s);
+                }
+                byUrl.remove(urlKey(s.url));
+                s.name = c(r.name, 80);
+                s.slogan = c(r.description, 160);
+                s.url = memoryqBase + "/radio/" + r.id + ".mp3";
+                s.home = r.website == null ? "" : c(r.website, 300);
+                s.tags = "memoryq";
+                s.codec = "MP3";
+                s.addedBy = r.owner == null || r.owner.isEmpty() ? "Memoryq" : r.owner;
+                if (r.hasPlace()) {
+                    s.lat = r.lat;
+                    s.lon = r.lon;
+                    s.exact = true;
+                }
+                s.city = c(r.city, 60);
+                s.cc = c(r.cc, 2).toUpperCase(Locale.ROOT);
+                String[] row = COUNTRY_BY_CODE.get(s.cc);
+                s.country = !c(r.country, 60).isEmpty() ? c(r.country, 60) : row != null ? row[0] : "";
+                if (s.cc.isEmpty() && !s.country.isEmpty()) {
+                    String[] f = countryIn(s.country);
+                    s.cc = f == null ? "" : f[1];
+                }
+                s.lastOk = now;
+                s.lastCheck = now;
+                s.fails = 0;
+                String want = show ? "active" : "removed";
+                if (!want.equals(s.status)) {
+                    s.status = want;
+                    s.note = show ? "a Memoryq station" : "not shown: off air, no place, or Global Radio switched off for it (Admin -> Radio -> Stations)";
+                }
+                index(s);
+                dirty = true;
+            }
+            for (Station s : stations.values()) {
+                if ("memoryq".equals(s.source) && !seen.contains(s.uuid) && !"removed".equals(s.status)) {
+                    s.status = "removed";
+                    s.note = "the Memoryq station was deleted";
+                    dirty = true;
+                }
+            }
+        }
+        flushIfDirty();
+    }
+
     // ---- the open dataset (Radio Browser) ----
 
     static final String[] RB_MIRRORS = {"https://de1.api.radio-browser.info", "https://fi1.api.radio-browser.info",
@@ -627,7 +718,7 @@ public final class WorldRadio {
             if (!"active".equals(s.status) || (cc != null && !cc.isEmpty() && !cc.equalsIgnoreCase(s.cc))) {
                 continue;
             }
-            String hay = (s.name + " " + s.tags + " " + s.city + " " + s.country + " " + s.lang).toLowerCase(Locale.ROOT);
+            String hay = (s.name + " " + s.slogan + " " + s.tags + " " + s.city + " " + s.country + " " + s.lang).toLowerCase(Locale.ROOT);
             boolean ok = true;
             for (String w : ws) {
                 if (!hay.contains(w)) {
@@ -1010,7 +1101,7 @@ public final class WorldRadio {
                         for (Station s : stations.values()) {
                             if ("active".equals(s.status)) {
                                 sb.append(n++ > 0 ? ";" : "").append(s.id).append(',').append(s.lat).append(',').append(s.lon).append(',')
-                                        .append("member".equals(s.source) || "admin".equals(s.source) ? 1 : 0);
+                                        .append("memoryq".equals(s.source) ? 2 : "member".equals(s.source) || "admin".equals(s.source) ? 1 : 0);
                             }
                         }
                     }
@@ -1143,9 +1234,14 @@ public final class WorldRadio {
         }
         s.tags = c(p(form, "tags"), 160).toLowerCase(Locale.ROOT);
         s.lang = c(p(form, "lang"), 60).toLowerCase(Locale.ROOT);
+        s.slogan = c(p(form, "slogan"), 160);
         s.city = c(p(form, "city"), 60);
         s.country = c(p(form, "country"), 60);
         s.cc = c(p(form, "cc"), 2).toUpperCase(Locale.ROOT);
+        if (!s.cc.matches("[A-Z]{2}")) {
+            String[] found = countryIn(s.country);
+            s.cc = found == null ? "" : found[1];
+        }
         if (s.country.isEmpty() && COUNTRY_BY_CODE.containsKey(s.cc)) {
             s.country = COUNTRY_BY_CODE.get(s.cc)[0];
         }
@@ -1430,6 +1526,7 @@ public final class WorldRadio {
             s.home = c(p(form, "home"), 300).matches("(?i)https?://\\S+") ? c(p(form, "home"), 300) : "";
             s.tags = c(p(form, "tags"), 160).toLowerCase(Locale.ROOT);
             s.lang = c(p(form, "lang"), 60).toLowerCase(Locale.ROOT);
+            s.slogan = c(p(form, "slogan"), 160);
             s.city = c(p(form, "city"), 60);
             s.cc = c(p(form, "cc"), 2).toUpperCase(Locale.ROOT);
             s.country = c(p(form, "country"), 60);
@@ -1585,7 +1682,7 @@ public final class WorldRadio {
     private String json(Station s) {
         String low = s.url.toLowerCase(Locale.ROOT);
         boolean https = low.startsWith("https://") && !low.matches(".*\\.(pls|m3u)(\\?.*)?$");
-        return "{\"id\":" + s.id + ",\"name\":" + q(s.name) + ",\"play\":" + q(https ? s.url : "/api/world/listen?id=" + s.id)
+        return "{\"id\":" + s.id + ",\"name\":" + q(s.name) + ",\"slogan\":" + q(s.slogan) + ",\"play\":" + q(https ? s.url : "/api/world/listen?id=" + s.id)
                 + ",\"home\":" + q(s.home) + ",\"tags\":" + q(s.tags) + ",\"city\":" + q(s.city) + ",\"country\":" + q(s.country)
                 + ",\"cc\":" + q(s.cc) + ",\"lang\":" + q(s.lang) + ",\"lat\":" + s.lat + ",\"lon\":" + s.lon + ",\"codec\":" + q(s.codec)
                 + ",\"bitrate\":" + s.bitrate + ",\"source\":" + q(s.source) + ",\"addedBy\":" + q(s.addedBy) + ",\"status\":" + q(s.status)

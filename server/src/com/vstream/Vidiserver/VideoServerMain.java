@@ -309,6 +309,17 @@ public class VideoServerMain {
                 profiles, emails, services, signIn, System::currentTimeMillis);
         vistrImport.init();
         api.addModule(vistrImport::register);
+        // Admin -> Mail: email to @memoryq.com (Postfix hands it over on 127.0.0.1:2525), what Memoryq sends, and the Marketplace
+        MailCenter mailCenter = new MailCenter(Paths.get(System.getProperty("vstream.mailDir", "mail")), sessions, System::currentTimeMillis)
+                .mailer(streamMailer).market(market, notes);
+        try {
+            mailCenter.init();
+        } catch (java.io.IOException e) {
+            System.out.println("[mail] could not read the mail centre: " + e.getMessage());
+        }
+        Mailer.sentLog = m -> mailCenter.logSystem(m[0], m[1], m[2]);
+        mailCenter.startSmtp(Integer.getInteger("vstream.mailInPort", 2525));
+        api.addModule(mailCenter::register);
         // World Radio (memoryq.com/world): stations from all over the world on a spinning globe; members add their own
         WorldRadio world = new WorldRadio(Paths.get(System.getProperty("vstream.worldFile", "world-radio.txt")), users, sessions,
                 System::currentTimeMillis);
@@ -319,6 +330,8 @@ public class VideoServerMain {
         Runtime.getRuntime().addShutdownHook(new Thread(world::flushIfDirty));
         api.addModule(world::register);
         // the station finder bot: Radio Browser + Wikidata daily, the Icecast directory weekly, every stream checked nightly
+        world.setMemoryqStations(radioStore::stations, "https://" + System.getProperty("vstream.publicHost", "memoryq.com"));
+        radioApi.setWorldSync(world::syncMemoryq);
         WorldBot worldBot = new WorldBot(world, geoIp::country);
         worldBot.startSchedule();
         ScheduledExecutorService marketTimer = Executors.newSingleThreadScheduledExecutor(r -> {

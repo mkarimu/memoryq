@@ -73,6 +73,25 @@
   button.del { color: var(--bad); }
   button:disabled { opacity: .45; cursor: default; }
   table.acc td { vertical-align: middle; }
+  /* Radio -> Stations: compact, like Centova's account editor - label on the left, a small field on the right */
+  table.acc th, table.acc td { padding: 5px 8px; font-size: 13px; }
+  #accEdit, #newBox { padding: 10px 14px; }
+  #accEdit .fgrid, #newBox .fgrid { display: block; margin: 6px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 0 6px 6px 6px; background: rgba(0,0,0,.015); }
+  #accEdit .fgrid > label, #newBox .fgrid > label { display: grid; grid-template-columns: 210px minmax(0, 340px) auto; align-items: center; gap: 2px 10px;
+    font-size: 13px; color: var(--ink, #1b1f23); margin: 0; padding: 2px 0; }
+  #accEdit .fgrid > label > input, #accEdit .fgrid > label > select, #newBox .fgrid > label > input, #newBox .fgrid > label > select {
+    margin: 0; padding: 3px 6px; font-size: 13px; height: 26px; width: 100%; border-radius: 3px; }
+  #accEdit .fgrid > label > input[type=checkbox], #newBox .fgrid > label > input[type=checkbox] { width: 16px; height: 16px; justify-self: start; }
+  #accEdit .fgrid > label > .muted, #newBox .fgrid > label > .muted { font-size: 12px; }
+  #accEdit .fgrid > label > button { justify-self: start; margin: 0; padding: 3px 12px; font-size: 13px; }
+  #accEdit .fgrid > .wide, #accEdit .fgrid > div { margin: 6px 0 2px; font-size: 13px; }
+  #accEdit .fgrid .sub { font-weight: 700; font-size: 13px; margin: 10px 0 4px; padding-top: 6px; border-top: 1px solid var(--line); }
+  #accEdit .edtabs { border-bottom: 1px solid #c8d1da; margin: 8px 0 0; gap: 3px; }
+  #accEdit .edtabs button { border: 1px solid #c8d1da; border-bottom: 0; border-radius: 5px 5px 0 0; padding: 5px 11px; font-size: 13px; color: var(--ink, #1b1f23); background: #eef2f6; }
+  #accEdit .edtabs button.on { background: #fff; color: var(--ink, #1b1f23); border-top: 2px solid #f0a020; font-weight: 600; margin-bottom: -1px; }
+  #accEdit .edhead h3 { font-size: 17px; }
+  #accEdit .edfoot button, #newBox > button { padding: 4px 10px; font-size: 13px; }
+  @media (max-width: 700px) { #accEdit .fgrid > label, #newBox .fgrid > label { grid-template-columns: 1fr; } }
   table.acc .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
   table.acc td.warn { color: var(--bad); font-weight: 600; }
   table.acc tr.sel td { background: rgba(47,111,237,.07); }
@@ -103,6 +122,50 @@
     nav#side button { width: auto; white-space: nowrap; }
     .content { padding: 14px; }
   }
+  /* Mail: folders | list | reader */
+  .mlwrap { display: grid; grid-template-columns: 150px minmax(300px, 1fr) minmax(340px, 1.25fr); gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-height: 560px; overflow: hidden; }
+  .mlwrap.mk { grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.25fr); }
+  .mlfolders { border-right: 1px solid var(--line); padding: 8px 6px; background: #f8fafc; }
+  .mlfolders button { display: flex; justify-content: space-between; width: 100%; border: 0; background: none; padding: 7px 9px; margin: 1px 0; text-align: left; border-radius: 6px; }
+  .mlfolders button.on { background: #e3ecff; color: var(--accent); font-weight: 600; }
+  .mlfolders button b { background: var(--accent); color: #fff; border-radius: 9px; font-size: 11px; padding: 0 6px; }
+  .mllist { border-right: 1px solid var(--line); min-width: 0; display: flex; flex-direction: column; }
+  .mltool { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  .mltool button, .mltool select { padding: 3px 8px; font-size: 12px; margin: 1px; }
+  .mltool input[type=search] { width: 150px; margin: 0; padding: 4px 6px; font-size: 13px; }
+  .mltool .grow, .mlbar .grow { flex: 1; }
+  #mlRows, .mlwrap.mk .mllist { overflow-y: auto; max-height: 70vh; }
+  .mlrow { display: grid; grid-template-columns: 22px 1fr auto; grid-template-rows: auto auto; gap: 0 6px; padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; }
+  .mlwrap.mk .mlrow { grid-template-columns: 1fr auto; }
+  .mlrow:hover { background: #f5f8ff; } .mlrow.open { background: #e8f0ff; }
+  .mlrow input { grid-row: 1 / 3; margin: 2px 0 0; }
+  .mlrow .mlwho { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mlrow .mlmeta { color: var(--muted); font-size: 12px; white-space: nowrap; text-align: right; }
+  .mlrow .mlsubj { grid-column: 2 / 4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  .mlwrap.mk .mlrow .mlsubj { grid-column: 1 / 3; }
+  .mlrow .mlsubj b { font-weight: 500; }
+  .mlrow.unread .mlwho, .mlrow.unread .mlsubj b { font-weight: 700; }
+  .mlrow.unread { box-shadow: inset 3px 0 0 var(--accent); }
+  #mlPages { padding: 6px 10px; }
+  .mlread { padding: 12px 16px; min-width: 0; overflow-y: auto; max-height: 76vh; }
+  .mlbar { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; margin-bottom: 8px; }
+  .mlbar button { padding: 4px 10px; font-size: 13px; }
+  .mlh { font-size: 18px !important; margin: 6px 0 4px !important; word-break: break-word; }
+  .mlhead { border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 8px; }
+  .mlfiles { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .mlfiles button, .mlchip { font-size: 12px; background: #f3f6fa; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; }
+  .mlchip button { padding: 0 5px; margin: 0 0 0 4px; }
+  .mltext { white-space: pre-wrap; word-wrap: break-word; font-family: inherit; font-size: 14px; margin: 0; }
+  .mlframe { width: 100%; height: 400px; border: 0; background: #fff; }
+  .mlimg { background: #fff8e1; border: 1px solid #ffe08a; border-radius: 6px; padding: 5px 8px; margin-bottom: 6px; }
+  .mlcompose label { display: grid; grid-template-columns: 70px 1fr; align-items: center; font-size: 13px; margin: 2px 0; }
+  .mlcompose label input { margin: 0; padding: 4px 6px; }
+  .mlcompose textarea, .mlread textarea { width: 100%; font: 14px/1.45 system-ui, sans-serif; padding: 8px; border: 1px solid #c8d1da; border-radius: 6px; margin: 6px 0; }
+  .mlattach { cursor: pointer; font-size: 13px; padding: 4px 10px; border: 1px solid #c8d1da; border-radius: 6px; }
+  .mkchat { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+  .mkmsg { max-width: 85%; padding: 7px 10px; border-radius: 10px; background: #f1f4f8; font-size: 14px; white-space: pre-wrap; }
+  .mkmsg.seller { align-self: flex-end; background: #e8f5e9; } .mkmsg.mq { align-self: center; background: #e3ecff; }
+  @media (max-width: 1100px) { .mlwrap { grid-template-columns: 1fr; } .mlfolders { display: flex; flex-wrap: wrap; border-right: 0; } .mlfolders button { width: auto; gap: 6px; } }
 </style>
 </head>
 <body>
@@ -182,6 +245,9 @@
       <div class="panel" id="panel-market-pending" hidden><div id="mkPending"></div></div>
       <div class="panel" id="panel-market-reports" hidden><div id="mkReports"></div></div>
       <div class="panel" id="panel-market-all" hidden><div id="mkAll"></div></div>
+      <div class="panel" id="panel-mail-box" hidden><div id="mlBox"></div></div>
+      <div class="panel" id="panel-mail-market" hidden><div id="mlMarket"></div></div>
+      <div class="panel" id="panel-mail-blocked" hidden><div id="mlBlocked"></div></div>
       <div class="panel" id="panel-world-stations" hidden><div id="wrList"></div></div>
       <div class="panel" id="panel-world-countries" hidden><div id="wrCountries"></div></div>
       <div class="panel" id="panel-world-review" hidden><div id="wrReview"></div></div>
@@ -424,6 +490,9 @@
             <label>Plan<select id="rsPlan"></select></label>
             <label>Payment<select id="rsBill"><option value="paid">Paid</option><option value="trial">Trial</option><option value="unpaid">Not paid yet (owner pays online)</option></select></label>
             <label>Paid / trial until (empty = no end)<input id="rsUntil" type="date"></label>
+            <label>Where (town, country)<input id="rsWhere" maxlength="80" placeholder="e.g. Mwanza, Tanzania - for Global Radio"></label>
+            <label>Latitude, longitude (optional)<input id="rsLatLon" maxlength="40" placeholder="-2.5164, 32.9175 (empty = found from the town)"></label>
+            <label>Show on Global Radio<input id="rsWorld" type="checkbox" checked></label>
           </div>
           <button id="rsCreate">Create station and login</button> <button id="rsNewPass">New passwords</button>
           <div class="muted" style="margin-top:6px">Leave the login user empty for a Memoryq-run station. If the login user already exists, the station
@@ -1069,7 +1138,7 @@ async function loginAs(s) {
   window.open('/studio?station=' + s.id + '#as=' + r.data.token, '_blank', 'noopener');
 }
 // the edit panel: Stream, Limits, AutoDJ, Billing, Links, Advanced
-const ACC_TABS = [['stream', 'Stream'], ['limits', 'Limits'], ['autodj', 'AutoDJ'], ['billing', 'Billing'], ['links', 'Links'], ['staff', 'Staff'], ['advanced', 'Advanced']];
+const ACC_TABS = [['stream', 'Stream'], ['world', 'Global Radio'], ['limits', 'Limits'], ['autodj', 'AutoDJ'], ['billing', 'Billing'], ['links', 'Links'], ['staff', 'Staff'], ['advanced', 'Advanced']];
 function drawAccEdit() {
   const s = accList.find(x => x.id === accEditId); const box = $('accEdit');
   if (!s) { box.hidden = true; return; }
@@ -1105,6 +1174,26 @@ function drawAccEdit() {
     field('livePass', 'Source (stream) password', s.livePass, { max: 40 });
     field('ownerPassword', 'Owner\'s login password', '', { type: 'password', ph: s.owner ? '(empty = keep it)' : '(no owner account)', note: s.owner ? 'sets a new password for ' + s.owner : '' });
     body.appendChild(el('div', 'Live DJs (BUTT, Mixxx): ' + st.liveHost + ':' + s.livePort + ' \u00b7 mount /live \u00b7 user source' + (s.liveProblem ? ' \u00b7 ' + s.liveProblem : ''))).className = 'muted small wide';
+  } else if (accEditTab === 'world') {
+    // where the station is: it is listed on Global Radio (memoryq.com/world) while it is on air
+    field('worldOn', 'Show on Global Radio', s.worldOn !== false, { check: true, note: s.lat == null ? 'needs a place (below)' : (s.onAir ? 'on the globe' : 'shown when on air') });
+    const look = el('label', 'Find the place'); const q = el('input'); q.placeholder = 'town, country - e.g. Mwanza, Tanzania'; look.appendChild(q);
+    const go = button('Find', async () => {
+      if (!q.value.trim()) { return; }
+      const r = await api('/api/world/geocode?q=' + encodeURIComponent(q.value.trim()));
+      if (!r.ok) { flash(r.data.error || 'That place was not found', false); return; }
+      f.lat.value = r.data.lat; f.lon.value = r.data.lon; if (r.data.city) { f.city.value = r.data.city; } if (r.data.country) { f.country.value = r.data.country; } if (r.data.cc) { f.cc.value = r.data.cc; }
+      flash('Found: ' + [r.data.city, r.data.country].filter(Boolean).join(', ') + ' - press Update to save', true);
+    });
+    look.appendChild(go); body.appendChild(look);
+    q.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go.click(); } });
+    field('city', 'City / town', s.city, { max: 60 });
+    field('country', 'Country', s.country, { max: 60 });
+    field('cc', 'Country code', s.cc, { max: 2, ph: 'TZ' });
+    field('lat', 'Latitude', s.lat == null ? '' : s.lat, { ph: '-6.8160', note: '-90 to 90' });
+    field('lon', 'Longitude', s.lon == null ? '' : s.lon, { ph: '39.2803', note: '-180 to 180' });
+    body.appendChild(el('div', 'Slogan, website and name come from the Stream tab. Listeners play it from ' + location.origin + '/radio/' + s.id + '.mp3 on the globe.')).className = 'muted small wide';
+    if (s.lat != null) { const a = el('a', 'See the place on a map'); a.href = 'https://www.openstreetmap.org/?mlat=' + s.lat + '&mlon=' + s.lon + '#map=10/' + s.lat + '/' + s.lon; a.target = '_blank'; body.appendChild(a); }
   } else if (accEditTab === 'limits') {
     field('plan', 'Plan', s.planId || 0, { options: [[0, '(no plan - no limits)']].concat(adminPlans.map(p => [p.id, p.name])) });
     const base = adminPlans.find(p => p.id === s.planId) || {};
@@ -1247,7 +1336,10 @@ async function saveEdit(s, f) {
     const djs = v('limDjs');
     adminForm.limits = [num('limListeners'), Number(v('limKbps')), num('limStorage'), num('limTransfer'), djs === '' ? 0 : (djs === 'none' ? -1 : Number(djs))].join(',');
   }
-  ['name', 'description', 'timezone', 'enabled', 'djName', 'voice', 'talkEvery', 'newsOn', 'shoutOn', 'introsOn', 'sayArtist', 'idEvery', 'storyEvery', 'promo'].forEach(k => { if (f[k] !== undefined) { saveForm[k] = v(k); } });
+  ['name', 'description', 'timezone', 'enabled', 'djName', 'voice', 'talkEvery', 'newsOn', 'shoutOn', 'introsOn', 'sayArtist', 'idEvery', 'storyEvery', 'promo',
+    'city', 'country', 'cc', 'lat', 'lon'].forEach(k => { if (f[k] !== undefined) { saveForm[k] = v(k); } });
+  if (f.worldOn !== undefined) { saveForm.worldOn = f.worldOn.checked ? '1' : '0'; }
+  if ((saveForm.lat === '') !== (saveForm.lon === '')) { flash('Give both the latitude and the longitude (or neither)', false); return; }
   let ok = true;
   if (Object.keys(adminForm).length) { const r = await api('/api/admin/radio/station/admin', Object.assign({ id: s.id }, adminForm)); if (!r.ok) { flash(r.data.error || 'Could not save', false); ok = false; } }
   if (ok && Object.keys(saveForm).length) { const r = await api('/api/admin/radio/station/save', Object.assign({ id: s.id }, saveForm)); if (!r.ok) { flash(r.data.error || 'Could not save', false); ok = false; } }
@@ -1299,6 +1391,21 @@ $('rsCreate').addEventListener('click', async () => {
   ['rsName', 'rsDesc', 'rsWeb', 'rsUser', 'rsEmail', 'rsPass', 'rsLoginPass'].forEach(id => { $(id).value = ''; });
   delete $('rsUser').dataset.touched;
   radioMusicStation = r.data.id;
+  // the place, for Global Radio (memoryq.com/world)
+  const where = $('rsWhere').value.trim(), ll = $('rsLatLon').value.trim();
+  if (where || ll) {
+    const place = { id: r.data.id, worldOn: $('rsWorld').checked ? '1' : '0' };
+    const m = ll.match(/^(-?[0-9.]+)\s*[,; ]\s*(-?[0-9.]+)$/);
+    if (m) { place.lat = m[1]; place.lon = m[2]; }
+    if (where) {
+      const g = await api('/api/world/geocode?q=' + encodeURIComponent(where));
+      if (g.ok) { if (!m) { place.lat = g.data.lat; place.lon = g.data.lon; } place.city = g.data.city || where.split(',')[0].trim(); place.country = g.data.country; place.cc = g.data.cc; }
+      else { place.city = where.split(',')[0].trim(); }
+    }
+    const p = await api('/api/admin/radio/station/save', place);
+    flash(p.ok ? 'Station created - on Global Radio when it is on air' + (place.lat ? '' : ' (set its place: Edit -> Global Radio)') : (p.data.error || 'The place was not saved'), p.ok);
+    ['rsWhere', 'rsLatLon'].forEach(id => { $(id).value = ''; });
+  }
   loadRadioStations();
 });
 let adminPlans = [];
@@ -1538,6 +1645,10 @@ const NAV = [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
     { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
+  { id: 'mail', label: 'Mail', icon: '\u2709', tabs: [
+    { id: 'box', label: 'Mailbox', load: loadMail, noAuto: true, badge: 'mailUnread' },
+    { id: 'market', label: 'Marketplace enquiries', load: loadMailMarket, noAuto: true, badge: 'marketWaiting' },
+    { id: 'blocked', label: 'Spam blocker', load: loadMailBlocked, noAuto: true } ] },
   { id: 'world', label: 'Global Radio', icon: '\uD83C\uDF0D', tabs: [
     { id: 'stations', label: 'All stations', load: loadWorld, noAuto: true },
     { id: 'countries', label: 'By country', load: loadWorldCountries, noAuto: true },
@@ -1630,6 +1741,10 @@ async function updateBadges() {
   badges.chatReports = rep.ok ? (rep.data.reports || []).length : 0;
   badges.deletions = prof.ok ? (prof.data.pendingDeletions || 0) : 0;
   badges.wallReports = wall.ok ? (wall.data.reported || []).length : 0;
+  const ml = await api('/api/admin/mail/status');
+  badges.mailUnread = ml.ok ? ((ml.data.counts || {}).inbox || [0])[0] : 0;
+  const mq = await api('/api/admin/mail/market');
+  badges.marketWaiting = mq.ok ? (mq.data.conversations || []).filter(c => c.waitingHours >= 24).length : 0;
   drawNav();
 }
 
@@ -2709,10 +2824,321 @@ async function loadMarket(status) {
   if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, status === 'pending' ? 'Nothing is waiting.' : 'No listings yet.')); return; }
   list.forEach(l => root.appendChild(mkRow(l, () => loadMarket(status))));
 }
+// ---- Mail (super-admin only): email to @memoryq.com, what Memoryq sends, replies, forwards, spam blocker, the Marketplace ----
+const MAIL_FOLDERS = [['inbox', 'Inbox', '\uD83D\uDCE5'], ['server', 'Server', '\uD83D\uDDA5'], ['system', 'System', '\u2699'], ['sent', 'Sent', '\uD83D\uDCE4'],
+  ['spam', 'Spam', '\uD83D\uDEAB'], ['trash', 'Trash', '\uD83D\uDDD1']];
+const mail = { folder: 'inbox', q: '', page: 0, open: null, sel: new Set(), counts: {}, images: false };
+
+function mailSize(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function mailWhen(t) {
+  const d = new Date(t), now = new Date();
+  return d.toDateString() === now.toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+}
+async function mailBlob(path) {
+  const r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { throw new Error('could not download'); }
+  return r.blob();
+}
+function mailDataUrl(blob) { return new Promise(ok => { const f = new FileReader(); f.onload = () => ok(f.result); f.readAsDataURL(blob); }); }
+async function mailSave(path, name) {
+  try {
+    const b = await mailBlob(path);
+    const a = h('a', { href: URL.createObjectURL(b), download: name });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  } catch (e) { flash('Could not download ' + name, false); }
+}
+
+async function loadMail() {
+  const box = $('mlBox');
+  if (!box.dataset.built) {
+    box.dataset.built = '1';
+    box.textContent = '';
+    box.appendChild(h('div', { class: 'mlwrap' },
+      h('div', { class: 'mlfolders', id: 'mlFolders' }),
+      h('div', { class: 'mllist' },
+        h('div', { class: 'mltool' },
+          h('input', { type: 'checkbox', id: 'mlAll', title: 'Select all', on: { change: e => { mail.sel = new Set(e.target.checked ? [...document.querySelectorAll('#mlRows [data-id]')].map(r => Number(r.dataset.id)) : []); mailDrawSel(); } } }),
+          h('button', { class: 'pri', on: { click: () => mailCompose({}) } }, '\u270F New email'),
+          h('button', { id: 'mlDel', class: 'del', on: { click: () => mailAct('delete') } }, 'Delete'),
+          h('button', { id: 'mlSpam', on: { click: () => mailAct(mail.folder === 'spam' ? 'notspam' : 'spam') } }, 'Spam'),
+          h('button', { id: 'mlRead', on: { click: () => mailAct('read', { read: '1' }) } }, 'Mark read'),
+          h('button', { id: 'mlUnread', on: { click: () => mailAct('read', { read: '0' }) } }, 'Unread'),
+          h('select', { id: 'mlMove', on: { change: e => { if (e.target.value) { mailAct('move', { folder: e.target.value }); } e.target.value = ''; } } },
+            h('option', { value: '' }, 'Move to...'), MAIL_FOLDERS.map(f => h('option', { value: f[0] }, f[1]))),
+          h('span', { class: 'grow' }),
+          h('input', { type: 'search', id: 'mlQ', placeholder: 'Search mail', on: { input: e => { clearTimeout(mail.qt); mail.qt = setTimeout(() => { mail.q = e.target.value.trim(); mail.page = 0; mailList(); }, 300); } } })),
+        h('div', { id: 'mlRows' }),
+        h('div', { id: 'mlPages', class: 'small muted' })),
+      h('div', { class: 'mlread', id: 'mlRead2' }, h('p', { class: 'muted', style: 'padding:30px;text-align:center' }, 'Choose an email to read it.'))));
+    box.appendChild(h('div', { id: 'mlStatus', class: 'small muted', style: 'margin-top:8px' }));
+  }
+  await mailList();
+  const st = await api('/api/admin/mail/status');
+  if (st.ok) {
+    $('mlStatus').textContent = (st.data.receiving ? 'Receiving email for @memoryq.com (Postfix hands it over on port ' + st.data.port + ')' : 'NOT receiving email: the mail centre could not start')
+      + ' \u00B7 last email in: ' + (st.data.lastReceived ? when(st.data.lastReceived) : 'none yet - add the MX record in Cloudflare (the deploy shows it)')
+      + ' \u00B7 replies go out as ' + st.data.support;
+  }
+}
+
+function mailDrawFolders() {
+  const f = $('mlFolders');
+  f.textContent = '';
+  MAIL_FOLDERS.forEach(([id, label, ico]) => {
+    const c = mail.counts[id] || [0, 0];
+    f.appendChild(h('button', { class: mail.folder === id ? 'on' : '', on: { click: () => { mail.folder = id; mail.page = 0; mail.sel.clear(); mail.open = null; mailList(); } } },
+      h('span', {}, ico + ' ' + label), c[0] > 0 && id !== 'sent' && id !== 'system' ? h('b', {}, String(c[0])) : h('span', { class: 'muted small' }, String(c[1]))));
+  });
+  if (mail.folder === 'trash' || mail.folder === 'spam') {
+    f.appendChild(h('button', { class: 'del small', on: { click: async () => {
+      if (!confirm('Delete everything in ' + mail.folder + ' for good?')) { return; }
+      const r = await api('/api/admin/mail/empty', { folder: mail.folder });
+      flash(r.ok ? 'Emptied' : (r.data.error || 'Could not'), r.ok); mailList(); } } }, 'Empty ' + mail.folder));
+  }
+}
+
+async function mailList() {
+  const r = await api('/api/admin/mail/list?folder=' + mail.folder + '&page=' + mail.page + '&q=' + encodeURIComponent(mail.q));
+  if (!r.ok) { flash(r.data.error || 'Could not load the mail', false); return; }
+  mail.counts = r.data.counts || {};
+  badges.mailUnread = (mail.counts.inbox || [0])[0];
+  drawNav();
+  mailDrawFolders();
+  $('mlSpam').textContent = mail.folder === 'spam' ? 'Not spam' : 'Spam';
+  $('mlDel').textContent = mail.folder === 'trash' ? 'Delete for good' : 'Delete';
+  const rows = $('mlRows');
+  rows.textContent = '';
+  if (!r.data.items.length) { rows.appendChild(h('p', { class: 'muted', style: 'padding:20px' }, mail.q ? 'Nothing matches.' : 'No email here.')); }
+  r.data.items.forEach(m => {
+    const who = mail.folder === 'sent' || mail.folder === 'system' ? 'To: ' + m.to.replace(/[<>]/g, '') : (m.fromName || m.from);
+    const row = h('div', { class: 'mlrow' + (m.read ? '' : ' unread') + (mail.open === m.id ? ' open' : ''), 'data-id': m.id },
+      h('input', { type: 'checkbox', checked: mail.sel.has(m.id), on: { click: e => e.stopPropagation(), change: e => { if (e.target.checked) { mail.sel.add(m.id); } else { mail.sel.delete(m.id); } mailDrawSel(); } } }),
+      h('div', { class: 'mlwho' }, who, m.blocked ? h('span', { class: 'pill unpaid', style: 'margin-left:6px' }, 'blocked') : null),
+      h('div', { class: 'mlsubj' }, h('b', {}, m.subject), h('span', { class: 'muted' }, ' \u2014 ' + m.snippet)),
+      h('div', { class: 'mlmeta' }, m.attachments ? '\uD83D\uDCCE ' : '', mailWhen(m.date)));
+    row.addEventListener('click', () => mailOpen(m.id));
+    rows.appendChild(row);
+  });
+  $('mlPages').textContent = '';
+  if (r.data.pages > 1) {
+    $('mlPages').append(h('button', { disabled: mail.page === 0, on: { click: () => { mail.page--; mailList(); } } }, '\u2039 Newer'),
+      ' page ' + (mail.page + 1) + ' of ' + r.data.pages + ' ',
+      h('button', { disabled: mail.page + 1 >= r.data.pages, on: { click: () => { mail.page++; mailList(); } } }, 'Older \u203A'));
+  }
+  mailDrawSel();
+}
+
+function mailDrawSel() {
+  const n = mail.sel.size;
+  ['mlDel', 'mlSpam', 'mlRead', 'mlUnread', 'mlMove'].forEach(id => { $(id).disabled = n === 0; });
+  document.querySelectorAll('#mlRows .mlrow').forEach(r => { r.querySelector('input').checked = mail.sel.has(Number(r.dataset.id)); });
+}
+
+async function mailAct(op, extra, ids) {
+  const list = ids || [...mail.sel];
+  if (!list.length) { return; }
+  if (op === 'delete' && mail.folder === 'trash' && !confirm('Delete ' + list.length + ' email(s) for good?')) { return; }
+  const r = await api('/api/admin/mail/' + op, Object.assign({ ids: list.join(',') }, extra || {}));
+  if (!r.ok) { flash(r.data.error || 'Could not', false); return; }
+  const said = { delete: mail.folder === 'trash' ? 'Deleted for good' : 'Moved to Trash', spam: 'Moved to Spam - the sender is blocked', notspam: 'Back in the Inbox - the sender is unblocked',
+    move: 'Moved', read: 'Done', restore: 'Restored' };
+  flash(said[op] || 'Done', true);
+  mail.sel.clear();
+  if (list.includes(mail.open) && op !== 'read') { mail.open = null; $('mlRead2').textContent = ''; }
+  mailList();
+}
+
+// the email itself: plain text, or the HTML in a locked frame (no scripts, no remote pictures unless you ask)
+async function mailOpen(id) {
+  mail.open = id;
+  document.querySelectorAll('#mlRows .mlrow').forEach(r => r.classList.toggle('open', Number(r.dataset.id) === id));
+  const pane = $('mlRead2');
+  pane.textContent = 'Opening...';
+  const r = await api('/api/admin/mail/message?id=' + id);
+  if (!r.ok) { pane.textContent = r.data.error || 'Could not open it'; return; }
+  const m = r.data;
+  const was = document.querySelector('#mlRows [data-id="' + id + '"]');
+  if (was && was.classList.contains('unread')) {
+    was.classList.remove('unread');
+    const c = mail.counts[m.folder];
+    if (c && c[0] > 0) { c[0]--; }
+    badges.mailUnread = (mail.counts.inbox || [0])[0];
+    drawNav(); mailDrawFolders();
+  }
+  mail.images = false;
+  pane.textContent = '';
+  const inTrash = m.folder === 'trash';
+  pane.appendChild(h('div', { class: 'mlbar' },
+    h('button', { class: 'pri', on: { click: () => mailCompose({ reply: m }) } }, '\u21A9 Reply'),
+    h('button', { on: { click: () => mailCompose({ reply: m, all: true }) } }, 'Reply all'),
+    h('button', { on: { click: () => mailCompose({ forward: m }) } }, '\u21AA Forward'),
+    inTrash ? h('button', { on: { click: () => mailAct('restore', null, [id]) } }, 'Restore') : null,
+    h('button', { class: 'del', on: { click: () => mailAct('delete', null, [id]) } }, inTrash ? 'Delete for good' : 'Delete'),
+    m.folder === 'spam' ? h('button', { on: { click: () => mailAct('notspam', null, [id]) } }, 'Not spam')
+      : h('button', { on: { click: () => mailAct('spam', null, [id]) } }, m.blocked ? 'Spam (blocked)' : 'Spam / block sender'),
+    h('button', { title: 'The whole email as a file', on: { click: () => mailSave('/api/admin/mail/raw?id=' + id, 'email-' + id + '.eml') } }, '.eml')));
+  pane.appendChild(h('h2', { class: 'mlh' }, m.subject));
+  pane.appendChild(h('div', { class: 'mlhead small' },
+    h('div', {}, h('b', {}, m.fromName && m.fromName !== m.from ? m.fromName + ' ' : ''), h('span', { class: 'muted' }, '<' + m.from + '>'), h('span', { class: 'muted', style: 'float:right' }, when(m.date))),
+    h('div', { class: 'muted' }, 'To: ' + m.to + (m.cc ? ' \u00B7 Cc: ' + m.cc : '') + (m.replyTo && m.replyTo !== m.from ? ' \u00B7 Reply to: ' + m.replyTo : '')),
+    m.spamScore >= 3 ? h('div', { class: 'warn' }, 'Looks like spam (score ' + m.spamScore + ')') : null));
+  if (m.files.length) {
+    pane.appendChild(h('div', { class: 'mlfiles' }, m.files.filter(f => !f.cid || !m.html.includes('cid:' + f.cid)).map(f =>
+      h('button', { on: { click: () => mailSave('/api/admin/mail/attachment?id=' + id + '&n=' + f.n, f.name) } }, '\uD83D\uDCCE ' + f.name + ' (' + mailSize(f.size) + ')'))));
+  }
+  const body = h('div', { class: 'mlbody' });
+  pane.appendChild(body);
+  const drawBody = async () => {
+    body.textContent = '';
+    if (!m.html) { body.appendChild(h('pre', { class: 'mltext' }, m.text || '(empty)')); return; }
+    let html = m.html;
+    for (const f of m.files) {   // pictures inside the email (cid:) are shown from its own attachments
+      if (f.cid && html.includes('cid:' + f.cid) && /^image\//.test(f.type) && !/svg/.test(f.type)) {
+        try { html = html.split('cid:' + f.cid).join(await mailDataUrl(await mailBlob('/api/admin/mail/attachment?id=' + id + '&n=' + f.n))); } catch (e) { }
+      }
+    }
+    const remote = /<img[^>]+src=["']?https?:/i.test(html) || /url\(\s*['"]?https?:/i.test(html);
+    if (remote && !mail.images) {
+      body.appendChild(h('div', { class: 'mlimg small' }, 'Pictures from the internet are hidden (they can tell the sender you opened it). ',
+        h('button', { on: { click: () => { mail.images = true; drawBody(); } } }, 'Show pictures')));
+    }
+    const csp = "default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:" + (mail.images ? ' https: http:' : '');
+    const frame = h('iframe', { sandbox: 'allow-same-origin allow-popups allow-popups-to-escape-sandbox', referrerpolicy: 'no-referrer', class: 'mlframe' });
+    frame.srcdoc = '<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + csp + '"><base target="_blank">'
+      + '<style>body{font-family:system-ui,sans-serif;font-size:14px;color:#1b1f23;margin:8px;word-wrap:break-word}img{max-width:100%;height:auto}</style>' + html;
+    frame.addEventListener('load', () => { try { frame.style.height = Math.min(4000, Math.max(200, frame.contentDocument.documentElement.scrollHeight + 20)) + 'px'; } catch (e) { frame.style.height = '600px'; } });
+    body.appendChild(frame);
+    body.appendChild(h('details', { class: 'small muted' }, h('summary', {}, 'Plain text'), h('pre', { class: 'mltext' }, m.text)));
+  };
+  await drawBody();
+  if (m.envelope) { pane.appendChild(h('div', { class: 'small muted', style: 'margin-top:8px' }, 'Delivered: ' + m.envelope)); }
+}
+
+// writing: new email, reply, reply all, forward - with attachments
+function mailCompose(o) {
+  const pane = $('mlRead2');
+  const m = o.reply || o.forward;
+  const quote = m ? '\n\n' + (o.forward ? '---------- Forwarded message ----------\nFrom: ' + (m.fromName ? m.fromName + ' ' : '') + '<' + m.from + '>\nDate: ' + when(m.date)
+    + '\nSubject: ' + m.subject + '\nTo: ' + m.to + '\n\n' + (m.text || '') : 'On ' + when(m.date) + ', ' + (m.fromName || m.from) + ' wrote:\n'
+    + (m.text || '').split('\n').map(l => '> ' + l).join('\n')) : '';
+  let to = o.to || '', cc = '';
+  if (o.reply) {
+    to = m.folder === 'sent' ? m.to.replace(/[<>]/g, '') : (m.replyTo || m.from);
+    if (o.all) { cc = [m.to, m.cc].join(',').split(',').map(s => s.trim()).filter(s => s && !/support@memoryq\.com/i.test(s) && s.indexOf(m.from) < 0).join(', '); }
+  }
+  const subj = m ? ((o.forward ? 'Fwd: ' : 'Re: ') + m.subject.replace(/^((re|fwd?|aw|sv):\s*)+/i, '')) : '';
+  const files = [];
+  const fileList = h('div', { class: 'mlfiles' });
+  const drawFiles = () => {
+    fileList.textContent = '';
+    files.forEach((f, i) => fileList.appendChild(h('span', { class: 'mlchip' }, '\uD83D\uDCCE ' + f.name + ' (' + mailSize(f.size) + ') ', h('button', { class: 'small', on: { click: () => { files.splice(i, 1); drawFiles(); } } }, '\u00D7'))));
+  };
+  const keep = o.forward && m.files.length ? h('input', { type: 'checkbox', checked: true }) : null;
+  pane.textContent = '';
+  const f = {
+    to: h('input', { value: to, placeholder: 'someone@example.com, another@example.com' }),
+    cc: h('input', { value: cc, placeholder: 'optional' }),
+    subject: h('input', { value: subj, maxlength: 300 }),
+    text: h('textarea', { rows: 16 }),
+  };
+  f.text.value = quote;
+  pane.appendChild(h('div', { class: 'mlcompose' },
+    h('h2', { class: 'mlh' }, o.forward ? 'Forward' : (o.reply ? (o.all ? 'Reply all' : 'Reply') : 'New email')),
+    h('label', {}, 'To', f.to), h('label', {}, 'Cc', f.cc), h('label', {}, 'Subject', f.subject),
+    f.text,
+    keep ? h('label', { class: 'small', style: 'display:block' }, keep, ' Include the ' + m.files.length + ' attachment(s) of the original') : null,
+    fileList,
+    h('div', { class: 'mlbar' },
+      h('button', { class: 'pri', on: { click: async e => {
+        const total = files.reduce((a, x) => a + x.size, 0);
+        if (total > 25 * 1048576) { flash('The attachments together may be 25 MB', false); return; }
+        e.target.disabled = true; e.target.textContent = 'Sending...';
+        const enc = await Promise.all(files.map(async x => ({ name: x.name, type: x.type || 'application/octet-stream', b64: (await mailDataUrl(x)).split(',')[1] || '' })));
+        const form = { to: f.to.value, cc: f.cc.value, subject: f.subject.value, text: f.text.value, files: JSON.stringify(enc) };
+        if (o.reply) { form.replyTo = m.id; }
+        if (o.forward) { form.forward = m.id; form.keepFiles = keep && !keep.checked ? '0' : '1'; }
+        const r = await api('/api/admin/mail/send', form);
+        e.target.disabled = false; e.target.textContent = 'Send';
+        if (!r.ok) { flash(r.data.error || 'Could not send', false); return; }
+        flash('Sent', true);
+        mail.open = null;
+        pane.textContent = '';
+        pane.appendChild(h('p', { class: 'ok', style: 'padding:30px;text-align:center' }, '\u2713 Sent - a copy is in Sent.'));
+        mailList();
+      } } }, 'Send'),
+      h('label', { class: 'mlattach' }, '\uD83D\uDCCE Attach files', h('input', { type: 'file', multiple: true, hidden: true, on: { change: e => { [...e.target.files].forEach(x => files.push(x)); e.target.value = ''; drawFiles(); } } })),
+      h('span', { class: 'grow' }),
+      h('button', { on: { click: () => { if (m) { mailOpen(m.id); } else { pane.textContent = ''; } } } }, 'Cancel'))));
+  (o.reply ? f.text : f.to).focus();
+  if (o.reply) { f.text.setSelectionRange(0, 0); }
+}
+
+// Marketplace enquiries: every buyer-seller conversation; the ones where the seller has not answered for a day come first
+async function loadMailMarket() {
+  const box = $('mlMarket');
+  const r = await api('/api/admin/mail/market');
+  box.textContent = '';
+  if (!r.ok) { box.textContent = r.data.error || 'Could not load the conversations'; return; }
+  const list = r.data.conversations;
+  const late = list.filter(c => c.waitingHours >= 24).length;
+  box.appendChild(h('p', { class: 'muted' }, list.length + ' conversation(s)' + (late ? ' \u00B7 ' + late + ' waiting more than a day for the seller' : '') + '. You answer as "memoryq"; the buyer and the seller are both told.'));
+  const wrap = h('div', { class: 'mlwrap mk' }, h('div', { class: 'mllist' }), h('div', { class: 'mlread', id: 'mlMkRead' }, h('p', { class: 'muted', style: 'padding:30px;text-align:center' }, 'Choose a conversation.')));
+  box.appendChild(wrap);
+  const rows = wrap.firstChild;
+  if (!list.length) { rows.appendChild(h('p', { class: 'muted', style: 'padding:20px' }, 'No marketplace messages yet.')); }
+  list.forEach(c => {
+    const row = h('div', { class: 'mlrow' + (c.waitingHours >= 24 ? ' unread' : '') },
+      h('div', { class: 'mlwho' }, c.buyer + ' \u2192 ' + c.seller),
+      h('div', { class: 'mlsubj' }, h('b', {}, c.title), h('span', { class: 'muted' }, ' \u2014 ' + c.lastFrom + ': ' + c.last)),
+      h('div', { class: 'mlmeta' }, c.waitingHours >= 24 ? h('span', { class: 'pill unpaid' }, 'waiting ' + (c.waitingHours >= 48 ? Math.floor(c.waitingHours / 24) + ' days' : c.waitingHours + ' h'))
+        : (c.waitingHours >= 0 ? h('span', { class: 'pill trial' }, 'seller to answer') : null), ' ', mailWhen(c.at)));
+    row.addEventListener('click', () => { rows.querySelectorAll('.mlrow').forEach(x => x.classList.remove('open')); row.classList.add('open'); mailMarketThread(c.listing, c.buyer); });
+    rows.appendChild(row);
+  });
+}
+
+async function mailMarketThread(listing, buyer) {
+  const pane = $('mlMkRead');
+  const r = await api('/api/admin/mail/market/thread?listing=' + listing + '&buyer=' + encodeURIComponent(buyer));
+  pane.textContent = '';
+  if (!r.ok) { pane.textContent = r.data.error || 'Could not open it'; return; }
+  const t = r.data;
+  pane.appendChild(h('h2', { class: 'mlh' }, t.title || '(listing removed)'));
+  pane.appendChild(h('div', { class: 'small muted' }, 'Buyer: ' + t.buyer + ' \u00B7 Seller: ' + t.seller + ' \u00B7 ', h('a', { href: '/market#item/' + listing, target: '_blank' }, 'open the listing')));
+  const chat = h('div', { class: 'mkchat' });
+  t.messages.forEach(m => chat.appendChild(h('div', { class: 'mkmsg ' + (m.from === t.seller ? 'seller' : (m.from === 'memoryq' ? 'mq' : 'buyer')) },
+    h('div', { class: 'small muted' }, (m.from === 'memoryq' ? 'Memoryq (you)' : m.from + (m.from === t.seller ? ' (seller)' : ' (buyer)')) + ' \u00B7 ' + when(m.at)), h('div', {}, m.text))));
+  pane.appendChild(chat);
+  const ta = h('textarea', { rows: 4, maxlength: 2000, placeholder: 'Answer the buyer as Memoryq support...' });
+  pane.appendChild(ta);
+  pane.appendChild(h('div', { class: 'mlbar' }, h('button', { class: 'pri', on: { click: async () => {
+    if (!ta.value.trim()) { return; }
+    const q = await api('/api/admin/mail/market/reply', { listing: listing, buyer: buyer, text: ta.value });
+    flash(q.ok ? 'Answered - the buyer and the seller were told' : (q.data.error || 'Could not'), q.ok);
+    if (q.ok) { loadMailMarket().then(() => mailMarketThread(listing, buyer)); }
+  } } }, 'Send answer')));
+}
+
+// the spam blocker: blocked addresses and whole domains
+async function loadMailBlocked() {
+  const box = $('mlBlocked');
+  const r = await api('/api/admin/mail/blocked');
+  box.textContent = '';
+  const inp = h('input', { placeholder: 'someone@example.com or @example.com', style: 'width:300px' });
+  box.appendChild(h('div', { class: 'box' }, h('b', {}, 'Block a sender or a whole domain'), h('br'), inp,
+    h('button', { class: 'pri', on: { click: async () => { const q = await api('/api/admin/mail/block', { entry: inp.value.trim() }); flash(q.ok ? 'Blocked - their email goes straight to Spam' : (q.data.error || 'Could not'), q.ok); if (q.ok) { loadMailBlocked(); } } } }, 'Block'),
+    h('p', { class: 'small muted' }, 'Pressing Spam on an email also blocks its sender; Not spam unblocks them. Email that looks like spam (lottery, casino, loans, too many links...) goes to Spam by itself.')));
+  const list = r.ok ? r.data.blocked : [];
+  box.appendChild(list.length ? h('table', {}, h('tr', {}, h('th', {}, 'Blocked'), h('th', {}, '')),
+    list.map(b => h('tr', {}, h('td', {}, b), h('td', {}, h('button', { on: { click: async () => { await api('/api/admin/mail/unblock', { entry: b }); loadMailBlocked(); } } }, 'Unblock')))))
+    : h('p', { class: 'muted' }, 'Nobody is blocked.'));
+}
+
 // ---- Global Radio (memoryq.com/world): every station on the globe, editing, the station finder bot ----
 const WR_STATUS = { active: 'on the globe', broken: 'silent (hidden)', removed: 'taken off', noplace: 'no place yet' };
 const WR_STATUS_BG = { active: '#2e7d32', broken: '#b26a00', removed: '#6b7a88', noplace: '#7b4fd6' };
-const WR_SOURCE = { rb: 'Radio Browser', wikidata: 'Wikidata', icecast: 'Icecast directory', list: 'from a list', member: 'member', admin: 'super-admin' };
+const WR_SOURCE = { rb: 'Radio Browser', wikidata: 'Wikidata', icecast: 'Icecast directory', list: 'from a list', member: 'member', admin: 'super-admin', memoryq: 'Memoryq station' };
 let wrCountries = null;
 async function wrCountryList() {
   if (!wrCountries) { const r = await api('/api/admin/world/countries'); wrCountries = r.ok ? r.data.countries : []; }
@@ -2737,6 +3163,7 @@ function wrEdit(s, after) {
     s ? h('span', { class: 'muted small' }, '  ' + (WR_SOURCE[s.source] || s.source) + (s.addedBy ? ' (' + s.addedBy + ')' : '') + ' \u00b7 ' + s.plays + ' plays \u00b7 last check ' + wrAgo(s.lastCheck) + (s.note ? ' \u00b7 ' + s.note : '')) : null));
   box.appendChild(h('div', { class: 'fgrid' },
     field('name', 'Station name', s && s.name, { maxlength: 80 }),
+    field('slogan', 'Slogan', s && s.slogan, { maxlength: 160 }),
     field('url', 'Stream address', s && s.url, { maxlength: 500, style: 'font-family:monospace' }),
     field('home', 'Website', s && s.home, { maxlength: 300 }),
     field('tags', 'Genre (comma between)', s && s.tags, { maxlength: 160 }),
@@ -2767,7 +3194,7 @@ function wrEdit(s, after) {
   box.appendChild(msg);
   box.appendChild(h('div', {},
     h('button', { class: 'pri', on: { click: async () => {
-      const form = { name: f.name.value.trim(), url: f.url.value.trim(), home: f.home.value.trim(), tags: f.tags.value.trim(), lang: f.lang.value.trim(),
+      const form = { name: f.name.value.trim(), slogan: f.slogan.value.trim(), url: f.url.value.trim(), home: f.home.value.trim(), tags: f.tags.value.trim(), lang: f.lang.value.trim(),
         city: f.city.value.trim(), country: f.country.value.trim(), cc: f.cc.value.trim(), lat: f.lat.value.trim(), lon: f.lon.value.trim(), status: st.value, force: force.checked ? '1' : '' };
       if (s) { form.id = s.id; }
       msg.className = 'muted small'; msg.textContent = 'Saving (a new stream address is tested first)...';

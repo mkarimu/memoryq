@@ -110,6 +110,21 @@ public final class RadioApi {
         });
     }
 
+    /** Global Radio is told at once when a station's place or "show on Global Radio" changes. */
+    private volatile Runnable worldSync;
+
+    public void setWorldSync(Runnable r) {
+        this.worldSync = r;
+    }
+
+    private static Double dbl(String v) {
+        if (v == null) {
+            return null;
+        }
+        String t = v.trim();
+        return t.isEmpty() ? Double.valueOf(0) : Double.valueOf(t);
+    }
+
     private static final class Bad extends Exception {
         private static final long serialVersionUID = 1L;
         final int status;
@@ -441,14 +456,14 @@ public final class RadioApi {
 
     /** Operations a station owner may use on their own stations (the admin may use all). */
     private static final java.util.Set<String> OWNER_OPS = new java.util.HashSet<String>(java.util.Arrays.asList(
-            "status", "station/save", "tracks", "upload", "track/save", "track/delete", "testvoice", "skip", "talk",
+            "status", "station/save", "tracks", "upload", "track/save", "track/delete", "track/bulk", "track/audio", "folder/save", "folder/delete", "testvoice", "skip", "talk",
             "live/password", "live/kick", "stats", "request", "pay", "paid", "trial", "billing/portal", "dj/save", "dj/delete", "plan/change",
             "playlists", "playlist/save", "playlist/delete", "playlist/enable", "stories", "story/add", "story/update", "story/delete", "report", "report.csv", "listeners", "logs", "restart"));
     /** Station staff: a co-admin runs the whole Studio except paying / plans; a presenter does the programme. */
     private static final java.util.Set<String> COADMIN_NOT = new java.util.HashSet<String>(java.util.Arrays.asList(
             "request", "pay", "paid", "trial", "billing/portal", "plan/change"));
     private static final java.util.Set<String> PRESENTER_OPS = new java.util.HashSet<String>(java.util.Arrays.asList(
-            "status", "tracks", "upload", "track/save", "testvoice", "skip", "talk", "stats", "listeners",
+            "status", "tracks", "upload", "track/save", "track/bulk", "track/audio", "folder/save", "testvoice", "skip", "talk", "stats", "listeners",
             "playlists", "playlist/save", "playlist/enable", "stories", "story/add", "story/update"));
     /** The Studio operation being handled (for the staff checks in manageable). */
     private final ThreadLocal<String> currentOp = new ThreadLocal<String>();
@@ -1355,6 +1370,21 @@ public final class RadioApi {
                         RadioStore.Station cur = store.station(s.id);
                         store.setContact(s.id, company == null ? cur.company : company, email == null ? cur.email : email);
                     }
+                    if (!trial) { // where the station is: Global Radio (memoryq.com/world)
+                        String wo = MediaAuthHttpServer.queryParam(body, "worldOn");
+                        try {
+                            store.setPlace(s.id, wo == null || wo.trim().isEmpty() ? null : ("1".equals(wo.trim()) || "true".equals(wo.trim())),
+                                    dbl(MediaAuthHttpServer.queryParam(body, "lat")), dbl(MediaAuthHttpServer.queryParam(body, "lon")),
+                                    MediaAuthHttpServer.queryParam(body, "city"), MediaAuthHttpServer.queryParam(body, "country"),
+                                    MediaAuthHttpServer.queryParam(body, "cc"));
+                        } catch (NumberFormatException e) {
+                            throw new Bad(400, "latitude and longitude are numbers, e.g. -6.8 and 39.28");
+                        }
+                        Runnable sync = worldSync;
+                        if (sync != null) {
+                            sync.run();
+                        }
+                    }
                     store.flushIfDirty();
                     radio.refresh();
                     send(ex, 200, "{\"ok\":true}");
@@ -1384,7 +1414,15 @@ public final class RadioApi {
                         if (i < list.size() - 1) {
                             sb.append(',');
                         }
+                        long size = 0;
+                        try {
+                            size = Files.size(store.pathOf(t));
+                        } catch (IOException e) {
+                            size = 0;
+                        }
                         sb.append("{\"id\":").append(t.id).append(",\"title\":").append(q(t.title))
+                                .append(",\"folder\":").append(q(t.folder)).append(",\"size\":").append(size)
+                                .append(",\"ext\":").append(q(t.file.substring(t.file.lastIndexOf('.') + 1)))
                                 .append(",\"artist\":").append(q(t.artist)).append(",\"album\":").append(q(t.album))
                                 .append(",\"durationMs\":").append(t.durationMs).append(",\"plays\":").append(t.plays)
                                 .append(",\"added\":").append(t.added).append(",\"lastPlayed\":").append(t.lastPlayed)
@@ -1392,7 +1430,120 @@ public final class RadioApi {
                                 .append(",\"taps\":").append(t.taps).append(",\"requests\":").append(t.requests)
                                 .append('}');
                     }
+                    sb.append("],\"folders\":[");
+                    int k = 0;
+                    for (java.util.Map.Entry<String, int[]> e : store.folders(id).entrySet()) {
+                        sb.append(k++ > 0 ? "," : "").append("{\"path\":").append(q(e.getKey())).append(",\"songs\":").append(e.getValue()[0]).append('}');
+                    }
                     send(ex, 200, sb.append("]}").toString());
+                    break;
+                }
+                case "track/audio": { // listen to a song in the media manager
+                    long trackId = id(MediaAuthHttpServer.queryParam(query, "id"));
+                    manageableTrack(me, admin, trackId);
+                    RadioStore.Track t = store.track(trackId);
+                    byte[] data = Files.readAllBytes(store.pathOf(t));
+                    String ext = t.file.substring(t.file.lastIndexOf('.') + 1).toLowerCase(java.util.Locale.ROOT);
+                    String type = ext.equals("mp3") ? "audio/mpeg" : ext.equals("m4a") || ext.equals("aac") ? "audio/mp4" : ext.equals("ogg") || ext.equals("opus")
+                            ? "audio/ogg" : ext.equals("wav") ? "audio/wav" : ext.equals("flac") ? "audio/flac" : "application/octet-stream";
+                    ex.getResponseHeaders().set("Content-Type", type);
+                    ex.getResponseHeaders().set("Cache-Control", "private, max-age=300");
+                    ex.sendResponseHeaders(200, data.length);
+                    ex.getResponseBody().write(data);
+                    ex.close();
+                    break;
+                }
+                case "track/bulk": { // the media manager: delete / move / edit / add to a playlist, many songs at once
+                    requirePost(post);
+                    String body = readBody(ex, 512 * 1024);
+                    String action = val(body, "action", "");
+                    currentOp.set(action.equals("delete") ? "track/delete" : action.equals("playlist") ? "playlist/save" : "track/save");
+                    RadioStore.Station s = manageable(me, admin, id(MediaAuthHttpServer.queryParam(body, "station")));
+                    List<Long> ids = new java.util.ArrayList<Long>();
+                    for (String x : val(body, "ids", "").split(",")) {
+                        if (x.trim().matches("\\d{1,12}")) {
+                            RadioStore.Track t = store.track(Long.parseLong(x.trim()));
+                            if (t != null && t.station == s.id) {
+                                ids.add(t.id);
+                            }
+                        }
+                    }
+                    if (ids.isEmpty()) {
+                        throw new Bad(400, "choose some songs first");
+                    }
+                    int n = 0;
+                    try {
+                        switch (action) {
+                            case "delete":
+                                for (long t : ids) {
+                                    if (store.deleteTrack(t)) {
+                                        n++;
+                                    }
+                                }
+                                break;
+                            case "move":
+                                n = store.moveTracks(s.id, ids, val(body, "folder", ""));
+                                break;
+                            case "edit":
+                                n = store.editTracks(s.id, ids, MediaAuthHttpServer.queryParam(body, "artist"), MediaAuthHttpServer.queryParam(body, "album"),
+                                        MediaAuthHttpServer.queryParam(body, "link"));
+                                break;
+                            case "playlist": {
+                                RadioStore.Playlist pl = store.playlist(intParam(val(body, "playlist", "0")));
+                                if (pl == null || pl.station != s.id) {
+                                    throw new Bad(404, "no such playlist");
+                                }
+                                for (long t : ids) {
+                                    if (!pl.tracks.contains(t)) {
+                                        store.addToPlaylist(pl.id, t);
+                                        n++;
+                                    }
+                                }
+                                break;
+                            }
+                            default:
+                                throw new Bad(400, "delete, move, edit or playlist?");
+                        }
+                    } catch (IllegalArgumentException e) {
+                        throw new Bad(400, e.getMessage());
+                    }
+                    store.flushIfDirty();
+                    if (action.equals("delete")) {
+                        radio.refresh();
+                    }
+                    send(ex, 200, "{\"ok\":true,\"changed\":" + n + "}");
+                    break;
+                }
+                case "folder/save": { // a new folder (path), or a renamed / moved one (from -> path)
+                    requirePost(post);
+                    String body = readBody(ex, MAX_BODY);
+                    RadioStore.Station s = manageable(me, admin, id(MediaAuthHttpServer.queryParam(body, "station")));
+                    String from = val(body, "from", "");
+                    String made;
+                    try {
+                        made = from.isEmpty() ? store.createFolder(s.id, val(body, "path", "")) : store.renameFolder(s.id, from, val(body, "path", ""));
+                    } catch (IllegalArgumentException e) {
+                        throw new Bad(400, e.getMessage());
+                    }
+                    store.flushIfDirty();
+                    send(ex, 200, "{\"ok\":true,\"path\":" + q(made) + "}");
+                    break;
+                }
+                case "folder/delete": {
+                    requirePost(post);
+                    String body = readBody(ex, MAX_BODY);
+                    RadioStore.Station s = manageable(me, admin, id(MediaAuthHttpServer.queryParam(body, "station")));
+                    int gone;
+                    try {
+                        gone = store.deleteFolder(s.id, val(body, "path", ""), bool(body, "songs", false));
+                    } catch (IllegalArgumentException e) {
+                        throw new Bad(400, e.getMessage());
+                    }
+                    store.flushIfDirty();
+                    if (gone > 0) {
+                        radio.refresh();
+                    }
+                    send(ex, 200, "{\"ok\":true,\"deleted\":" + gone + "}");
                     break;
                 }
                 case "upload":
@@ -1774,6 +1925,9 @@ public final class RadioApi {
                     .append(",\"liveProblem\":").append(q(door == null ? "" : door.lastProblem()))
                     .append(",\"website\":").append(q(s.website))
                     .append(",\"company\":").append(q(s.company)).append(",\"email\":").append(q(s.email))
+                    .append(",\"worldOn\":").append(s.worldOn).append(",\"lat\":").append(s.hasPlace() ? String.valueOf(s.lat) : "null")
+                    .append(",\"lon\":").append(s.hasPlace() ? String.valueOf(s.lon) : "null").append(",\"city\":").append(q(s.city))
+                    .append(",\"country\":").append(q(s.country)).append(",\"cc\":").append(q(s.cc))
                     .append(",\"limits\":[").append(s.limListeners).append(',').append(s.limKbps).append(',').append(s.limStorageMb).append(',')
                     .append(s.limTransferGb).append(',').append(s.limDjs).append(']')
                     .append(",\"kbpsNow\":").append(radio.kbpsFor(s.id))
@@ -1854,6 +2008,15 @@ public final class RadioApi {
         }
         RadioStore.Track t = store.addTrack(station, name, ext, data, tags.title, tags.artist, tags.album,
                 tags.durationMs, clock.getAsLong());
+        String folder = MediaAuthHttpServer.queryParam(query, "folder");
+        if (folder != null && !folder.trim().isEmpty()) {
+            try {
+                store.setFolder(t.id, folder);
+                store.flushIfDirty();
+            } catch (IllegalArgumentException e) {
+                // stays at the top
+            }
+        }
         String into = MediaAuthHttpServer.queryParam(query, "playlist");
         if (into != null && into.matches("\\d{1,9}")) {
             RadioStore.Playlist pl = store.playlist(Long.parseLong(into));
