@@ -16,6 +16,20 @@ final class PerformanceReport {
 
     static final int MAX_DAYS = 366;
 
+    /** The time zone a game's days are cut in when the game does not say (Vistr counts in Los Angeles time, like Weekly Champions). */
+    static String tzOf(String game) {
+        return "vistr".equals(game) ? "America/Los_Angeles" : "UTC";
+    }
+
+    /** Today's date in a time zone (IANA name); UTC when the name is not known. */
+    static String todayIn(String tz) {
+        try {
+            return LocalDate.now(java.time.ZoneId.of(tz)).toString();
+        } catch (RuntimeException e) {
+            return LocalDate.now(java.time.ZoneOffset.UTC).toString();
+        }
+    }
+
     /** One player. days: date (YYYY-MM-DD) -> games that day. */
     static final class Row {
         final String email;
@@ -23,6 +37,10 @@ final class PerformanceReport {
         final String gameId;
         final String moderator;
         final Map<String, Integer> days = new HashMap<String, Integer>();
+        /** date -> {games, points, last game time (ms)}: what the game kept for that day. */
+        final Map<String, long[]> daily = new HashMap<String, long[]>();
+        /** Each game from the day the game started its play log: {time (ms), word length, points, "solo"/"duo", "app"/"web", date}. */
+        final List<String[]> plays = new ArrayList<String[]>();
 
         Row(String email, String username, String gameId, String moderator) {
             this.email = email == null ? "" : email;
@@ -39,6 +57,10 @@ final class PerformanceReport {
     final String generated;
     /** Today's UTC date: the report always shows what each player played today, whatever the period. */
     String today = "";
+    /** The time zone the days are cut in (IANA name; "UTC" for a game that counts in UTC). */
+    String tz = "UTC";
+    /** The first day the game listed single games from (empty: none yet). Days before it only have totals. */
+    String logFrom = "";
     /** What a day is worth: at least payThreshold games in a day pays payCents once (no more for extra games, nothing for fewer). */
     int payThreshold = 6;
     long payCents = 2000;
@@ -223,6 +245,7 @@ final class PerformanceReport {
     String json() {
         StringBuilder sb = new StringBuilder("{\"game\":").append(q(gameName)).append(",\"scope\":").append(q(scope)).append(",\"from\":").append(q(from))
                 .append(",\"to\":").append(q(to)).append(",\"generated\":").append(q(generated)).append(",\"today\":").append(q(today))
+                .append(",\"tz\":").append(q(tz)).append(",\"logFrom\":").append(q(logFrom))
                 .append(",\"pay\":{\"threshold\":").append(payThreshold).append(",\"cents\":").append(payCents).append(",\"currency\":").append(q(payCurrency)).append("},\"dates\":[");
         for (int i = 0; i < dates.size(); i++) {
             sb.append(i > 0 ? "," : "").append(q(dates.get(i)));
@@ -243,7 +266,17 @@ final class PerformanceReport {
             for (int i = 0; i < weeks.size(); i++) {
                 sb.append(i > 0 ? "," : "").append(week(r, weeks.get(i)));
             }
-            sb.append("],\"total\":").append(total(r)).append(",\"today\":").append(todayOf(r)).append('}');
+            sb.append("],\"total\":").append(total(r)).append(",\"today\":").append(todayOf(r)).append(",\"daily\":{");
+            int nd = 0;
+            for (Map.Entry<String, long[]> e : new java.util.TreeMap<String, long[]>(r.daily).entrySet()) {
+                sb.append(nd++ > 0 ? "," : "").append(q(e.getKey())).append(":[").append(e.getValue()[0]).append(',').append(e.getValue()[1]).append(',').append(e.getValue()[2]).append(']');
+            }
+            sb.append("},\"plays\":[");
+            for (int i = 0; i < r.plays.size(); i++) {
+                String[] p = r.plays.get(i);
+                sb.append(i > 0 ? "," : "").append('[').append(p[0]).append(',').append(p[1]).append(',').append(p[2]).append(',').append(q(p[3])).append(',').append(q(p[4])).append(',').append(q(p[5])).append(']');
+            }
+            sb.append("]}");
         }
         sb.append("],\"dayTotals\":[");
         for (int i = 0; i < dates.size(); i++) {
@@ -279,7 +312,7 @@ final class PerformanceReport {
         float y = SimplePdf.H - 40;
         pdf.text(28, y, 15, true, "Performance report - " + gameName);
         y -= 16;
-        pdf.text(28, y, 9, false, "Period: " + from + " to " + to + "   (dates are UTC; each week starts on Monday)");
+        pdf.text(28, y, 9, false, "Period: " + from + " to " + to + "   (dates are " + (tz.equals("UTC") ? "UTC" : tz + " time") + "; each week starts on Monday)");
         y -= 12;
         pdf.text(28, y, 9, false, "Players: " + scope);
         y -= 12;

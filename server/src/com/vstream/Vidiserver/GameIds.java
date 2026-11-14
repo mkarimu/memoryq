@@ -61,6 +61,21 @@ public final class GameIds {
         default java.util.Map<String, java.util.Map<String, Integer>> report(String actor, String from, String to) throws Exception {
             return null;
         }
+
+        /** Like report(), plus the time zone the days were cut in and each game that was kept singly; null when the game keeps no such record. */
+        default Detail reportDetail(String actor, String from, String to) throws Exception {
+            return null;
+        }
+    }
+
+    /** What a game keeps about games per day: days (Player ID -> date -> games), daily (-> date -> {games, points, last time}), plays (-> {time, level, points, mode, platform, date}). */
+    public static final class Detail {
+        public String tz = "UTC";
+        public String logFrom = "";
+        public String today = "";
+        public final java.util.Map<String, java.util.Map<String, Integer>> days = new java.util.LinkedHashMap<String, java.util.Map<String, Integer>>();
+        public final java.util.Map<String, java.util.Map<String, long[]>> daily = new java.util.LinkedHashMap<String, java.util.Map<String, long[]>>();
+        public final java.util.Map<String, List<String[]>> plays = new java.util.LinkedHashMap<String, List<String[]>>();
     }
 
     /** Thrown when the ID cannot be given (taken, wrong form, no email): nothing is saved. */
@@ -490,6 +505,12 @@ public final class GameIds {
     public java.util.Map<String, java.util.Map<String, Integer>> playsPerDay(String actor, String gameKey, String from, String to) throws Exception {
         Sync s = syncs.get(gameKey);
         return s == null ? null : s.report(actor, from, to);
+    }
+
+    /** The same with each game's details, or null when the game gives none (the caller then uses playsPerDay). */
+    public Detail playsDetail(String actor, String gameKey, String from, String to) throws Exception {
+        Sync s = syncs.get(gameKey);
+        return s == null ? null : s.reportDetail(actor, from, to);
     }
 
     /** Does this game keep a record of games per day (the performance report)? */

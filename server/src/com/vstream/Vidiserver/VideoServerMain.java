@@ -344,6 +344,10 @@ public class VideoServerMain {
                     public java.util.Map<String, java.util.Map<String, Integer>> report(String actor, String from, String to) throws Exception {
                         return vi.gameReport(actor, from, to);
                     }
+
+                    public GameIds.Detail reportDetail(String actor, String from, String to) throws Exception {
+                        return vi.gameReportDetail(actor, from, to);
+                    }
                 })
                 .knownVistr(vi::gameIdOf)
                 .emails(u -> {

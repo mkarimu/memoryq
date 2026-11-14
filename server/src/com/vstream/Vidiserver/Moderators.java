@@ -1151,7 +1151,9 @@ public final class Moderators {
         if (ids == null || !ids.hasDailyRecord(game)) {
             throw new Bad(400, g[1] + " does not keep a daily record");
         }
-        String to = p(query, "to").isEmpty() ? java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString() : p(query, "to");
+        String todayUtc = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
+        String todayZone = PerformanceReport.todayIn(PerformanceReport.tzOf(game)); // the game's own day (Vistr: Los Angeles, like Weekly Champions)
+        String to = p(query, "to").isEmpty() ? todayZone : p(query, "to");
         String from = p(query, "from");
         try {
             if (from.isEmpty()) {
@@ -1161,12 +1163,14 @@ public final class Moderators {
         } catch (RuntimeException e) {
             throw new Bad(400, e.getMessage() == null || e.getMessage().startsWith("Text") ? "dates must look like 2026-10-31" : e.getMessage());
         }
-        String today = java.time.LocalDate.now(java.time.ZoneOffset.UTC).toString();
-        String lo = from.compareTo(today) < 0 ? from : today; // the games of today are always fetched too
-        String hi = to.compareTo(today) > 0 ? to : today;
+        String loDay = todayUtc.compareTo(todayZone) < 0 ? todayUtc : todayZone;
+        String hiDay = todayUtc.compareTo(todayZone) > 0 ? todayUtc : todayZone;
+        String lo = from.compareTo(loDay) < 0 ? from : loDay; // the games of today are always fetched too
+        String hi = to.compareTo(hiDay) > 0 ? to : hiDay;
         String cacheKey = game + "|" + lo + "|" + hi;
         boolean live = "1".equals(p(query, "live")); // the page asking every few seconds: a few seconds old is fine
         java.util.Map<String, java.util.Map<String, Integer>> plays = null;
+        GameIds.Detail det = null;
         List<String[]> roster = null;
         boolean fresh = false;
         if (live) {
@@ -1175,13 +1179,15 @@ public final class Moderators {
                 if (c != null && System.currentTimeMillis() - ((Long) c[0]).longValue() < 5000) {
                     plays = (java.util.Map<String, java.util.Map<String, Integer>>) c[1];
                     roster = (List<String[]>) c[2];
+                    det = (GameIds.Detail) c[3];
                     fresh = true;
                 }
             }
         }
         if (!fresh) {
             try {
-                plays = ids.playsPerDay(me.username, game, lo, hi);
+                det = ids.playsDetail(me.username, game, lo, hi);
+                plays = det != null ? det.days : ids.playsPerDay(me.username, game, lo, hi);
             } catch (Exception e) {
                 throw new Bad(502, g[1] + " could not be reached: " + e.getMessage());
             }
@@ -1194,7 +1200,7 @@ public final class Moderators {
                     if (liveCache.size() > 40) {
                         liveCache.clear();
                     }
-                    liveCache.put(cacheKey, new Object[] {Long.valueOf(System.currentTimeMillis()), plays, roster});
+                    liveCache.put(cacheKey, new Object[] {Long.valueOf(System.currentTimeMillis()), plays, roster, det});
                 }
             }
         }
@@ -1206,7 +1212,9 @@ public final class Moderators {
         }
         String now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC).withNano(0).toString().replace('T', ' ');
         PerformanceReport rep = new PerformanceReport(g[1], admin ? "all players" : "the players added by " + me.username, from, to, now);
-        rep.today = today;
+        rep.tz = det != null ? det.tz : "UTC"; // what the game said; an older game server cuts its days in UTC
+        rep.logFrom = det != null ? det.logFrom : "";
+        rep.today = PerformanceReport.todayIn(rep.tz);
         String[] pv = payOf(game);
         rep.payThreshold = Integer.parseInt(pv[0]);
         rep.payCents = Long.parseLong(pv[1]);
@@ -1230,6 +1238,7 @@ public final class Moderators {
             if (d != null) {
                 row.days.putAll(d);
             }
+            addDetail(row, det, e.id);
             seen.add(e.id);
             rows.add(row);
         }
@@ -1241,6 +1250,7 @@ public final class Moderators {
                     if (d != null) {
                         row.days.putAll(d);
                     }
+                    addDetail(row, det, r[0]);
                     rows.add(row);
                 }
             }
@@ -1258,6 +1268,21 @@ public final class Moderators {
             sendFile(ex, "application/pdf", base + ".pdf", rep.pdf());
         } else {
             send(ex, 200, rep.json());
+        }
+    }
+
+    /** The day totals (games, points, last game) and the single games the game kept for this player, when it keeps them. */
+    private static void addDetail(PerformanceReport.Row row, GameIds.Detail det, String id) {
+        if (det == null) {
+            return;
+        }
+        java.util.Map<String, long[]> dy = det.daily.get(id);
+        if (dy != null) {
+            row.daily.putAll(dy);
+        }
+        List<String[]> pl = det.plays.get(id);
+        if (pl != null) {
+            row.plays.addAll(pl);
         }
     }
 

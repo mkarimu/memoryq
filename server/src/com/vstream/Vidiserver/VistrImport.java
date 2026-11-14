@@ -754,17 +754,32 @@ public final class VistrImport {
         return out;
     }
 
+    /** The time zone the Vistr report cuts its days in (the same as Weekly Champions, so the numbers agree with the game). */
+    static final String REPORT_TZ = "America/Los_Angeles";
+
     /** Games per player per day between two dates: Player ID -> (date -> games). */
     java.util.Map<String, java.util.Map<String, Integer>> gameReport(String who, String from, String to) throws Bad, IOException {
-        String[] r = vistr(who, "GET", "/api/admin/report?from=" + from + "&to=" + to, null);
+        return gameReportDetail(who, from, to).days;
+    }
+
+    /** The same, with the time zone, the first day single games are listed from, and each player's daily totals and games. */
+    GameIds.Detail gameReportDetail(String who, String from, String to) throws Bad, IOException {
+        String[] r = vistr(who, "GET", "/api/admin/report?from=" + from + "&to=" + to + "&tz=" + REPORT_TZ, null);
         if (!r[0].equals("200")) {
             throw new Bad(502, "Vistr answered " + r[0] + (r[0].equals("404") ? " (the game's server does not have the report yet - update it)" : ""));
         }
         Object o = safeParse(r[1]);
-        java.util.Map<String, java.util.Map<String, Integer>> out = new java.util.LinkedHashMap<String, java.util.Map<String, Integer>>();
+        GameIds.Detail out = new GameIds.Detail();
+        String tz = MiniJson.str(o, "tz");
+        out.tz = tz == null || tz.isEmpty() ? "UTC" : tz;   // an older game server cuts its days in UTC and says nothing
+        String lf = MiniJson.str(o, "logFrom");
+        out.logFrom = lf == null ? "" : lf;
+        String td = MiniJson.str(o, "today");
+        out.today = td == null ? "" : td;
         Object pl = MiniJson.at(o, "players");
         if (pl instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) pl).entrySet()) {
+                String code = String.valueOf(e.getKey());
                 java.util.Map<String, Integer> days = new java.util.TreeMap<String, Integer>();
                 Object d = MiniJson.at(e.getValue(), "days");
                 if (d instanceof Map) {
@@ -772,7 +787,24 @@ public final class VistrImport {
                         days.put(String.valueOf(x.getKey()), Integer.valueOf((int) MiniJson.num(d, x.getKey())));
                     }
                 }
-                out.put(String.valueOf(e.getKey()), days);
+                out.days.put(code, days);
+                java.util.Map<String, long[]> daily = new java.util.TreeMap<String, long[]>();
+                Object dy = MiniJson.at(e.getValue(), "daily");
+                if (dy instanceof Map) {
+                    for (Map.Entry<?, ?> x : ((Map<?, ?>) dy).entrySet()) {
+                        Object v = ((Map<?, ?>) dy).get(x.getKey());
+                        daily.put(String.valueOf(x.getKey()), new long[] {(long) MiniJson.num(v, "g"), (long) MiniJson.num(v, "p"), (long) MiniJson.num(v, "t")});
+                    }
+                }
+                out.daily.put(code, daily);
+                List<String[]> plays = new ArrayList<String[]>();
+                Object pa = MiniJson.at(e.getValue(), "plays");
+                int np = pa instanceof List ? ((List<?>) pa).size() : 0;
+                for (int j = 0; j < np; j++) {
+                    plays.add(new String[] {String.valueOf((long) MiniJson.num(pa, j, "t")), String.valueOf((long) MiniJson.num(pa, j, "lv")), String.valueOf((long) MiniJson.num(pa, j, "sc")),
+                        MiniJson.str(pa, j, "m"), MiniJson.str(pa, j, "p"), MiniJson.str(pa, j, "d")});
+                }
+                out.plays.put(code, plays);
             }
         }
         return out;

@@ -34,6 +34,10 @@
                  cursor: pointer; white-space: nowrap; margin: 0; display: flex; gap: 6px; align-items: center; }
   #tabs button:hover { color: var(--ink); }
   #tabs button.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  #subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: -8px 0 14px; }
+  #subtabs button { background: var(--card, #fff); border: 1px solid var(--line); border-radius: 16px; padding: 4px 12px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  #subtabs button:hover { color: var(--ink); }
+  #subtabs button.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
   .panel { overflow-x: auto; }
   .panel h2 { margin: 0 0 8px; font-size: 17px; }
   .panel h3 { margin: 18px 0 8px; font-size: 15px; }
@@ -198,6 +202,7 @@
     <section class="content">
       <h1 id="pageTitle"></h1>
       <div id="tabs"></div>
+      <div id="subtabs" hidden></div>
       <div id="flash"></div>
       <div id="keybox" hidden>
         <div id="keyLabel"></div>
@@ -1679,12 +1684,13 @@ const NAV = [
     { id: 'moderators', label: 'Moderators', load: loadModerators, noAuto: true } ] },
   { id: 'games', label: 'Games', icon: '\uD83C\uDFAE', tabs: [
     { id: 'all', label: 'All games', load: loadGamesOverview, noAuto: true },
-    { id: 'pvistr', label: 'Vistr players', load: () => loadGamePlayers('vistr'), noAuto: true },
-    { id: 'perf', label: 'Performance report', load: loadPerformance, noAuto: true },
-      { id: 'earn', label: 'Earnings', load: loadEarnings, noAuto: true },
-    { id: 'vistr', label: 'Vistr word game', load: loadGames, noAuto: true },
-    { id: 'pmissing', label: 'Spot What\'s Missing players', load: () => loadGamePlayers('missing'), noAuto: true },
-    { id: 'missing', label: 'Spot What\'s Missing', load: loadMissingAdmin, noAuto: true } ] },
+    // one entry per game; the pages of a game are the small tabs under it (grp = the game, sub = the small tab)
+    { id: 'vistr', grp: 'Vistr', sub: 'Overview', label: 'Vistr word game', load: loadGames, noAuto: true },
+    { id: 'pvistr', grp: 'Vistr', sub: 'Players', label: 'Vistr players', load: () => loadGamePlayers('vistr'), noAuto: true },
+    { id: 'perf', grp: 'Vistr', sub: 'Performance', label: 'Performance report', load: loadPerformance, noAuto: true },
+    { id: 'earn', grp: 'Vistr', sub: 'Earnings', label: 'Earnings', load: loadEarnings, noAuto: true },
+    { id: 'missing', grp: 'Spot What\'s Missing', sub: 'Overview', label: 'Spot What\'s Missing', load: loadMissingAdmin, noAuto: true },
+    { id: 'pmissing', grp: 'Spot What\'s Missing', sub: 'Players', label: 'Spot What\'s Missing players', load: () => loadGamePlayers('missing'), noAuto: true } ] },
   { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
@@ -1742,14 +1748,34 @@ function drawNav() {
   });
   const ft = findTab(current.cat, current.tab);
   $('pageTitle').textContent = ft.c.label;
-  const tabs = $('tabs');
+  const tabs = $('tabs'), subtabs = $('subtabs');
   tabs.textContent = '';
+  subtabs.textContent = ''; subtabs.hidden = true;
+  // tabs of one game (grp) are shown as one big tab for the game, with the game's pages as small tabs underneath
+  const strip = [];
   ft.c.tabs.forEach(t => {
-    const b = el('button', t.label);
-    b.className = t.id === ft.t.id ? 'active' : '';
-    if (t.badge && badges[t.badge] > 0) { const s = el('span', String(badges[t.badge])); s.className = 'badge'; b.appendChild(s); }
-    b.addEventListener('click', () => show(ft.c.id, t.id));
+    if (t.grp) {
+      let g = strip.find(s => s.grp === t.grp);
+      if (!g) { g = { grp: t.grp, label: t.grp, tabs: [] }; strip.push(g); }
+      g.tabs.push(t);
+    } else { strip.push({ label: t.label, tabs: [t], badge: t.badge }); }
+  });
+  strip.forEach(s => {
+    const here = s.tabs.some(t => t.id === ft.t.id);
+    const b = el('button', s.label);
+    b.className = here ? 'active' : '';
+    if (s.badge && badges[s.badge] > 0) { const n = el('span', String(badges[s.badge])); n.className = 'badge'; b.appendChild(n); }
+    b.addEventListener('click', () => show(ft.c.id, s.tabs[0].id));
     tabs.appendChild(b);
+    if (here && s.grp && s.tabs.length > 1) {
+      subtabs.hidden = false;
+      s.tabs.forEach(t => {
+        const sb = el('button', t.sub || t.label);
+        sb.className = t.id === ft.t.id ? 'active' : '';
+        sb.addEventListener('click', () => show(ft.c.id, t.id));
+        subtabs.appendChild(sb);
+      });
+    }
   });
 }
 
@@ -4281,13 +4307,18 @@ async function loadModLive() {
       : h('tr', {}, h('td', { colspan: 5, class: 'muted' }, 'Nobody is live right now.'))));
 }
 // ---- Games -> Performance report: games per player per day and week (the super-admin; moderators when it is switched on for them) ----
-const PERF = { game: 'vistr', from: '', to: '', view: 'weeks', data: null, timer: null, stamp: '', lost: false };
+const PERF = { game: 'vistr', from: '', to: '', view: 'weeks', data: null, timer: null, stamp: '', lost: false, tz: '', week: '', weekDay: 'all' };
 const PERF_GAMES = [['vistr', 'Vistr word game']];
 function perfDay(d) { return d.toISOString().slice(0, 10); }
 function perfAdd(day, n) { const x = new Date(day + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return perfDay(x); }
 function perfMonday(day) { const x = new Date(day + 'T00:00:00Z'); return perfAdd(day, -((x.getUTCDay() + 6) % 7)); }
+// today in the time zone the report cuts its days in (Los Angeles for Vistr, like Weekly Champions), not the browser's or UTC
+function perfToday() {
+  try { return new Intl.DateTimeFormat('en-CA', { timeZone: PERF.tz || 'America/Los_Angeles' }).format(new Date()); } catch (e) { return perfDay(new Date()); }
+}
+function perfTzName(tz) { return !tz || tz === 'UTC' ? 'UTC' : tz === 'America/Los_Angeles' ? 'Los Angeles time' : tz + ' time'; }
 function perfPreset(kind) {
-  const today = perfDay(new Date());
+  const today = perfToday();
   const mon = perfMonday(today);
   const m0 = today.slice(0, 8) + '01';
   const prevEnd = perfAdd(m0, -1);
@@ -4322,28 +4353,97 @@ async function loadPerformance() {
     const r = await api('/api/mod/report?' + perfQuery());
     out.textContent = '';
     if (!r.ok) { out.appendChild(h('div', { class: 'error' }, r.data.error || ('The report answered ' + r.status))); PERF.data = null; return; }
-    PERF.data = r.data; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); draw();
+    PERF.data = r.data; PERF.tz = r.data.tz || PERF.tz; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); draw();
   };
   const live = async () => {
     if (document.hidden || !document.body.contains(root) || root.offsetParent === null || !PERF.data) { return; }
     const r = await api('/api/mod/report?' + perfQuery() + '&live=1');
-    if (r.ok) { PERF.data = r.data; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); } else { PERF.lost = true; }
+    if (r.ok) { PERF.data = r.data; PERF.tz = r.data.tz || PERF.tz; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); } else { PERF.lost = true; }
     draw();
   };
   const preset = (label, kind) => h('button', { on: { click: () => { const p = perfPreset(kind); from.value = p[0]; to.value = p[1]; show_(); } } }, label);
   const viewBtn = (label, v) => h('button', { class: PERF.view === v ? 'pri' : '', on: { click: () => { PERF.view = v; loadPerformanceView(); } } }, label);
+  const clock = ms => { try { return new Date(ms).toLocaleTimeString([], { timeZone: (PERF.data && PERF.data.tz) || undefined, hour: 'numeric', minute: '2-digit' }); } catch (e) { return new Date(ms).toLocaleTimeString(); } };
+  const thc = (t, right) => h('th', { style: 'padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap;text-align:' + (right ? 'right' : 'left') }, t);
+  const tdc = (t, right, bold) => h('td', { style: 'padding:3px 8px;text-align:' + (right ? 'right' : 'left') + (bold ? ';font-weight:700' : '') }, t == null ? '' : String(t));
+  const who = r => r.username + (r.gameId ? ' (' + r.gameId + ')' : '');
+  const pts = (r, date) => { const x = r.daily && r.daily[date]; return x ? x[1] : null; };
+  const drawWeek = d => {
+    const monday = PERF.week;
+    const days = d.dates.filter(x => perfMonday(x) === monday);
+    if (!days.length) { PERF.view = 'weeks'; draw(); return; }
+    const label = x => new Date(x + 'T00:00:00Z').toLocaleDateString([], { weekday: 'short', timeZone: 'UTC' }) + ' ' + x.slice(5);
+    const sel = PERF.weekDay === 'all' || days.indexOf(PERF.weekDay) >= 0 ? PERF.weekDay : 'all';
+    const tab = (id, text) => h('button', { class: sel === id ? 'pri' : '', on: { click: () => { PERF.weekDay = id; draw(); } } }, text);
+    out.appendChild(h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 10px' },
+      h('button', { on: { click: () => { PERF.view = 'weeks'; draw(); } } }, '\u2190 All weeks'), h('b', {}, 'Week of ' + monday.slice(5) + ':'), tab('all', 'All days'), days.map(x => tab(x, label(x)))));
+    const th = d.pay && d.pay.threshold ? d.pay.threshold : 0;
+    if (sel === 'all') {
+      const idx = days.map(x => d.dates.indexOf(x));
+      const rows = d.rows.filter(r => idx.some(i => r.days[i] > 0));
+      let totalG = 0, totalP = 0, anyP = false;
+      const body = rows.map(r => {
+        let g = 0, p = 0, known = false, paid = 0;
+        idx.forEach((i, k) => { g += r.days[i]; if (th && r.days[i] >= th) { paid++; } const v = pts(r, days[k]); if (v != null) { p += v; known = true; } });
+        totalG += g; if (known) { totalP += p; anyP = true; }
+        return h('tr', { style: 'border-top:1px solid #e3e7ec' }, tdc(who(r)), idx.map(i => tdc(r.days[i] || 0, true)), tdc(g, true, true), tdc(known ? p : '-', true, true), tdc(paid, true));
+      });
+      const foot = h('tr', { style: 'border-top:2px solid #8a93a0;font-weight:700' }, tdc('All players', false, true), idx.map(i => tdc(d.dayTotals[i], true, true)), tdc(totalG, true, true), tdc(anyP ? totalP : '-', true, true), tdc(''));
+      out.appendChild(h('div', { class: 'muted small', style: 'margin-bottom:6px' }, rows.length + ' players, ' + totalG + ' games this week. Days paid counts days with at least ' + th + ' games.'));
+      out.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, h('tr', {}, thc('Player'), days.map(x => thc(label(x), true)), thc('Games', true), thc('Points', true), thc('Days paid', true))), h('tbody', {}, body, foot)));
+      return;
+    }
+    const i = d.dates.indexOf(sel);
+    const rows = d.rows.filter(r => r.days[i] > 0).sort((a, b) => b.days[i] - a.days[i]);
+    let tg = 0, tp = 0, anyP = false;
+    const body = rows.map(r => {
+      const g = r.days[i], p = pts(r, sel), x = r.daily && r.daily[sel];
+      const games = (r.plays || []).filter(q => q[5] === sel).sort((a, b) => a[0] - b[0]);
+      tg += g; if (p != null) { tp += p; anyP = true; }
+      return h('tr', { style: 'border-top:1px solid #e3e7ec;vertical-align:top' }, tdc(who(r)), tdc(g, true, true), tdc(p == null ? '-' : p, true, true), tdc(x && x[2] ? clock(x[2]) : '-', true),
+        tdc(th ? (g >= th ? 'Yes' : 'No (' + g + '/' + th + ')') : '', true),
+        h('td', { style: 'padding:3px 8px;font-size:12px' }, games.length ? games.map(q => h('div', {}, clock(q[0]) + '  ' + q[1] + ' letters  ' + q[2] + ' pts  ' + (q[3] === 'duo' ? '2-player' : 'solo') + '  ' + (q[4] === 'app' ? 'app' : 'web'))) : h('span', { class: 'muted' }, 'single games were not kept for this day')));
+    });
+    const foot = h('tr', { style: 'border-top:2px solid #8a93a0;font-weight:700' }, tdc(rows.length + ' players', false, true), tdc(tg, true, true), tdc(anyP ? tp : '-', true, true), tdc(''), tdc(''), tdc(''));
+    out.appendChild(h('div', { class: 'muted small', style: 'margin-bottom:6px' }, label(sel) + ' (' + perfTzName(d.tz) + '): ' + tg + ' games by ' + rows.length + ' players'));
+    out.appendChild(rows.length ? h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, h('tr', {}, thc('Player'), thc('Games', true), thc('Points', true), thc('Last game', true), thc('Pays', true), thc('Games played'))), h('tbody', {}, body, foot))
+      : h('div', { class: 'muted' }, 'Nobody played on this day.'));
+  };
+  const drawResults = (d, plat) => {
+    const levels = [3, 4, 5, 6, 7];
+    const agg = {};
+    levels.forEach(l => { agg[l] = { g: 0, p: 0, best: 0, who: {}, solo: 0, duo: 0, day: {} }; });
+    d.rows.forEach(r => (r.plays || []).forEach(q => {
+      if (q[4] !== plat || !agg[q[1]]) { return; }
+      const a = agg[q[1]]; a.g++; a.p += q[2]; a.best = Math.max(a.best, q[2]); a.who[r.gameId || r.username] = 1; if (q[3] === 'duo') { a.duo++; } else { a.solo++; }
+      a.day[q[5]] = (a.day[q[5]] || 0) + 1;
+    }));
+    const tot = { g: 0, p: 0, best: 0, who: {}, solo: 0, duo: 0 };
+    levels.forEach(l => { const a = agg[l]; tot.g += a.g; tot.p += a.p; tot.best = Math.max(tot.best, a.best); Object.keys(a.who).forEach(k => { tot.who[k] = 1; }); tot.solo += a.solo; tot.duo += a.duo; });
+    const avg = a => a.g ? (Math.round(a.p / a.g * 10) / 10) : '-';
+    out.appendChild(h('div', { style: 'margin:4px 0 6px' }, h('b', {}, plat === 'app' ? 'Game results (Android app)' : 'Web results (browser)'), h('span', { class: 'muted small', style: 'margin-left:8px' }, d.dates[0] + ' to ' + d.dates[d.dates.length - 1] + ', ' + perfTzName(d.tz))));
+    out.appendChild(h('div', { class: 'muted small', style: 'margin-bottom:8px' }, d.logFrom ? 'Single games are listed from ' + d.logFrom + ' on; earlier days only have totals. Only online games.' : 'Single games are not listed yet: the game server needs the newest update. Only online games.'));
+    out.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, h('tr', {}, thc('Word length'), thc('Games', true), thc('Players', true), thc('Points', true), thc('Average', true), thc('Best', true), thc('Solo', true), thc('2-player', true))),
+      h('tbody', {}, levels.map(l => { const a = agg[l]; return h('tr', { style: 'border-top:1px solid #e3e7ec' }, tdc(l + ' letters'), tdc(a.g, true), tdc(Object.keys(a.who).length, true), tdc(a.p, true), tdc(avg(a), true), tdc(a.g ? a.best : '-', true), tdc(a.solo, true), tdc(a.duo, true)); }),
+        h('tr', { style: 'border-top:2px solid #8a93a0;font-weight:700' }, tdc('All', false, true), tdc(tot.g, true, true), tdc(Object.keys(tot.who).length, true, true), tdc(tot.p, true, true), tdc(avg(tot), true, true), tdc(tot.g ? tot.best : '-', true, true), tdc(tot.solo, true, true), tdc(tot.duo, true, true)))));
+    out.appendChild(h('div', { style: 'margin:14px 0 6px' }, h('b', {}, 'Games per day')));
+    out.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, h('tr', {}, thc('Word length'), d.dates.map(x => thc(x.slice(5), true)))),
+      h('tbody', {}, levels.map(l => h('tr', { style: 'border-top:1px solid #e3e7ec' }, tdc(l + ' letters'), d.dates.map(x => { const n = agg[l].day[x] || 0; return h('td', { style: 'padding:3px 8px;text-align:right' + (n ? '' : ';color:#9aa3ad') }, String(n)); }))))));
+  };
   const draw = () => {
     out.textContent = '';
     const d = PERF.data; if (!d) { return; }
     const weekly = PERF.view === 'weeks';
     const nPlay = d.rows.filter(r => r.today > 0).length;
     out.appendChild(h('div', { class: 'box', style: 'margin:0 0 8px;padding:8px 10px;border-left:4px solid #2e9e5b' },
-      h('b', {}, 'Today (' + d.today + ' UTC): '), d.todayTotal + (d.todayTotal === 1 ? ' game' : ' games') + ' by ' + nPlay + (nPlay === 1 ? ' player' : ' players'),
+      h('b', {}, 'Today (' + d.today + ', ' + perfTzName(d.tz) + '): '), d.todayTotal + (d.todayTotal === 1 ? ' game' : ' games') + ' by ' + nPlay + (nPlay === 1 ? ' player' : ' players'),
       h('span', { class: 'muted small', style: 'margin-left:10px' }, PERF.lost ? 'could not refresh - trying again' : 'updated ' + PERF.stamp + ' - updates by itself')));
+    if (PERF.view === 'week') { drawWeek(d); return; }
+    if (PERF.view === 'game' || PERF.view === 'web') { drawResults(d, PERF.view === 'game' ? 'app' : 'web'); return; }
     const cols = weekly ? d.weeks : d.dates;
     const num = v => h('td', { style: 'text-align:right;padding:3px 8px;' + (v ? '' : 'color:#9aa3ad') }, String(v));
     const head = h('tr', {}, ['Email', 'Username', 'Game ID', 'Moderator'].map(t => h('th', { style: 'text-align:left;padding:4px 8px;position:sticky;top:0;background:#eef1f5' }, t)),
-      cols.map(c => h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap' }, weekly ? 'Week of ' + c.slice(5) : c.slice(5))),
+      cols.map(c => h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap' }, weekly ? h('button', { title: 'Open this week day by day', style: 'background:none;border:0;padding:0;font:inherit;font-weight:700;color:#1a5fd0;text-decoration:underline;cursor:pointer', on: { click: () => { PERF.week = c; PERF.weekDay = 'all'; PERF.view = 'week'; draw(); } } }, 'Week of ' + c.slice(5)) : c.slice(5))),
       h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5' }, 'Total'),
       h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#e3f4ea' }, 'Today'));
     const rows = d.rows.map(r => h('tr', { style: 'border-top:1px solid #e3e7ec' },
@@ -4359,10 +4459,10 @@ async function loadPerformance() {
   window.loadPerformanceView = draw;
   root.appendChild(h('div', { class: 'box' },
     h('b', { style: 'font-size:16px' }, 'Performance report'),
-    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Online games each player finished, per day and per week (dates are UTC; a week starts on Monday). Daily counts begin on the day the game was updated for this report; earlier games were only added up, not dated.'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Online games each player finished, per day and per week. Days are cut in Los Angeles time (the same days as Weekly Champions); a week starts on Monday. Click a week to open it day by day: who played, when, and the points. Game results are the Android app, web results are the browser, each by word length 3 to 7. Single games are listed from the day the game server was updated for this report; earlier days only have totals. Games played offline in the app are not in this report.'),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, 'Game', sel, 'From', from, 'To', to, h('button', { class: 'pri', on: { click: show_ } }, 'Show')),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, preset('Today', 'today'), preset('This week', 'thisweek'), preset('Last week', 'lastweek'), preset('Last 7 days', 'last7'), preset('Last 28 days', 'last28'), preset('This month', 'thismonth'), preset('Last month', 'lastmonth')),
-    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' }, 'Show', viewBtn('Weekly totals', 'weeks'), viewBtn('Day by day', 'days'), h('span', { style: 'flex:1' }),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' }, 'Show', viewBtn('Weekly totals', 'weeks'), viewBtn('Day by day', 'days'), viewBtn('Game results (3-7)', 'game'), viewBtn('Web results (3-7)', 'web'), h('span', { style: 'flex:1' }),
       h('button', { on: { click: () => perfDownload('csv') } }, 'Download CSV'), h('button', { on: { click: () => perfDownload('pdf') } }, 'Download PDF')),
     out));
   show_();
@@ -4442,10 +4542,10 @@ async function loadEarnings() {
     out.textContent = '';
     const d = EARN.data; if (!d) { return; }
     const cur = d.pay.currency, th = d.pay.threshold, e = earnCalc(d), weekly = EARN.view === 'weeks';
-    rule.textContent = 'Rule: a player with at least ' + th + ' games in a day (UTC) earns ' + earnMoney(d.pay.cents, cur) + ' for that day. More games pay no extra; fewer than ' + th + ' pay nothing. Total = paid days x ' + earnMoney(d.pay.cents, cur) + '.';
+    rule.textContent = 'Rule: a player with at least ' + th + ' games in a day (' + perfTzName(d.tz) + ') earns ' + earnMoney(d.pay.cents, cur) + ' for that day. More games pay no extra; fewer than ' + th + ' pay nothing. Total = paid days x ' + earnMoney(d.pay.cents, cur) + '.';
     const nPaid = e.rows.filter(x => x.today > 0).length;
     out.appendChild(h('div', { class: 'box', style: 'margin:0 0 8px;padding:8px 10px;border-left:4px solid #2e9e5b' },
-      h('b', {}, 'Today (' + d.today + ' UTC): '), nPaid + (nPaid === 1 ? ' player has' : ' players have') + ' reached ' + th + ' games, ' + earnMoney(e.today, cur) + ' earned so far',
+      h('b', {}, 'Today (' + d.today + ', ' + perfTzName(d.tz) + '): '), nPaid + (nPaid === 1 ? ' player has' : ' players have') + ' reached ' + th + ' games, ' + earnMoney(e.today, cur) + ' earned so far',
       h('span', { class: 'muted small', style: 'margin-left:10px' }, EARN.lost ? 'could not refresh - trying again' : 'updated ' + EARN.stamp + ' - updates by itself')));
     const cols = weekly ? d.weeks : d.dates;
     const thS = 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap';
