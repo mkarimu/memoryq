@@ -312,6 +312,121 @@ public class VideoServerMain {
                 profiles, emails, services, signIn, System::currentTimeMillis);
         vistrImport.init();
         api.addModule(vistrImport::register);
+        // Spot What's Missing (Vistr game 2): players, sessions, progress and pictures live here; the game is on vistr.memoryq.com/missing/
+        MissingGame missing = new MissingGame(Paths.get(System.getProperty("vstream.missingDir", "missing")), sessions, users, signIn, System::currentTimeMillis);
+        missing.init();
+        api.addModule(missing::register);
+        // Moderators: members the super-admin trusts with parts of the admin panel (Profiler -> Moderators), right by right
+        final VistrImport vi = vistrImport;
+        // Game IDs: one ID per member per game (Profiler -> All users -> Edit -> Games), kept here, sent to the Vistr game when it can be reached
+        GameIds gameIds = new GameIds(Paths.get(System.getProperty("vstream.gameIdsFile", "gameids.txt")), System::currentTimeMillis)
+                .sync("vistr", new GameIds.Sync() {
+                    public String send(String actor, String username, String code, boolean change) throws Exception {
+                        return vi.assignGameId(actor, username, code, change);
+                    }
+
+                    public String peek(String actor, String username) throws Exception {
+                        return vi.peekGameId(actor, username)[0];
+                    }
+
+                    public void pause(String actor, String id, boolean on) throws Exception {
+                        vi.pausePlayer(actor, id, on);
+                    }
+
+                    public void drop(String actor, String id) throws Exception {
+                        vi.deletePlayer(actor, id);
+                    }
+
+                    public java.util.List<String[]> roster(String actor) throws Exception {
+                        return vi.gamePlayers(actor);
+                    }
+
+                    public java.util.Map<String, java.util.Map<String, Integer>> report(String actor, String from, String to) throws Exception {
+                        return vi.gameReport(actor, from, to);
+                    }
+                })
+                .knownVistr(vi::gameIdOf)
+                .emails(u -> {
+                    EmailService.Entry e = emails.get(u);
+                    return e == null || e.email == null || e.email.isEmpty() ? null : e.email;
+                })
+                .init();
+        gameIds.start();
+        final ModerationService modService = moderation;
+        Moderators moderators = new Moderators(Paths.get(System.getProperty("vstream.moderatorsFile", "moderators.txt")), users, sessions, System::currentTimeMillis)
+                .members(new Moderators.Members() {
+                    @Override
+                    public String profileJson(UserStore.Info i) {
+                        return vi.profileJson(i);
+                    }
+
+                    @Override
+                    public String edit(String actor, UserStore.Info i, String form, boolean emailOk) throws Exception {
+                        return vi.profileJson(vi.editMember(actor, i, form, emailOk, false));
+                    }
+
+                    @Override
+                    public String gameId(String actor, String username, String code) throws Exception {
+                        return vi.assignGameId(actor, username, code);
+                    }
+
+                    @Override
+                    public String gameIdOf(String username) {
+                        return vi.gameIdOf(username);
+                    }
+
+                    @Override
+                    public void delete(String actor, String username) throws Exception {
+                        modService.deleteAccount(actor, username);
+                    }
+
+                    @Override
+                    public String emailOf(String username) {
+                        EmailService.Entry e = emails.get(username);
+                        return e == null || e.email == null || e.email.isEmpty() ? null : e.email;
+                    }
+
+                    @Override
+                    public String nameOf(String username) {
+                        ProfileStore.Profile pr = profiles.get(username);
+                        return pr == null ? "" : ((pr.firstName == null ? "" : pr.firstName) + " " + (pr.lastName == null ? "" : pr.lastName)).trim();
+                    }
+
+                    @Override
+                    public void setEmail(String username, String email) throws Exception {
+                        emails.adminSet(username, email);
+                    }
+                }).init();
+        api.addModule(moderators::register);
+        // Studio Master (memoryq.com/master): the live-event video mixer - 5 slots, transitions, debate mode, one programme out
+        StudioMaster studioMaster = new StudioMaster(Paths.get(System.getProperty("vstream.masterFile", "studio-master.txt")), sessions, users,
+                claims, registry, MediaMtxClient::isChannelLive, System::currentTimeMillis)
+                .ffmpeg(() -> audioTools.ready() ? audioTools.ffmpegPath() : null);
+        try {
+            studioMaster.init();
+        } catch (java.io.IOException e) {
+            System.out.println("[master] could not read who may use Studio Master: " + e.getMessage());
+        }
+        authServer.setMasterAuth(studioMaster::deny);
+        api.addModule(studioMaster::register);
+        studioMaster.start();
+        // Memoryq Radio Server licences: memoryq.com/licence (Single / Reseller, Stripe, PayPal, M-Pesa), /install.sh, Admin -> Licences
+        LicenseStore licences = new LicenseStore(Paths.get(System.getProperty("vstream.licenceFile", "licences.txt")),
+                Paths.get(System.getProperty("vstream.licenceSecrets", "licence-secrets.txt")), System::currentTimeMillis);
+        try {
+            licences.init();
+        } catch (java.io.IOException e) {
+            System.out.println("[licences] could not read the licences: " + e.getMessage());
+        }
+        Runtime.getRuntime().addShutdownHook(new Thread(licences::flushIfDirty));
+        LicenseApi licenceApi = new LicenseApi(licences, new LicensePay(licences, radioBilling), sessions, System::currentTimeMillis)
+                .publicBase("https://" + System.getProperty("vstream.publicHost", System.getProperty("vstream.mediaHost", "memoryq.com")))
+                .mail(streamMailer, user -> {
+                    EmailService.Entry e = emails.get(user);
+                    return e != null && e.verified ? e.email : null;
+                }, System.getProperty("vstream.adminEmail", "support@memoryq.com"));
+        api.addModule(licenceApi::register);
+        licenceApi.start();
         // Admin -> Mail: email to @memoryq.com (Postfix hands it over on 127.0.0.1:2525), what Memoryq sends, and the Marketplace
         MailCenter mailCenter = new MailCenter(Paths.get(System.getProperty("vstream.mailDir", "mail")), sessions, System::currentTimeMillis)
                 .mailer(streamMailer).market(market, notes);
@@ -370,7 +485,7 @@ public class VideoServerMain {
         alma.setOpenAi(System.getenv("OPENAI_API_KEY"), System.getProperty("vstream.almaModel", "gpt-5-nano"), null);
         alma.setLiveFacts(() -> {
             StringBuilder f = new StringBuilder();
-            f.append("- Live on Memoryq TV right now: ").append(listServer.liveChannels().size()).append(" stream(s).\n");
+            f.append("- Live on Mkarimu STV right now: ").append(listServer.liveChannels().size()).append(" stream(s).\n");
             StringBuilder on = new StringBuilder();
             int n = 0;
             for (RadioStore.Station st : radioStore.stations()) {
@@ -409,7 +524,7 @@ public class VideoServerMain {
                     failed++;
                 }
             }
-            return all + " (" + tvn + " on Memoryq TV" + (failed > 0 ? ", " + failed + " failed to convert" : "") + ")";
+            return all + " (" + tvn + " on Mkarimu STV" + (failed > 0 ? ", " + failed + " failed to convert" : "") + ")";
         }).fact("Radio stations", () -> {
             int all = 0, on = 0;
             for (RadioStore.Station st : radioStore.stations()) {
@@ -423,7 +538,7 @@ public class VideoServerMain {
                 .fact("Alma", () -> alma.askedToday() + " questions today, answers with " + (alma.aiReady() ? "OpenAI" : "built-in answers (no OpenAI key)"))
                 .fact("Downloads", downloads::available)
                 .fact("FFmpeg", () -> audioTools.ready() ? "ready" : "NOT installed")
-                .fact("Video disk (Mkarimu TV, mkarimu.net)", () -> MediaDisks.spaceLine(videoDir) + " - " + videoDir.toAbsolutePath())
+                .fact("Video disk (Mkarimu STV, mkarimu.net)", () -> MediaDisks.spaceLine(videoDir) + " - " + videoDir.toAbsolutePath())
                 .fact("Backup disk", () -> backup.available() ? MediaDisks.spaceLine(MediaDisks.backupRoot()) + "; last backup "
                         + BackupJob.when(backup.lastRun()) + ": " + backup.lastMessage() : "not there (setup-disks.sh)")
                 .fact("Live recordings", () -> {

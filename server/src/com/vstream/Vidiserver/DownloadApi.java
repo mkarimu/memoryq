@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
  * history (the last 3 older files can still be downloaded).
  *
  *   GET  /download                 the page          GET /download/ID.EXT   (e.g. /download/vstream.apk)   GET /download/old/FILE
+ *   GET  /download/versions.json   each app's version and link (the Vistr app checks it on start to offer an update)
  *   GET  /api/admin/downloads      POST /api/admin/downloads/upload?app=ID|new&name=&desc=&note=&version=&released=YYYY-MM-DD&file=NAME.EXT
  *   POST /api/admin/downloads/info   app=, name=, desc=, note=, version=, released=        POST /api/admin/downloads/delete  app=  (super-admin)
  * Files: downloads/ID.EXT; downloads/items.tsv (ID, name, description, type, what's new, version, released, sha-256);
@@ -403,6 +404,27 @@ public final class DownloadApi {
                 SuperAgent.send(ex, 200, "text/html; charset=utf-8", AdSense.inject(page(), "/download"));
                 return;
             }
+            if (path.equals("/download/versions.json")) { // the apps ask this to see if there is a newer version (the Vistr app on start)
+                StringBuilder sb = new StringBuilder("{\"apps\":[");
+                int n = 0;
+                for (Item it : items()) {
+                    if (!Files.isRegularFile(fileOf(it))) {
+                        continue;
+                    }
+                    sb.append(n++ > 0 ? "," : "").append("{\"id\":").append(VideoApi.jq(it.id)).append(",\"name\":").append(VideoApi.jq(it.name == null ? it.id : it.name))
+                            .append(",\"version\":").append(VideoApi.jq(it.version)).append(",\"released\":").append(it.released).append(",\"url\":")
+                            .append(VideoApi.jq("https://" + System.getProperty("vstream.publicHost", "memoryq.com") + "/download/" + it.id + "." + it.ext))
+                            .append(",\"sha256\":").append(VideoApi.jq(it.sha)).append('}');
+                }
+                ex.getResponseHeaders().set("Access-Control-Allow-Origin", "*"); // public: names and version numbers only
+                ex.getResponseHeaders().set("Cache-Control", "max-age=300");
+                byte[] b = sb.append("]}").toString().getBytes(StandardCharsets.UTF_8);
+                ex.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
+                ex.sendResponseHeaders(200, b.length);
+                ex.getResponseBody().write(b);
+                ex.close();
+                return;
+            }
             for (Item it : items()) {
                 if (path.equals("/download/" + it.id + "." + it.ext)) {
                     Path f = fileOf(it);
@@ -603,7 +625,7 @@ public final class DownloadApi {
                 + ".scroll{overflow-x:auto}.scroll table{min-width:520px}.legal{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}"
                 + "@media (max-width:720px){td.side{display:none}td.inst{width:auto;font-size:15px}.name{font-size:17px}td,th{padding:10px}}"
                 + "</style></head><body><header><div><a class=\"logo\" href=\"/\">Memoryq</a><nav><a href=\"/\">Home</a><a href=\"/me\">Web app</a>"
-                + "<a href=\"/tv\">Memoryq TV</a><a href=\"/radio\">Radio</a></nav></div></header><main>"
+                + "<a href=\"/tv\">Mkarimu STV</a><a href=\"/radio\">Radio</a></nav></div></header><main>"
                 + "<h1>Download Memoryq</h1><p class=\"lead\">The apps for your phone. On a computer, use <a href=\"/me\">the web app</a> - nothing to install.</p>"
                 + body + history
                 + "<p class=\"legal\">By installing you accept the <a href=\"/terms\">Terms</a> and the <a href=\"/privacy\">Privacy Policy</a>"

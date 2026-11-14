@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Studio Master - Memoryq</title>
+<meta name="description" content="Studio Master: mix up to five live feeds - phones, guests, cameras and videos - into one live programme.">
+<style>
+  :root { --bg: #0b0f14; --panel: #131a22; --panel2: #18212b; --line: #263241; --ink: #e7edf3; --muted: #8a9aab; --accent: #3d7bff;
+          --cue: #ffb020; --air: #ff3b3b; --good: #35c46a; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  button, select, input { font: inherit; font-size: 13px; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; }
+  button { cursor: pointer; } button:hover { border-color: #3a4a5c; } button:disabled { opacity: .45; cursor: default; }
+  header { display: flex; align-items: center; gap: 10px; padding: 8px 14px; background: #0f151c; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header .brand { font-weight: 800; letter-spacing: .3px; } header .brand span { color: var(--cue); }
+  header .grow { flex: 1; }
+  .onair { font-weight: 800; padding: 6px 14px; border-radius: 7px; background: #2a333e; color: #c9d3dd; letter-spacing: .5px; }
+  .onair.live { background: var(--air); color: #fff; box-shadow: 0 0 0 3px rgba(255,59,59,.25); }
+  #goLive.live { background: var(--air); border-color: var(--air); color: #fff; font-weight: 700; }
+  #goLive { background: #1c2a1f; border-color: #2c5a36; font-weight: 700; }
+  .wrap { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; padding: 12px; }
+  .stage { position: relative; background: #000; border: 2px solid #222; border-radius: 10px; overflow: hidden; aspect-ratio: 16 / 9; }
+  .stage.live { border-color: var(--air); }
+  .stage canvas { width: 100%; height: 100%; display: block; }
+  .stage .tag { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,.6); padding: 3px 9px; border-radius: 5px; font-size: 12px; font-weight: 700; }
+  .stage .tag.live { background: var(--air); }
+  /* the slider that appears when a slot is cued: shows the slot number of the incoming stream */
+  .tbar { position: absolute; right: 12px; top: 12%; bottom: 12%; width: 74px; background: rgba(10,14,20,.82); border: 2px solid var(--cue); border-radius: 12px;
+          display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 6px; }
+  .tbar .num { font-size: 26px; font-weight: 900; color: var(--cue); line-height: 1; }
+  .tbar .lbl { font-size: 10px; color: var(--muted); text-align: center; text-transform: uppercase; letter-spacing: .6px; }
+  .tbar input { writing-mode: vertical-lr; direction: rtl; flex: 1; width: 28px; accent-color: var(--cue); padding: 0; background: transparent; border: 0; }
+  .side { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 2px; }
+  .side > .box { flex-shrink: 0; }
+  @media (max-width: 1100px) { .side { max-height: none !important; } }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .box h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .grid button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #take { width: 100%; padding: 12px; font-size: 16px; font-weight: 800; background: var(--cue); border-color: var(--cue); color: #1a1205; margin-top: 8px; }
+  #cut { width: 100%; margin-top: 6px; font-weight: 700; }
+  .row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+  .row label { font-size: 12px; color: var(--muted); }
+  .slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; padding: 0 12px 12px; }
+  .slot { background: var(--panel); border: 3px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  .slot.cued { border-color: var(--cue); box-shadow: 0 0 0 3px rgba(255,176,32,.25); }
+  .slot.program { border-color: var(--air); }
+  .slot.program.cued { border-color: var(--air); }
+  .slot .vid { position: relative; aspect-ratio: 16 / 9; background: #05080b; cursor: pointer; }
+  .slot video, .slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .slot .n { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,.7); width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; font-weight: 900; }
+  .slot.cued .n { background: var(--cue); color: #1a1205; } .slot.program .n { background: var(--air); }
+  .slot .st { position: absolute; bottom: 6px; left: 6px; right: 6px; font-size: 11px; color: #cfd8e2; text-shadow: 0 1px 2px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .slot .empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
+  .slot .ctl { padding: 7px; display: flex; flex-direction: column; gap: 5px; }
+  .slot .ctl select { width: 100%; }
+  .slot .mix { display: flex; align-items: center; gap: 5px; }
+  .slot .mix input[type=range] { flex: 1; accent-color: var(--good); padding: 0; border: 0; background: transparent; }
+  .meter { height: 5px; background: #0a0e13; border-radius: 3px; overflow: hidden; } .meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--good), #e2d23a 70%, var(--air)); }
+  .slot .link { font-size: 11px; word-break: break-all; color: var(--muted); }
+  /* Talk show: the guest bay - places for 2, 3 or 4 slots, arranged by dragging, then committed to the programme */
+  .bayStage { position: relative; aspect-ratio: 16 / 9; background: #05080b; border: 1px solid var(--line); border-radius: 8px; margin-top: 8px; }
+  .ph { position: absolute; border: 2px dashed #3a4a5c; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        cursor: pointer; background: #0e141b; overflow: hidden; user-select: none; }
+  .ph.full { border-style: solid; border-color: #4b6584; background: #142030; }
+  .ph.over { border-color: var(--cue); background: #2a2210; }
+  .ph.air { border-color: var(--air); }
+  .ph .pn { font-size: 26px; font-weight: 900; line-height: 1; } .ph.full .pn { color: var(--cue); }
+  .ph .pl { font-size: 10px; color: var(--muted); max-width: 95%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; }
+  .ph .px { position: absolute; top: 2px; right: 3px; border: 0; background: rgba(0,0,0,.5); padding: 0 5px; font-size: 12px; border-radius: 4px; line-height: 16px; }
+  .ph .pos { position: absolute; bottom: 2px; left: 4px; font-size: 9px; color: #5d6b7a; }
+  #bayPick { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  #bayPick button { padding: 4px 9px; }
+  #commit { width: 100%; margin-top: 8px; padding: 10px; font-weight: 800; background: #1f2f4d; border-color: var(--accent); }
+  #commit.dirty { background: var(--cue); border-color: var(--cue); color: #1a1205; }
+  .slot .vid[draggable=true] { cursor: grab; }
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: #23303d; border: 1px solid #3a4a5c; padding: 10px 16px; border-radius: 9px; z-index: 50; max-width: 90vw; }
+  .gate { max-width: 460px; margin: 12vh auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px; text-align: center; }
+  .small { font-size: 12px; } .muted { color: var(--muted); }
+  #timer { font-variant-numeric: tabular-nums; font-weight: 700; }
+  @media (max-width: 1100px) { .wrap { grid-template-columns: 1fr; } .slots { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (max-width: 640px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<div id="gate" class="gate" hidden>
+  <h2 style="margin-top:0">Studio Master</h2>
+  <p id="gateMsg" class="muted">Mix live events: up to five feeds - Vstream phones, guests, your camera and videos - into one live programme.</p>
+  <a href="/login?next=/master"><button style="background:var(--accent);border-color:var(--accent)">Sign in</button></a>
+</div>
+
+<div id="app" hidden>
+<header>
+  <div class="brand">STUDIO <span>MASTER</span></div>
+  <span class="onair" id="airTag">OFF AIR</span><span id="timer" class="muted"></span>
+  <span class="grow"></span>
+  <input id="title" placeholder="Programme title (Live Channels, Mkarimu STV)" maxlength="80" style="width:260px">
+  <select id="radio" title="Also send the programme's sound to a radio station"><option value="">Radio: none</option></select>
+  <label class="small muted" title="Hear the programme sound on this computer"><input type="checkbox" id="monitor" style="vertical-align:-2px"> Listen</label>
+  <button id="goLive">GO LIVE</button>
+</header>
+
+<div class="wrap">
+  <div>
+    <div class="stage" id="stage">
+      <canvas id="pgm" width="1280" height="720"></canvas>
+      <span class="tag" id="pgmTag">PROGRAMME</span>
+      <div class="tbar" id="tbar" hidden title="Drag to bring in the cued slot (or press TAKE)">
+        <div class="lbl">ready</div><div class="num" id="tNum">2</div>
+        <input type="range" id="tSlide" min="0" max="100" value="0" aria-label="Transition">
+        <div class="lbl">drag</div>
+      </div>
+    </div>
+    <div class="row small muted" style="margin-top:8px">Click a slot to cue it (yellow). Drag the slider on the programme screen or press TAKE.
+      Keys: 1-5 cue &middot; Space take &middot; C cut &middot; D debate &middot; Enter commit the guest bay.</div>
+  </div>
+  <div class="side">
+    <div class="box"><h3>Transition</h3>
+      <div class="grid" id="trans">
+        <button data-t="cut">Cut</button><button data-t="mix" class="on">Mix</button><button data-t="dip">Dip</button>
+        <button data-t="wipe">Wipe</button><button data-t="slide">Slide</button><button data-t="zoom">Zoom</button>
+      </div>
+      <div class="row"><label>Length</label><select id="dur"><option value="400">0.4 s</option><option value="800" selected>0.8 s</option><option value="1500">1.5 s</option><option value="3000">3 s</option></select></div>
+      <button id="take" disabled>TAKE</button>
+      <button id="cut" disabled>CUT</button>
+    </div>
+    <div class="box" id="bay"><h3>Talk show - guest bay</h3>
+      <div class="grid" id="bayN"><button data-n="2" class="on">2 guests</button><button data-n="3">3 guests</button><button data-n="4">4 guests</button></div>
+      <div class="bayStage" id="bayStage"></div>
+      <div id="bayPick" hidden></div>
+      <div class="row small"><span class="muted">Drag slot numbers onto the places (or click a place). &#x2715; shuts one off.</span></div>
+      <div class="row small"><label><input type="checkbox" id="bayNames" checked style="vertical-align:-2px"> names on screen</label><span style="flex:1"></span><b id="bayState" class="muted"></b></div>
+      <button id="commit">COMMIT TO PROGRAMME</button>
+    </div>
+    <div class="box"><h3>Layout</h3>
+      <div class="grid" id="layout"><button data-l="full" class="on">Full</button><button data-l="debate">Debate</button><button data-l="pip">Pic-in-pic</button></div>
+      <p class="small muted" style="margin:8px 0 0">Debate: the programme slot and the cued slot side by side, both heard. Pic-in-pic: the cued slot small in a corner.</p>
+    </div>
+    <div class="box"><h3>Caption</h3>
+      <input id="caption" placeholder="Name / topic shown at the bottom" maxlength="80" style="width:100%">
+      <div class="row"><button id="capOn">Show</button><button id="capOff">Hide</button></div>
+    </div>
+    <div class="box small muted" id="outInfo">Not live. GO LIVE sends the programme to your Memoryq live channel (Live Channels, Mkarimu STV, recorded) and to the
+      platforms set in "Also stream to" on memoryq.com/me.</div>
+  </div>
+</div>
+<div class="slots" id="slots"></div>
+</div>
+
+<script src="/mq-auth.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let token = MQAuth.token();
+function toast(t, ms) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), ms || 3500); }
+async function api(path, form) {
+  const o = { headers: { 'Authorization': 'Bearer ' + token } };
+  if (form) { o.method = 'POST'; o.headers['Content-Type'] = 'application/x-www-form-urlencoded'; o.body = new URLSearchParams(form).toString(); }
+  try { const r = await fetch(path, o); let d = {}; try { d = await r.json(); } catch (e) { } return { ok: r.ok, status: r.status, data: d, error: d.error || ('error ' + r.status) }; }
+  catch (e) { return { ok: false, status: 0, data: {}, error: 'no connection' }; }
+}
+function iceDone(pc) { return new Promise(res => { if (pc.iceGatheringState === 'complete') { res(); return; } const t = setTimeout(res, 2500); pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); res(); } }); }); }
+function preferH264(tr) {
+  try { const caps = RTCRtpSender.getCapabilities && RTCRtpSender.getCapabilities('video'); if (!caps || !tr.setCodecPreferences) { return; }
+    const score = c => (/packetization-mode=1/.test(c.sdpFmtpLine || '') ? 2 : 0) + (/profile-level-id=42e01f/.test(c.sdpFmtpLine || '') ? 1 : 0);
+    const h = caps.codecs.filter(c => /h264/i.test(c.mimeType)).sort((a, b) => score(b) - score(a));
+    if (h.length) { tr.setCodecPreferences(h.concat(caps.codecs.filter(c => !/h264/i.test(c.mimeType)))); } } catch (e) { }
+}
+
+// ================= audio: every slot -> its fader -> the programme mix (audio follows the picture) =================
+let actx = null, dest = null, monitorGain = null;
+function audio() {
+  if (actx) { return actx; }
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  dest = actx.createMediaStreamDestination();
+  monitorGain = actx.createGain(); monitorGain.gain.value = 0; monitorGain.connect(actx.destination);
+  return actx;
+}
+$('monitor').onchange = () => { audio(); monitorGain.gain.value = $('monitor').checked ? 1 : 0; actx.resume(); };
+
+// ================= the five slots =================
+const N = 5;
+const slots = [];
+for (let i = 1; i <= N; i++) { slots[i] = { n: i, kind: '', label: '', el: null, stream: null, pc: null, fader: null, onAir: null, analyser: null, vol: 1, mute: false, srcNode: null, retry: 0, info: null }; }
+const ASM = 9, ASMOLD = 8; // the committed guest bay on the programme (and the one it replaces, during a transition)
+let bay = { n: 2, draft: [0, 0, 0, 0], committed: null, previous: null, pick: -1 };
+let program = 0, cued = 0, layout = 'full', trans = 'mix', tr = null, caption = '', captionOn = false, server = null, feeds = [], videos = [];
+
+function slotHtml(s) {
+  const d = document.createElement('div'); d.className = 'slot'; d.id = 'slot' + s.n;
+  d.innerHTML = '<div class="vid"><div class="empty">Empty - pick a source below</div><span class="n">' + s.n + '</span><span class="st"></span></div>'
+    + '<div class="ctl"><select class="src"></select><div class="extra"></div>'
+    + '<div class="mix"><button class="mu" title="Mute">&#x1F50A;</button><input type="range" class="vo" min="0" max="150" value="100" title="Volume"></div><div class="meter"><i></i></div></div>';
+  d.querySelector('.vid').onclick = () => cue(s.n);
+  d.querySelector('.vid').draggable = true;
+  d.querySelector('.vid').addEventListener('dragstart', e => { if (!s.kind) { e.preventDefault(); return; } e.dataTransfer.setData('text/plain', 'slot:' + s.n); });
+  d.querySelector('.src').onchange = e => choose(s.n, e.target.value);
+  d.querySelector('.vo').oninput = e => { s.vol = e.target.value / 100; applyGains(); };
+  d.querySelector('.mu').onclick = () => { s.mute = !s.mute; d.querySelector('.mu').innerHTML = s.mute ? '&#x1F507;' : '&#x1F50A;'; applyGains(); };
+  return d;
+}
+function fillMenus() {
+  if (!$('slot1')) { return; }
+  for (let i = 1; i <= N; i++) {
+    const sel = document.querySelector('#slot' + i + ' .src'), cur = slots[i].kind ? slots[i].kind + ':' + (slots[i].ref || '') : '';
+    let h = '<option value="">- source -</option><optgroup label="Vstream phones (live now)">';
+    h += feeds.length ? feeds.map(f => '<option value="feed:' + f.channel + '">' + esc((f.title || f.holder) + ' (' + f.holder + ')') + '</option>').join('') : '<option disabled>no phone is live right now</option>';
+    h += '</optgroup><optgroup label="Others"><option value="guest:">Invite a guest (link)</option><option value="camera:">My camera</option><option value="file:">A video file from this computer</option></optgroup>';
+    if (videos.length) { h += '<optgroup label="Memoryq videos">' + videos.map(v => '<option value="video:' + v.id + '">' + esc(v.title) + '</option>').join('') + '</optgroup>'; }
+    h += '<option value="clear:">- clear the slot -</option>';
+    sel.innerHTML = h;
+    if (cur && [...sel.options].some(o => o.value === cur)) { sel.value = cur; } else if (slots[i].kind) { const o = document.createElement('option'); o.value = cur; o.textContent = slots[i].label; sel.insertBefore(o, sel.options[1]); sel.value = cur; }
+  }
+}
+function setStatus(n, text) { const st = document.querySelector('#slot' + n + ' .st'); if (st) { st.textContent = text; } }
+
+function attachMedia(s, stream, videoEl) {
+  const box = document.querySelector('#slot' + s.n + ' .vid');
+  box.querySelector('.empty').hidden = true;
+  if (s.el && s.el !== videoEl) { s.el.remove(); }
+  const v = videoEl || document.createElement('video');
+  v.muted = true; v.playsInline = true; v.autoplay = true;
+  if (stream) { v.srcObject = stream; }
+  if (!v.parentNode) { box.insertBefore(v, box.firstChild); }
+  s.el = v; s.stream = stream;
+  v.play().catch(() => {});
+  // sound
+  audio();
+  if (s.srcNode) { try { s.srcNode.disconnect(); } catch (e) { } s.srcNode = null; }
+  try {
+    if (stream && stream.getAudioTracks().length) { s.srcNode = actx.createMediaStreamSource(stream); }
+    else if (!stream) { s.srcNode = actx.createMediaElementSource(v); v.muted = false; }
+  } catch (e) { s.srcNode = null; }
+  if (!s.fader) { s.fader = actx.createGain(); s.onAir = actx.createGain(); s.onAir.gain.value = 0; s.analyser = actx.createAnalyser(); s.analyser.fftSize = 512;
+    s.fader.connect(s.analyser); s.fader.connect(s.onAir); s.onAir.connect(dest); s.onAir.connect(monitorGain); }
+  if (s.srcNode) { s.srcNode.connect(s.fader); }
+  applyGains();
+}
+function clearSlot(s) {
+  if (s.pc) { try { s.pc.close(); } catch (e) { } s.pc = null; }
+  clearTimeout(s.retry);
+  if (s.kind === 'camera' && s.stream) { s.stream.getTracks().forEach(t => t.stop()); }
+  if (s.srcNode) { try { s.srcNode.disconnect(); } catch (e) { } s.srcNode = null; }
+  if (s.el) { s.el.pause && s.el.pause(); s.el.remove(); s.el = null; }
+  if (s.kind === 'feed') { api('/api/master/unrelay', { slot: s.n }); }
+  if (s.kind === 'guest') { api('/api/master/uninvite', { slot: s.n }); }
+  s.kind = ''; s.label = ''; s.stream = null; s.ref = '';
+  const box = document.querySelector('#slot' + s.n);
+  box.querySelector('.empty').hidden = false; box.querySelector('.extra').innerHTML = ''; setStatus(s.n, '');
+  if (program === s.n) { program = 0; }
+  bay.draft = bay.draft.map(x => x === s.n ? 0 : x);
+  if (cued === s.n) { cued = 0; }
+  drawSlots();
+}
+
+/** Reads a stream from the media server (WHEP), retrying until it is there. */
+async function whep(s, url, what) {
+  if (s.pc) { try { s.pc.close(); } catch (e) { } }
+  const pc = new RTCPeerConnection(); s.pc = pc;
+  pc.addTransceiver('video', { direction: 'recvonly' }); pc.addTransceiver('audio', { direction: 'recvonly' });
+  const stream = new MediaStream();
+  pc.ontrack = e => { stream.addTrack(e.track); if (stream.getTracks().length === 1 || e.track.kind === 'audio') { attachMedia(s, stream, s.el && s.el.srcObject === stream ? s.el : null); } setStatus(s.n, what + ' - live'); };
+  pc.onconnectionstatechange = () => { if (s.pc === pc && (pc.connectionState === 'failed' || pc.connectionState === 'disconnected')) { setStatus(s.n, what + ' - reconnecting...'); s.retry = setTimeout(() => s.pc === pc && whep(s, url, what), 3000); } };
+  try {
+    const offer = await pc.createOffer(); await pc.setLocalDescription(offer); await iceDone(pc);
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+    if (!r.ok) { throw new Error(r.status); }
+    await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+  } catch (e) {
+    if (s.pc !== pc) { return; }
+    try { pc.close(); } catch (x) { }
+    setStatus(s.n, what + ' - waiting for the picture...');
+    s.retry = setTimeout(() => s.pc === pc && whep(s, url, what), 3000);
+  }
+}
+
+async function choose(n, value) {
+  const s = slots[n];
+  const [kind, ref] = [value.split(':')[0], value.slice(value.indexOf(':') + 1)];
+  if (kind !== s.kind || ref !== s.ref) { clearSlot(s); }
+  if (!kind || kind === 'clear') { fillMenus(); return; }
+  s.kind = kind; s.ref = ref;
+  const box = document.querySelector('#slot' + n);
+  if (kind === 'feed') {
+    const f = feeds.find(x => x.channel === ref); s.label = f ? (f.title || f.holder) : ref;
+    setStatus(n, 'starting ' + s.label + '...');
+    const r = await api('/api/master/relay', { slot: n, channel: ref });
+    if (!r.ok) { toast('Slot ' + n + ': ' + r.error, 5000); clearSlot(s); fillMenus(); return; }
+    server = r.data; const sl = server.slots[n - 1];
+    whep(s, sl.whep, s.label);
+  } else if (kind === 'guest') {
+    const name = prompt('Guest name (shown to you and on the guest page):', 'Guest ' + n);
+    if (name === null) { clearSlot(s); fillMenus(); return; }
+    const r = await api('/api/master/invite', { slot: n, name: name });
+    if (!r.ok) { toast(r.error, 5000); clearSlot(s); return; }
+    server = r.data; const sl = server.slots[n - 1]; s.label = sl.guest; s.ref = '';
+    box.querySelector('.extra').innerHTML = '<div class="link">Send this link to ' + esc(sl.guest) + ':<br><b>' + esc(sl.link) + '</b></div><button class="cp">Copy link</button>';
+    box.querySelector('.cp').onclick = async () => { try { await navigator.clipboard.writeText(sl.link); toast('Link copied'); } catch (e) { prompt('Copy:', sl.link); } };
+    setStatus(n, sl.guest + ' - waiting to join...');
+    whep(s, sl.guestWhep, sl.guest);
+  } else if (kind === 'camera') {
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 }, audio: { echoCancellation: true, noiseSuppression: true } });
+      s.label = 'My camera'; attachMedia(s, st); setStatus(n, 'My camera');
+    } catch (e) { toast('The camera could not start: ' + e.message, 5000); clearSlot(s); }
+  } else if (kind === 'file') {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'video/*';
+    inp.onchange = () => { const f = inp.files[0]; if (!f) { clearSlot(s); return; } s.label = f.name; const v = document.createElement('video'); v.src = URL.createObjectURL(f); v.loop = false; attachMedia(s, null, v); videoControls(s); setStatus(n, f.name); };
+    inp.click();
+  } else if (kind === 'video') {
+    const vd = videos.find(x => String(x.id) === ref); s.label = vd ? vd.title : 'Video';
+    const v = document.createElement('video'); v.crossOrigin = 'anonymous'; v.src = vd.src; attachMedia(s, null, v); videoControls(s); setStatus(n, s.label);
+  }
+  fillMenus(); drawSlots();
+}
+function videoControls(s) {
+  const ex = document.querySelector('#slot' + s.n + ' .extra');
+  ex.innerHTML = '<div class="mix"><button class="pl">&#x25B6;</button><button class="rw">&#x23EE;</button><label class="small muted"><input type="checkbox" class="lp"> loop</label></div>';
+  const v = s.el; v.pause();
+  ex.querySelector('.pl').onclick = () => { audio().resume(); if (v.paused) { v.play(); } else { v.pause(); } };
+  ex.querySelector('.rw').onclick = () => { v.currentTime = 0; };
+  ex.querySelector('.lp').onchange = e => { v.loop = e.target.checked; };
+  v.onplay = () => ex.querySelector('.pl').innerHTML = '&#x23F8;'; v.onpause = () => ex.querySelector('.pl').innerHTML = '&#x25B6;';
+}
+
+// ================= cue, take, transitions =================
+function drawSlots() {
+  for (let i = 1; i <= N; i++) { const d = $('slot' + i); d.classList.toggle('cued', cued === i); d.classList.toggle('program', members(program).includes(i)); }
+  drawBay();
+  $('tbar').hidden = !cued || cued === program;
+  $('tNum').textContent = cued || '';
+  $('take').disabled = $('cut').disabled = !cued || cued === program;
+  $('take').textContent = cued && cued !== program ? 'TAKE ' + cued + ' (' + trans.toUpperCase() + ')' : 'TAKE';
+}
+function cue(n) {
+  if (!slots[n].kind) { toast('Slot ' + n + ' is empty - pick a source first'); return; }
+  audio().resume();
+  cued = cued === n ? 0 : n; $('tSlide').value = 0; drawSlots();
+  const v = slots[n].el; if (v && slots[n].kind !== 'feed' && slots[n].kind !== 'guest' && slots[n].kind !== 'camera' && v.paused && cued === n) { /* a video waits until taken */ }
+}
+function take(kind) {
+  if (!cued || cued === program || tr) { return; }
+  const k = kind || trans, v = slots[cued].el;
+  bay.previous = null;
+  if (v && (slots[cued].kind === 'video' || slots[cued].kind === 'file') && v.paused) { v.play().catch(() => {}); }
+  if (k === 'cut' || !program) { finish(cued); return; }
+  tr = { from: program, to: cued, kind: k, start: performance.now(), dur: +$('dur').value, manual: false };
+}
+function finish(n) {
+  program = n; cued = 0; tr = null; bay.previous = null; $('tSlide').value = 0; drawSlots(); applyGains();
+  if (layout !== 'full') { /* debate / pip need a second slot: keep the layout, it shows when something is cued */ }
+}
+$('take').onclick = () => take();
+$('cut').onclick = () => take('cut');
+$('tSlide').oninput = () => {
+  if (!cued || cued === program) { return; }
+  const t = $('tSlide').value / 100;
+  if (!program) { if (t > .5) { finish(cued); } return; }
+  tr = { from: program, to: cued, kind: trans === 'cut' ? 'mix' : trans, manual: true, t: t };
+  if (t >= 1) { finish(cued); }
+};
+document.querySelectorAll('#trans button').forEach(b => b.onclick = () => { trans = b.dataset.t; document.querySelectorAll('#trans button').forEach(x => x.classList.toggle('on', x === b)); drawSlots(); });
+document.querySelectorAll('#layout button').forEach(b => b.onclick = () => { layout = b.dataset.l; document.querySelectorAll('#layout button').forEach(x => x.classList.toggle('on', x === b)); applyGains(); });
+$('capOn').onclick = () => { caption = $('caption').value.trim(); captionOn = !!caption; };
+$('capOff').onclick = () => { captionOn = false; };
+document.addEventListener('keydown', e => {
+  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { return; }
+  if (e.key >= '1' && e.key <= '5') { cue(+e.key); }
+  else if (e.key === ' ') { e.preventDefault(); take(); }
+  else if (e.key === 'c' || e.key === 'C') { take('cut'); }
+  else if (e.key === 'd' || e.key === 'D') { document.querySelector('#layout button[data-l="' + (layout === 'debate' ? 'full' : 'debate') + '"]').click(); }
+});
+
+/** How loud each slot is on air right now: the programme slot; during a transition both; in debate / pic-in-pic the cued one too. */
+function onAirLevels() {
+  const lv = {};
+  const set = (id, v) => members(id).forEach(n => { lv[n] = Math.max(lv[n] || 0, v); });
+  if (tr) { const t = tr.manual ? tr.t : Math.min(1, (performance.now() - tr.start) / tr.dur); set(tr.from, 1 - t); set(tr.to, t); }
+  else if (program) { set(program, 1); }
+  if (layout !== 'full' && cued && cued !== program && !tr) { lv[cued] = 1; }
+  return lv;
+}
+function applyGains() {
+  if (!actx) { return; }
+  const lv = onAirLevels();
+  for (let i = 1; i <= N; i++) {
+    const s = slots[i]; if (!s.fader) { continue; }
+    s.fader.gain.setTargetAtTime(s.mute ? 0 : s.vol, actx.currentTime, .03);
+    s.onAir.gain.setTargetAtTime(lv[i] || 0, actx.currentTime, .03);
+  }
+}
+
+// ================= drawing the programme (30 pictures a second, also when this tab is in the background) =================
+const cv = $('pgm'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+function cover(v, x, y, w, h) {
+  if (!v || !v.videoWidth) { g.fillStyle = '#05080b'; g.fillRect(x, y, w, h); return; }
+  const r = Math.max(w / v.videoWidth, h / v.videoHeight), vw = v.videoWidth * r, vh = v.videoHeight * r;
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); g.drawImage(v, x + (w - vw) / 2, y + (h - vh) / 2, vw, vh); g.restore();
+}
+function el(n) { return n && slots[n] ? slots[n].el : null; }
+/** The slots a programme source stands for: one slot, or the members of the committed bay. */
+function members(id) {
+  if (id === ASM) { return bay.committed ? bay.committed.slots.filter(Boolean) : []; }
+  if (id === ASMOLD) { return bay.previous ? bay.previous.slots.filter(Boolean) : []; }
+  return id ? [id] : [];
+}
+/** Where each place of a 2, 3 or 4 guest bay sits on the screen (fractions of the width and height). */
+function bayRects(n) {
+  if (n === 2) { return [[.012, .16, .482, .68], [.506, .16, .482, .68]]; }
+  if (n === 3) { return [[.01, .08, .32, .84], [.34, .08, .32, .84], [.67, .08, .32, .84]]; }
+  return [[.01, .015, .485, .475], [.505, .015, .485, .475], [.01, .51, .485, .475], [.505, .51, .485, .475]];
+}
+function drawBayScene(a, x, y, w, h) {
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  g.fillStyle = '#0a0f16'; g.fillRect(x, y, w, h);
+  if (a) {
+    bayRects(a.n).forEach((r, i) => {
+      const rx = x + r[0] * w, ry = y + r[1] * h, rw = r[2] * w, rh = r[3] * h, n = a.slots[i];
+      if (n && el(n)) { cover(el(n), rx, ry, rw, rh); } else { g.fillStyle = '#121a24'; g.fillRect(rx, ry, rw, rh); }
+      if (n && a.names && slots[n].label) {
+        const fs = Math.max(12, Math.round(22 * w / W)); g.font = '600 ' + fs + 'px system-ui, sans-serif';
+        const tw = g.measureText(slots[n].label).width + fs; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(rx + fs * .5, ry + rh - fs * 2.1, tw, fs * 1.6);
+        g.fillStyle = '#fff'; g.fillText(slots[n].label, rx + fs, ry + rh - fs * .95);
+      }
+    });
+  }
+  g.restore();
+}
+function paint(id, x, y, w, h) {
+  if (id === ASM) { drawBayScene(bay.committed, x, y, w, h); } else if (id === ASMOLD) { drawBayScene(bay.previous, x, y, w, h); } else { cover(el(id), x, y, w, h); }
+}
+function label(x, y, text) { g.font = '600 22px system-ui, sans-serif'; const w = g.measureText(text).width + 24; g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(x, y, w, 36); g.fillStyle = '#fff'; g.fillText(text, x + 12, y + 25); }
+function scene(main, second) {
+  if (main === ASM) { paint(ASM, 0, 0, W, H); return; }
+  if (layout === 'debate' && second) {
+    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+    cover(el(main), 8, 90, W / 2 - 12, H - 180); cover(el(second), W / 2 + 4, 90, W / 2 - 12, H - 180);
+    label(18, H - 136, slots[main].label || 'Slot ' + main); label(W / 2 + 14, H - 136, slots[second].label || 'Slot ' + second);
+  } else if (layout === 'pip' && second) {
+    cover(el(main), 0, 0, W, H);
+    const pw = W * .3, ph = H * .3; g.fillStyle = '#fff'; g.fillRect(W - pw - 34, 26, pw + 8, ph + 8); cover(el(second), W - pw - 30, 30, pw, ph);
+  } else { paint(main, 0, 0, W, H); }
+}
+function frame() {
+  const second = layout !== 'full' && cued && cued !== program && !tr ? cued : 0;
+  if (tr) {
+    let t = tr.manual ? tr.t : Math.min(1, (performance.now() - tr.start) / tr.dur);
+    const A = tr.from, B = tr.to;
+    switch (tr.kind) {
+      case 'dip': if (t < .5) { paint(A, 0, 0, W, H); g.fillStyle = 'rgba(0,0,0,' + (t * 2) + ')'; g.fillRect(0, 0, W, H); } else { paint(B, 0, 0, W, H); g.fillStyle = 'rgba(0,0,0,' + (2 - t * 2) + ')'; g.fillRect(0, 0, W, H); } break;
+      case 'wipe': paint(A, 0, 0, W, H); paint(B, 0, 0, Math.max(1, W * t), H); g.fillStyle = 'rgba(255,255,255,.8)'; g.fillRect(W * t - 2, 0, 4, H); break;
+      case 'slide': paint(A, -W * t, 0, W, H); paint(B, W * (1 - t), 0, W, H); break;
+      case 'zoom': paint(A, 0, 0, W, H); g.save(); g.globalAlpha = t; const s = .6 + .4 * t; paint(B, W * (1 - s) / 2, H * (1 - s) / 2, W * s, H * s); g.restore(); break;
+      default: paint(A, 0, 0, W, H); g.save(); g.globalAlpha = t; paint(B, 0, 0, W, H); g.restore();
+    }
+    applyGains();
+    if (!tr.manual && t >= 1) { finish(tr.to); }
+  } else if (program) { scene(program, second); }
+  else { g.fillStyle = '#05080b'; g.fillRect(0, 0, W, H); g.fillStyle = '#5d6b7a'; g.font = '600 30px system-ui'; g.textAlign = 'center';
+    g.fillText(cued ? 'Press TAKE to put slot ' + cued + ' on air' : 'Pick sources below; cue + TAKE, or arrange the guest bay + COMMIT', W / 2, H / 2); g.textAlign = 'start'; }
+  if (captionOn && caption) {
+    g.font = '700 34px system-ui, sans-serif'; const w = Math.min(W - 80, g.measureText(caption).width + 60);
+    g.fillStyle = 'rgba(12,18,26,.85)'; g.fillRect(40, H - 110, w, 62); g.fillStyle = '#ffb020'; g.fillRect(40, H - 110, 8, 62);
+    g.fillStyle = '#fff'; g.fillText(caption, 66, H - 68);
+  }
+  // meters
+  for (let i = 1; i <= N; i++) { const s = slots[i]; const m = document.querySelector('#slot' + i + ' .meter i'); if (!m) { continue; }
+    if (!s.analyser) { m.style.width = '0'; continue; } const a = new Uint8Array(s.analyser.fftSize); s.analyser.getByteTimeDomainData(a);
+    let p = 0; for (const x of a) { p = Math.max(p, Math.abs(x - 128)); } m.style.width = Math.min(100, p / 1.28 * 1.4) + '%'; }
+}
+// the side column is as tall as the programme screen (it scrolls), so the five slots stay right under the screen
+function fitSide() { const side = document.querySelector('.side'), st = $('stage'); if (side && st) { side.style.maxHeight = (st.offsetHeight + 40) + 'px'; } }
+window.addEventListener('resize', fitSide);
+if (window.ResizeObserver) { new ResizeObserver(fitSide).observe($('stage')); }
+const tick = new Worker(URL.createObjectURL(new Blob(['setInterval(() => postMessage(0), 33);'], { type: 'text/javascript' })));
+tick.onmessage = frame;
+
+// ================= talk show: the guest bay =================
+function bayFilled() { return bay.draft.slice(0, bay.n).filter(Boolean).length; }
+function bayDirty() { const c = bay.committed; return !c || c.n !== bay.n || c.names !== $('bayNames').checked || bay.draft.slice(0, bay.n).join() !== c.slots.join(); }
+function drawBay() {
+  const st = $('bayStage'); if (!st) { return; }
+  st.innerHTML = '';
+  const onAir = program === ASM && !tr;
+  bayRects(bay.n).forEach((r, i) => {
+    const n = bay.draft[i], d = document.createElement('div');
+    d.className = 'ph' + (n ? ' full' : '') + (onAir && bay.committed && bay.committed.slots[i] === n && n ? ' air' : '');
+    d.style.left = r[0] * 100 + '%'; d.style.top = r[1] * 100 + '%'; d.style.width = r[2] * 100 + '%'; d.style.height = r[3] * 100 + '%';
+    d.innerHTML = '<span class="pn">' + (n || '+') + '</span><span class="pl">' + esc(n ? (slots[n].label || 'Slot ' + n) : 'place ' + (i + 1)) + '</span><span class="pos">' + (i + 1) + '</span>'
+      + (n ? '<button class="px" title="Shut this one off">&#x2715;</button>' : '');
+    d.draggable = !!n;
+    d.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', 'place:' + i));
+    d.addEventListener('dragover', e => { e.preventDefault(); d.classList.add('over'); });
+    d.addEventListener('dragleave', () => d.classList.remove('over'));
+    d.addEventListener('drop', e => { e.preventDefault(); d.classList.remove('over'); bayDrop(i, e.dataTransfer.getData('text/plain')); });
+    d.onclick = e => { if (e.target.classList.contains('px')) { bay.draft[i] = 0; bay.pick = -1; drawBay(); return; } bay.pick = bay.pick === i ? -1 : i; drawBay(); };
+    st.appendChild(d);
+  });
+  // choosing by click: the slot numbers in their line-up
+  const pk = $('bayPick'); pk.hidden = bay.pick < 0; pk.innerHTML = '';
+  if (bay.pick >= 0) {
+    pk.appendChild(Object.assign(document.createElement('span'), { className: 'small muted', textContent: 'Place ' + (bay.pick + 1) + ':' }));
+    for (let n = 1; n <= N; n++) { if (!slots[n].kind) { continue; }
+      const b = document.createElement('button'); b.textContent = n + ' ' + (slots[n].label || '').slice(0, 12); b.onclick = () => bayDrop(bay.pick, 'slot:' + n); pk.appendChild(b); }
+    const x = document.createElement('button'); x.textContent = 'empty'; x.onclick = () => { bay.draft[bay.pick] = 0; bay.pick = -1; drawBay(); }; pk.appendChild(x);
+  }
+  const dirty = bayDirty();
+  $('commit').classList.toggle('dirty', dirty && bayFilled() > 0);
+  $('commit').textContent = onAir && !dirty ? 'ON AIR' : (onAir ? 'COMMIT CHANGES' : 'COMMIT TO PROGRAMME') + (trans !== 'cut' ? ' (' + trans.toUpperCase() + ')' : '');
+  $('bayState').textContent = onAir ? (dirty ? 'changed - not committed' : 'on air') : (bayFilled() ? 'ready' : '');
+  $('bayState').style.color = onAir && !dirty ? 'var(--air)' : dirty && bayFilled() ? 'var(--cue)' : '';
+}
+/** A slot dropped (or chosen) onto a place; a place dropped onto another swaps them. A slot is in one place only. */
+function bayDrop(i, data) {
+  if (!data) { return; }
+  const [what, v] = data.split(':'), k = +v;
+  if (what === 'slot') {
+    if (!slots[k] || !slots[k].kind) { toast('Slot ' + k + ' is empty'); return; }
+    const was = bay.draft.indexOf(k); if (was >= 0 && was < bay.n) { bay.draft[was] = bay.draft[i]; }
+    bay.draft[i] = k;
+  } else if (what === 'place' && k !== i) { const t = bay.draft[i]; bay.draft[i] = bay.draft[k]; bay.draft[k] = t; }
+  bay.pick = -1; drawBay();
+}
+function commitBay() {
+  if (!bayFilled()) { toast('Put at least one slot in the bay first'); return; }
+  if (tr) { return; }
+  audio().resume();
+  const next = { n: bay.n, slots: bay.draft.slice(0, bay.n), names: $('bayNames').checked };
+  next.slots.forEach(n => { const v = el(n); if (v && (slots[n].kind === 'video' || slots[n].kind === 'file') && v.paused) { v.play().catch(() => {}); } });
+  const k = trans;
+  if (program === ASM) {
+    bay.previous = bay.committed; bay.committed = next;
+    if (k !== 'cut') { tr = { from: ASMOLD, to: ASM, kind: k, start: performance.now(), dur: +$('dur').value, manual: false }; } else { bay.previous = null; }
+  } else {
+    bay.previous = null; bay.committed = next; cued = 0;
+    if (!program || k === 'cut') { finish(ASM); } else { tr = { from: program, to: ASM, kind: k, start: performance.now(), dur: +$('dur').value, manual: false }; }
+  }
+  drawSlots(); applyGains();
+}
+$('commit').onclick = commitBay;
+$('bayNames').onchange = drawBay;
+document.querySelectorAll('#bayN button').forEach(b => b.onclick = () => { bay.n = +b.dataset.n; bay.pick = -1; document.querySelectorAll('#bayN button').forEach(x => x.classList.toggle('on', x === b)); drawBay(); });
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && !/INPUT|SELECT|TEXTAREA|BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); commitBay(); } });
+
+// ================= going live: the programme to a live channel (+ restream), the sound to a radio station =================
+let livePc = null, liveSince = 0, radioSession = null, recorder = null, queue = [], sending = false, liveTimer = null;
+$('goLive').onclick = () => livePc ? stopLive() : goLive();
+async function goLive() {
+  audio().resume();
+  if (!program) { toast('Put a slot on air first (cue it, then TAKE)'); return; }
+  $('goLive').disabled = true;
+  const r = await api('/api/master/live', { title: $('title').value });
+  $('goLive').disabled = false;
+  if (!r.ok) { toast(r.error, 6000); return; }
+  const info = r.data;
+  try {
+    const pc = new RTCPeerConnection(); livePc = pc;
+    const v = cv.captureStream(30).getVideoTracks()[0], a = dest.stream.getAudioTracks()[0];
+    const both = new MediaStream([v, a]);
+    const tv = pc.addTransceiver(v, { direction: 'sendonly', streams: [both] }); preferH264(tv);
+    pc.addTransceiver(a, { direction: 'sendonly', streams: [both] });
+    pc.onconnectionstatechange = () => {
+      if (livePc !== pc) { return; }
+      if (pc.connectionState === 'connected') {
+        try { const p = tv.sender.getParameters(); if (!p.encodings || !p.encodings.length) { p.encodings = [{}]; } p.encodings[0].maxBitrate = 3500000; tv.sender.setParameters(p).catch(() => {}); } catch (e) { }
+        setLive(true, info.channel);
+      }
+      if (pc.connectionState === 'failed') { toast('The live connection dropped - trying again', 4000); try { pc.close(); } catch (e) { } livePc = null; setLive(false); setTimeout(goLive, 3000); }
+    };
+    const offer = await pc.createOffer(); await pc.setLocalDescription(offer); await iceDone(pc);
+    const res = await fetch(info.whipUrl, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: pc.localDescription.sdp });
+    if (!res.ok) { throw new Error('the video server said ' + res.status); }
+    await pc.setRemoteDescription({ type: 'answer', sdp: await res.text() });
+  } catch (e) { toast('Could not go live: ' + e.message, 6000); if (livePc) { try { livePc.close(); } catch (x) { } } livePc = null; setLive(false); return; }
+  const st = $('radio').value;
+  if (st) { radioOn(st); }
+}
+function setLive(on, channel) {
+  $('airTag').classList.toggle('live', on); $('airTag').textContent = on ? 'ON AIR' : 'OFF AIR';
+  $('stage').classList.toggle('live', on); $('pgmTag').classList.toggle('live', on); $('pgmTag').textContent = on ? 'PROGRAMME - LIVE' : 'PROGRAMME';
+  $('goLive').classList.toggle('live', on); $('goLive').textContent = on ? 'END' : 'GO LIVE';
+  clearInterval(liveTimer);
+  if (on) { liveSince = liveSince || Date.now(); liveTimer = setInterval(() => { const s = Math.floor((Date.now() - liveSince) / 1000); $('timer').textContent = Math.floor(s / 3600) + ':' + String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); }, 1000);
+    $('outInfo').innerHTML = 'Live on <b>' + esc(channel) + '</b>: Live Channels and Mkarimu STV (recorded). Copies go to the platforms switched on in "Also stream to" (memoryq.com/me).' + (radioSession ? '<br>Sound on air on the radio station.' : ''); }
+  else { liveSince = 0; $('timer').textContent = ''; }
+}
+async function stopLive() {
+  if (!confirm('End the live programme?')) { return; }
+  if (livePc) { const pc = livePc; livePc = null; try { pc.close(); } catch (e) { } }
+  setLive(false); $('outInfo').textContent = 'Not live.';
+  if (radioSession) { const s = radioSession; radioSession = null; if (recorder && recorder.state !== 'inactive') { recorder.stop(); } recorder = null; await api('/api/djpro/offair', { session: s }); }
+}
+async function radioOn(station) {
+  if (!window.MediaRecorder) { toast('This browser cannot send live sound to the radio'); return; }
+  const r = await api('/api/djpro/onair', { station: station, name: $('title').value || 'Studio Master' });
+  if (!r.ok) { toast('Radio: ' + r.error, 6000); return; }
+  radioSession = r.data.session; queue = [];
+  const type = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  recorder = new MediaRecorder(new MediaStream(dest.stream.getAudioTracks()), type ? { mimeType: type, audioBitsPerSecond: 160000 } : {});
+  recorder.ondataavailable = e => { if (e.data && e.data.size) { queue.push(e.data); sendLoop(); } };
+  recorder.start(500);
+  toast('The sound is on air on the radio station too');
+}
+async function sendLoop() {
+  if (sending) { return; } sending = true;
+  while (queue.length && radioSession) {
+    const part = queue.length > 1 ? new Blob(queue.splice(0, queue.length)) : queue.shift();
+    let r; try { r = await fetch('/api/djpro/audio?session=' + encodeURIComponent(radioSession), { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: part }); } catch (e) { r = null; }
+    if (r && r.status === 410) { toast('The radio session ended', 5000); radioSession = null; break; }
+    if (!r) { await new Promise(res => setTimeout(res, 800)); }
+  }
+  sending = false;
+}
+window.addEventListener('beforeunload', e => { if (livePc) { e.preventDefault(); e.returnValue = ''; } });
+
+// ================= start =================
+async function refresh() {
+  const r = await api('/api/master/state');
+  if (!r.ok) { return r; }
+  server = r.data; feeds = server.feeds || []; fillMenus();
+  return r;
+}
+(async () => {
+  if (!token) { $('gate').hidden = false; return; }
+  const r = await refresh();
+  if (!r.ok) { $('gate').hidden = false; $('gateMsg').textContent = r.status === 401 ? 'Sign in to use Studio Master.' : r.error; if (r.status !== 401) { document.querySelector('#gate a').hidden = true; } return; }
+  $('app').hidden = false; fitSide();
+  const box = $('slots'); for (let i = 1; i <= N; i++) { box.appendChild(slotHtml(slots[i])); }
+  const vr = await api('/api/videos?scope=tv'); if (vr.ok) { videos = (vr.data.videos || []).filter(v => v.src).slice(0, 60); }
+  const sr = await api('/api/studio/status'); if (sr.ok) { (sr.data.stations || []).forEach(s => { const o = document.createElement('option'); o.value = s.id; o.textContent = 'Radio: ' + s.name; $('radio').appendChild(o); }); }
+  fillMenus(); drawSlots();
+  setInterval(() => api('/api/master/ping', {}).then(x => { if (x.ok) { server = x.data; const before = feeds.map(f => f.channel).join(); feeds = server.feeds || []; if (feeds.map(f => f.channel).join() !== before) { fillMenus(); } } }), 20000);
+})();
+</script>
+</body>
+</html>

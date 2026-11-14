@@ -218,7 +218,8 @@ public final class RadioStoryTest {
         for (RadioEngine.Event x : ev) {
             storyBreaks += "story".equals(x.kind) ? 1 : 0;
             ids += "id".equals(x.kind) ? 1 : 0;
-            bridged |= "intro".equals(x.kind) && x.text.contains("continue with our story") || "intro".equals(x.kind) && x.text.contains("more of");
+            // any of Alma's three ways to say it ("... before we continue with our story of", "... and then more of", "Then we continue with")
+            bridged |= "intro".equals(x.kind) && (x.text.contains("continue with") || x.text.contains("more of"));
         }
         checkTrue("10 minutes on air: story breaks every 2 songs (" + storyBreaks + ")", storyBreaks >= 2);
         checkTrue("after the story part: the song, then more of the story", bridged);

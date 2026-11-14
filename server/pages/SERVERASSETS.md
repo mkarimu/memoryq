@@ -11,11 +11,11 @@ refreshes the live status every 5 minutes.
 - VPS 162.253.130.252 (Ubuntu), HTTPS by Caddy, Java 8+ server (Vidiserver), MediaMTX for live video
   (RTMP 1935, HLS at /hls, WebRTC/WHIP at /webrtc), FFmpeg, Piper voices.
 - Deployed from the PC with scripts\deploy-vps.ps1 (update scripts in scripts\apply-*.ps1).
-- Public pages: home (/), Memoryq TV (/tv), web app (/me), Studio (/studio), DJ Pro (/djpro),
+- Public pages: home (/), Mkarimu STV (/tv), web app (/me), Studio (/studio), DJ Pro (/djpro),
   downloads (/download), terms, privacy, Vstream legal (/vstream-legal).
 
-### Mkarimu TV (mkarimu.net) - the video site, on the same server
-- Its home page is the TV wall ("Mkarimu TV"); memoryq.com/tv sends people there once mkarimu.net is in use.
+### Mkarimu STV (mkarimu.net) - the video site, on the same server
+- Its home page is the TV wall ("Mkarimu STV"); memoryq.com/tv sends people there once mkarimu.net is in use.
 - Video disk /srv/mkarimu (400 GB on datastore2): videos, thumbnails, live recordings (every live channel, kept 30
   days; Admin - Videos - Live recordings: watch, keep as a video, delete; the oldest go first above 80% full).
 - Backup disk /srv/backup (100 GB on datastore1, the other drive): every night at 03:30 the data (last 14 nights),
@@ -70,14 +70,14 @@ refreshes the live status every 5 minutes.
 ## Web administration (/admin) - accomplished
 - Overview summary; Users (all users, create, suspended, deletion requests, profile photos, Account details:
   everything one account has - profile, streams, videos, posts, comments, chats - with suspend / reinstate / delete).
-- Videos: Memoryq TV playlist (YouTube links and uploads, order), all members' videos (on TV, pause, delete).
+- Videos: Mkarimu STV playlist (YouTube links and uploads, order), all members' videos (on TV, pause, delete).
 - Streaming: live channels, channel pool. Chat: rooms, reports, group admins, mail. Wall: posts and reports.
 - News sources and stories. Ads: slider settings and paid ads. Calls add-on. Profiler (test people).
 - Radio: on air, stations (accounts list, limits, billing, login as owner), music library, Centova import.
 - Server: SERVERASSETS (this file), downloads (APK files), Alma's questions.
 
 ## Video interface - accomplished
-- Memoryq TV (/tv): big screen + live thumbnails re-ordered by prominence (viewers, peak, growth, time
+- Mkarimu STV (/tv): big screen + live thumbnails re-ordered by prominence (viewers, peak, growth, time
   on air, new-stream boost, ratings when they exist); lists (Top live, Most watched, Rising, Just started,
   Live DJs, Top rated, Marathons, Videos); search; Prev / Play-Pause / Next; sound; Full screen;
   controls slide away 3 s after play starts. Featured videos play when nobody is live.

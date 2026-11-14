@@ -26,7 +26,7 @@ import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 
 /**
- * The public "Memoryq TV" page's data: every live channel with a prominence score, so the page can order the
+ * The public "Mkarimu STV" page's data: every live channel with a prominence score, so the page can order the
  * list (and re-order it as things change), plus a small picture of each channel taken every 20 seconds.
  *
  *   GET /api/tv                 {"updated":..,"channels":[{channelId,title,viewers,peak,rising,since,uptime,score,rating,thumb,radio?}]}

@@ -510,6 +510,11 @@ public final class RadioBilling {
         return "active".equals(st) || "trialing".equals(st);
     }
 
+    /** For other Memoryq payments (licences): a call to Stripe with the same key. */
+    public Map<String, Object> stripe(String method, String path, Map<String, String> form) throws StripeException {
+        return call(method, path, form);
+    }
+
     private Map<String, Object> call(String method, String path, Map<String, String> form) throws StripeException {
         String key;
         String base;

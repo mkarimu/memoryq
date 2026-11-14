@@ -729,10 +729,11 @@ public final class MarketApi {
     private void handleAdmin(HttpExchange ex) throws IOException {
         try {
             UserStore.Info me = me(ex);
-            if (!admin(me)) {
+            String op = ex.getRequestURI().getPath().substring("/api/admin/market/".length());
+            if (!admin(me) && !(Moderators.may(me, "market.approve") && !op.equals("settings"))) {   // settings: the super-admin only
                 throw new Bad(403, "admins only");
             }
-            String op = ex.getRequestURI().getPath().substring("/api/admin/market/".length());
+            Moderators.note(me, ex, "market.approve");
             String query = ex.getRequestURI().getRawQuery();
             boolean post = "POST".equalsIgnoreCase(ex.getRequestMethod());
             long now = clock.getAsLong();

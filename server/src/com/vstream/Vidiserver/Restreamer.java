@@ -216,8 +216,14 @@ public final class Restreamer {
         c.add("15000000");
         c.add("-i");
         c.add(mediaInput + channel);
-        c.add("-c");
-        c.add("copy");
+        c.add("-c:v");
+        c.add("copy"); // the picture untouched; the sound made AAC (a browser programme - Studio Master, DJ Pro - sends Opus)
+        c.add("-c:a");
+        c.add("aac");
+        c.add("-b:a");
+        c.add("160k");
+        c.add("-ar");
+        c.add("44100");
         c.add("-f");
         c.add("flv");
         c.add(destination(t));

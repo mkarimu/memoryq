@@ -11,7 +11,7 @@ import java.nio.file.Path;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Videos (upload, YouTube, comments, who may do what), Memoryq TV's video list, and the super-admin's user view. */
+/** Videos (upload, YouTube, comments, who may do what), Mkarimu STV's video list, and the super-admin's user view. */
 public final class VideoTest {
 
     private static int failures = 0;

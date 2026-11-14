@@ -368,7 +368,7 @@ public final class SuperAgent {
     static {
         PAGES.put("admin", "the admin page (/admin)");
         PAGES.put("user", "the web app (/me)");
-        PAGES.put("tv", "Memoryq TV (/tv)");
+        PAGES.put("tv", "Mkarimu STV (/tv)");
         PAGES.put("studio", "the Studio (/studio)");
         PAGES.put("djpro", "DJ Pro (/djpro)");
         PAGES.put("home", "the homepage");

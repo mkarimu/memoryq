@@ -46,6 +46,30 @@ public final class VistrImportTest {
             if (!url.contains("key=adm_test")) {
                 return new String[]{"403", "{\"error\":\"Wrong admin key.\"}"};
             }
+            if (url.contains("/api/contact/messages")) {
+                return new String[]{"200", "{\"messages\":[{\"id\":\"m1\",\"topic\":\"Help\"}],\"asked\":" + MiniJson.class.getSimpleName().length() + ",\"url\":\""
+                        + url.replaceAll("key=[^&]*", "key=K").replace("\"", "") + "\"}"};
+            }
+            if (url.contains("/api/admin/player/assign")) {
+                Object b = MiniJson.parse(json);
+                String mq = MiniJson.str(b, "mq"), want = MiniJson.str(b, "code");
+                String code = null;
+                for (Map.Entry<String, String[]> e : players.entrySet()) {
+                    if (e.getValue()[2].equalsIgnoreCase(mq)) {
+                        code = e.getKey();
+                    }
+                }
+                if (!want.isEmpty() && players.containsKey(want) && !want.equals(code)) {
+                    return new String[]{"409", "{\"error\":\"Player ID " + want + " belongs to another player.\"}"};
+                }
+                String[] pl = code == null ? new String[]{mq, MiniJson.str(b, "email"), mq} : players.remove(code);
+                code = want.isEmpty() ? (code == null ? "9" + players.size() : code) : want;
+                players.put(code, pl);
+                return new String[]{"200", "{\"player\":{\"code\":\"" + code + "\",\"name\":\"" + pl[0] + "\"}}"};
+            }
+            if (url.contains("/api/admin/guests")) {
+                return new String[]{"200", "{\"guests\":[{\"code\":\"L-1234\",\"games\":2}],\"liteUsers\":[]}"};
+            }
             if (url.contains("/api/admin/players")) {
                 StringBuilder sb = new StringBuilder("{\"players\":[");
                 int i = 0;
@@ -174,10 +198,39 @@ public final class VistrImportTest {
             r = call(port, "/api/admin/member/edit", "u=player14&username=Zawadi", admin);
             checkTrue("... which works for them", r[0].equals("200") && us.info("Zawadi") != null && game.players.get("14")[2].equals("Zawadi"));
             checkTrue("members cannot edit others", call(port, "/api/admin/member/edit", "u=baraka&firstName=x", neema)[0].equals("403"));
+            r = call(port, "/api/admin/vistr/game?p=/api/contact/messages&delete=m1", "", admin);
+            checkTrue("Admin -> Games -> Vistr reads the word game's messages through memoryq.com (and can delete one)", r[0].equals("200")
+                    && r[1].contains("\"topic\":\"Help\"") && r[1].contains("/api/contact/messages?delete=m1&key=K"));
+            checkTrue("only the game's admin pages, only for the super-admin", call(port, "/api/admin/vistr/game?p=/api/auth/register", "", admin)[0].equals("404")
+                    && call(port, "/api/admin/vistr/game?p=/api/contact/messages", "", neema)[0].equals("403"));
+            r = call(port, "/api/admin/vistr/game?p=/api/admin/guests", "", admin);
+            checkTrue("Admin -> Games -> Vistr reads the Lite and guest visitors (" + r[1] + ")", r[0].equals("200") && r[1].contains("L-1234")
+                    && call(port, "/api/admin/vistr/game?p=/api/admin/guests", "", neema)[0].equals("403"));
+            System.out.println("-- A game ID for any member with an email --");
+            us.createUser("no_mail_kid", "password123", UserStore.Role.CHATTER);
+            try {
+                vi.assignGameId("admin", "no_mail_kid", "");
+                checkTrue("no email: refused", false);
+            } catch (Exception e) {
+                checkTrue("no email: refused, said clearly", e.getMessage().contains("no email"));
+            }
+            us.createUser("mail_kid", "password123", UserStore.Role.CHATTER);
+            emails.adminSet("mail_kid", "mail.kid@example.com");
+            String gid = vi.assignGameId("admin", "mail_kid", "");
+            checkTrue("a member with an email gets a Vistr player (the game picks the ID)", !gid.isEmpty() && game.players.get(gid)[2].equals("mail_kid")
+                    && vi.gameIdOf("mail_kid").equals(gid));
+            checkTrue("... or the ID asked for", vi.assignGameId("admin", "mail_kid", "321").equals("321") && vi.gameIdOf("mail_kid").equals("321")
+                    && !game.players.containsKey(gid));
+            try {
+                vi.assignGameId("admin", "mail_kid", "12");
+                checkTrue("a taken ID is refused", false);
+            } catch (Exception e) {
+                checkTrue("a taken ID is refused", e.getMessage().contains("belongs to another player"));
+            }
             VistrImport again = new VistrImport(dir.resolve("vistr-import.txt"), us, sessions, profiles, emails, services, sign, () -> now[0]);
             again.init();
             again.setWeb(game, "https://vistr.test");
-            checkTrue("kept across a restart", again.importAll("admin").contains("5 already brought in"));
+            checkTrue("kept across a restart (5 brought in + 1 given a game ID)", again.importAll("admin").contains("6 already brought in"));
         } finally {
             http.stop(0);
         }

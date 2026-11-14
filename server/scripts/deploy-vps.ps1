@@ -252,6 +252,8 @@ KEEP=""
 if [ -f /etc/caddy/Caddyfile ]; then
   cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.before-memoryq
   KEEP="$(awk '/^# >>> /{on=1} on{print} /^# <<< /{on=0}' /etc/caddy/Caddyfile)"
+  # Vistr Lite lives at vistr.memoryq.com/lite: take out the separate vistrlite.memoryq.com site an earlier update added
+  KEEP="$(printf '%s\n' "$KEEP" | awk '/^# >>> vistrlite/{skip=1} !skip{print} /^# <<< vistrlite/{skip=0}')"
 fi
 # Vistr installed here but its site missing from Caddy (removed by an older deploy): put it back.
 if [ -f /etc/vistr.env ] && ! printf '%s\n' "$KEEP" | grep -q '^# >>> vistr'; then
@@ -403,6 +405,12 @@ if [ "$FIRST" = 1 ] && ! [ -s "$APP/users.txt" ]; then
 fi
 rm -rf "$TMP"
 echo
+# The Vistr games (vistr.memoryq.com): the newest game code from GitHub (the PC sent it there just before this)
+if [ -f /etc/vistr.env ] && [ -f /home/mkarimu/setup-server.sh ]; then
+  echo "Vistr: getting the newest games from GitHub..."
+  if bash /home/mkarimu/setup-server.sh update; then echo "  Vistr updated (vistr.memoryq.com, vistr.memoryq.com/missing)"
+  else echo "  Vistr could not update by itself - in Bitvise run:  cd /home/mkarimu && sudo bash setup-server.sh update"; fi
+fi
 echo "DONE."
 echo "  Homepage:                   https://$DOMAIN"
 echo "  Web dashboard:              https://$DOMAIN/me"

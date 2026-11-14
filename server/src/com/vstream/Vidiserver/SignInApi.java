@@ -166,6 +166,25 @@ public final class SignInApi {
         return code;
     }
 
+    /**
+     * Uses up a one-time code (Spot What's Missing swaps it for a game-only sign-in): {username, ttl ms}, or null when the
+     * code is unknown, used or older than 2 minutes, or the account is switched off.
+     */
+    String[] take(String code) {
+        Code c;
+        synchronized (codes) {
+            c = code == null ? null : codes.remove(code);
+        }
+        if (c == null || c.expires < clock.getAsLong()) {
+            return null;
+        }
+        UserStore.Info i = users.info(c.username);
+        if (i == null || i.disabled || issuer.refusal(i) != null) {
+            return null;
+        }
+        return new String[] {i.username, String.valueOf(c.ttl)};
+    }
+
     public synchronized String googleOf(String username) {
         for (String[] v : links.values()) {
             if (v[0].equalsIgnoreCase(username)) {
@@ -431,6 +450,18 @@ public final class SignInApi {
     private void handle(HttpExchange ex) throws IOException {
         int status = 200;
         String out;
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) { // the Vistr games hand over a sign-in from their own page
+            String origin = ex.getRequestHeaders().getFirst("Origin");
+            if (origin != null && MissingGame.allowedOrigin(origin)) {
+                ex.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+                ex.getResponseHeaders().set("Vary", "Origin");
+                ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+                ex.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
+            }
+            ex.sendResponseHeaders(204, -1);
+            ex.close();
+            return;
+        }
         try {
             String op = ex.getRequestURI().getPath().substring("/api/auth/".length());
             if (op.equals("config")) {
@@ -494,6 +525,13 @@ public final class SignInApi {
                         String ret = p(form, "return");
                         if (!allowedReturn(ret)) {
                             throw new Bad(400, "that address may not receive a Memoryq sign-in");
+                        }
+                        String[] gm = GameIds.game(p(form, "app"));
+                        if (gm != null && !Moderators.gameOpenFor(i, gm[0])) {
+                            throw new Bad(403, gm[1] + " is not open yet - ask the Memoryq admin.");
+                        }
+                        if ("missing".equals(p(form, "app")) && GameIds.current() != null && GameIds.current().paused(i.username, "missing")) {
+                            throw new Bad(403, "Spot What's Missing is paused for you - ask the person who added you.");
                         }
                         Code c = new Code();
                         c.username = i.username;

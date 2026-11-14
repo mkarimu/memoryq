@@ -204,6 +204,25 @@
     header .who span { display: none; }
     #ring, #callBox { right: 8px; left: 8px; width: auto; }
   }
+  /* Spot What's Missing - the carers' area */
+  .mg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .mg-card { margin: 0; } .mg-av { font-size: 34px; line-height: 1; }
+  .mg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; }
+  .mg-field { display: block; margin: 6px 0; } .mg-lbl { display: block; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+  .mg-field select, .mg-field input:not([type]) { width: 100%; }
+  .mg-avs { display: flex; flex-wrap: wrap; gap: 4px; } .mg-avb { font-size: 24px; width: 46px; height: 46px; padding: 0; border-radius: 50%; }
+  .mg-avb.on { border: 3px solid var(--accent); background: var(--accent-soft); }
+  .mg-chk { margin-right: 12px; font-size: 14px; }
+  .mg-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 10px 0; }
+  .mg-tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .mg-tile b { display: block; font-size: 22px; } .mg-tile span { font-size: 13px; color: var(--muted); }
+  .mg-suggest { border-color: var(--accent); background: var(--accent-soft); }
+  .mg-chart-wrap { position: relative; margin-top: 8px; } .mg-chart { width: 100%; height: auto; display: block; }
+  .mg-bar { fill: var(--accent); } .mg-bar.on { opacity: .75; }
+  .mg-grid-line { stroke: var(--line); stroke-width: 1; } .mg-axis { fill: var(--muted); font-size: 12px; } .mg-val { fill: var(--ink); font-size: 12px; font-weight: 600; }
+  .mg-tip { position: absolute; top: 0; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.12); pointer-events: none; max-width: 70%; }
+  .mg-table { border-collapse: collapse; width: 100%; margin: 8px 0; font-size: 14px; } .mg-table th, .mg-table td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -473,6 +492,8 @@
         <div id="myVideos"></div>
       </div>
 
+      <div class="panel" id="panel-missing-players" hidden><div id="mgPlayers"></div></div>
+      <div class="panel" id="panel-missing-progress" hidden><div id="mgProgress"></div></div>
       <div class="panel" id="panel-profile-account" hidden>
         <div class="box" id="gLinkBox">
           <b>Sign in with Google</b>
@@ -795,12 +816,15 @@ const NAV = [
     { id: 'watch', label: 'Watch', load: loadVideos },
     { id: 'mine', label: 'My videos', load: loadMyVideos },
     { id: 'play', label: 'Video', load: loadPlay, dynamic: true } ] },
-  { id: 'market', label: 'Marketplace', icon: '\ud83d\uded2', tabs: [ { id: 'go', label: 'Marketplace', load: () => { location.href = '/market'; } } ] },
-  { id: 'world', label: 'World Radio', icon: '\ud83c\udf0d', tabs: [ { id: 'go', label: 'World Radio', load: () => { location.href = '/world'; } } ] },
+  { id: 'market', label: 'Marketplace', icon: '\ud83d\uded2', tabs: [ { id: 'go', label: 'Marketplace', away: '/market' } ] },
+  { id: 'world', label: 'World Radio', icon: '\ud83c\udf0d', tabs: [ { id: 'go', label: 'World Radio', away: '/world' } ] },
   { id: 'live', label: 'On air', icon: '\ud83d\udce1', tabs: [
     { id: 'onair', label: 'Live now', load: loadLive },
     { id: 'mystreams', label: 'My streams', load: loadMyStreams },
     { id: 'watch', label: 'Watching', load: startWatching, dynamic: true } ] },
+  { id: 'missing', label: "Spot What's Missing", icon: '\ud83d\udd0d', tabs: [
+    { id: 'players', label: 'Players', load: loadMissingPlayers },
+    { id: 'progress', label: 'Progress', load: loadMissingProgress } ] },
   { id: 'notify', label: 'Notifications', icon: '\ud83d\udd14', tabs: [
     { id: 'all', label: 'Notifications', load: loadNotifications, badge: 'notify' },
     { id: 'post', label: 'Post', load: loadOnePost, dynamic: true } ] },
@@ -827,8 +851,13 @@ function dynAllowed(cat, tab) {
   return true;
 }
 // Services the super-admin gave this member (Admin -> Profiler -> Services); Notifications and Profile are always there.
-const SERVICE_OF = { home: 'home', wall: 'wall', people: 'people', chat: 'chat', calls: 'calls', radio: 'radio', videos: 'videos', market: 'market', world: 'world', live: 'live' };
-function allowed(cat) { return !SERVICE_OF[cat] || !me || !Array.isArray(me.services) || me.services.indexOf(SERVICE_OF[cat]) >= 0; }
+const SERVICE_OF = { home: 'home', wall: 'wall', people: 'people', chat: 'chat', calls: 'calls', radio: 'radio', videos: 'videos', market: 'market', world: 'world', live: 'live', missing: 'missing' };
+/** Games the super-admin has not opened to everyone yet are hidden (false), unless this member looks after them. */
+let GOPEN = {};
+function allowed(cat) {
+  if (GOPEN[cat] === false) { return false; }
+  return !SERVICE_OF[cat] || !me || !Array.isArray(me.services) || me.services.indexOf(SERVICE_OF[cat]) >= 0;
+}
 const SVC = [
   { key: 'home', icon: '\ud83c\udfe0', label: 'News feed', go: () => show('home', 'feed') },
   { key: 'wall', icon: '\ud83e\uddf1', label: 'My wall', go: () => show('wall', 'mine') },
@@ -838,13 +867,42 @@ const SVC = [
   { key: 'radio', icon: '\ud83d\udcfb', label: 'Radio', go: () => show('radio', 'stations') },
   { key: 'world', icon: '\ud83c\udf0d', label: 'World Radio', go: () => { location.href = '/world'; } },
   { key: 'videos', icon: '\ud83c\udfac', label: 'Videos', go: () => show('videos', 'watch') },
-  { key: 'tv', icon: '\ud83d\udcfa', label: 'Memoryq TV', go: () => { location.href = '/tv'; } },
+  { key: 'tv', icon: '\ud83d\udcfa', label: 'Mkarimu STV', go: () => { location.href = '/tv'; } },
   { key: 'live', icon: '\ud83d\udce1', label: 'On air', go: () => show('live', 'onair') },
   { key: 'market', icon: '\ud83d\uded2', label: 'Marketplace', go: () => { location.href = '/market'; } },
   { key: 'vistr', icon: '\ud83c\udfae', label: 'Vistr game', go: () => openVistr() },
+  { key: 'missing', icon: '\ud83d\udd0d', label: "Spot What's Missing", go: () => show('missing', 'players') },
 ];
-/** Vistr signs you in with this Memoryq account (no second password). */
+/** Moderators: the rights the super-admin gave (empty for everyone else). */
+let MODR = [];
+const modHas = k => MODR.indexOf(k) >= 0;
+/** A moderator who looks after the Vistr word game chooses: manage its players (admin) or play. */
+function vistrChoice() {
+  const o = el('div');
+  o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:70;display:flex;align-items:center;justify-content:center;padding:16px';
+  const b = el('div', null, 'box');
+  b.style.cssText = 'max-width:360px;width:100%;margin:0';
+  b.appendChild(el('b', 'Vistr word game'));
+  b.appendChild(el('div', 'You look after this game.', 'muted small'));
+  const row = el('div'); row.style.cssText = 'display:flex;flex-direction:column;gap:8px;margin-top:12px';
+  const manage = el('button', 'Manage players', 'primary');
+  manage.addEventListener('click', () => { location.href = '/admin#games/' + (modHas('players.vistr') || modHas('users.gameId') ? 'pvistr' : 'vistr'); });
+  const play = el('button', 'Play the game');
+  play.addEventListener('click', () => { o.remove(); playVistr(); });
+  const cancel = el('button', 'Cancel');
+  cancel.addEventListener('click', () => o.remove());
+  row.appendChild(manage); row.appendChild(play); row.appendChild(cancel);
+  b.appendChild(row);
+  o.appendChild(b);
+  o.addEventListener('click', e => { if (e.target === o) { o.remove(); } });
+  document.body.appendChild(o);
+}
 async function openVistr() {
+  if (modHas('players.vistr') || modHas('users.gameId') || modHas('games.vistr')) { vistrChoice(); return; }
+  playVistr();
+}
+/** Vistr signs you in with this Memoryq account (no second password). */
+async function playVistr() {
   const r = await api('/api/auth/handoff', { app: 'vistr', return: 'https://vistr.memoryq.com/', remember: MQAuth.rememberDefault() ? '1' : '0' });
   location.href = r.ok ? r.data.url : 'https://vistr.memoryq.com/';
 }
@@ -853,7 +911,7 @@ function drawServices() {
   bar.textContent = '';
   const mine = me && Array.isArray(me.services) ? me.services : SVC.map(s => s.key);
   SVC.forEach(s => {
-    if (mine.indexOf(s.key) < 0) { return; }
+    if (mine.indexOf(s.key) < 0 || GOPEN[s.key] === false) { return; }
     const b = el('button');
     b.appendChild(el('span', s.icon));
     b.appendChild(el('span', s.label));
@@ -928,6 +986,13 @@ async function show(cat, tab, how) {
   if (!allowed(cat)) { const first = NAV.find(c => allowed(c.id)); cat = first.id; tab = first.tabs[0].id; }
   let ft = findTab(cat, tab);
   if (ft.t.dynamic && !dynAllowed(ft.c.id, ft.t.id)) { ft = findTab(ft.c.id, ft.c.tabs[0].id); }
+  // Pages of their own (World Radio, Marketplace): open them without leaving a step here, so Back from there comes to
+  // the page you were on. Arriving here on such a step (from an older visit, or Back): show the News feed instead.
+  if (ft.t.away) {
+    if (how === 'pop' || navFirst) { return show('home', 'feed', how); }
+    location.href = ft.t.away;
+    return;
+  }
   const leaving = current;
   current = { cat: ft.c.id, tab: ft.t.id };
   if (leaving.cat === 'live' && leaving.tab === 'watch' && !(current.cat === 'live' && current.tab === 'watch')) { stopWatching(); }
@@ -942,6 +1007,263 @@ async function show(cat, tab, how) {
   drawNav();
   window.scrollTo(0, 0);
   if (ft.t.load) { await ft.t.load(); }
+}
+
+// ---------- Spot What's Missing: the carers' area (players, their settings, progress, printable report) ----------
+const MG = { players: [], current: '' };
+const MG_AV = { lion: '\ud83e\udd81', elephant: '\ud83d\udc18', giraffe: '\ud83e\udd92', turtle: '\ud83d\udc22', fish: '\ud83d\udc1f', butterfly: '\ud83e\udd8b', flower: '\ud83c\udf3b',
+  star: '\u2b50', car: '\ud83d\ude97', rocket: '\ud83d\ude80', sun: '\u2600\ufe0f', heart: '\u2764\ufe0f' };
+const MG_LEVELS = ['1 - First steps: one big thing missing, very forgiving taps', '2 - Looking: one or two big things', '3 - Finding: two or three, like a nose or a paw',
+  '4 - Detail: three or four small things, like a pupil', '5 - Sharp eyes: four to six small things, exact taps'];
+const MG_KINDS = ['animals', 'faces', 'home', 'vehicles', 'food', 'nature'];
+const MG_GAME = recall('mg_game') || 'https://vistr.memoryq.com/missing/'; // a test server can be set; memoryq.com only hands sign-ins to approved addresses
+function mgPct(a, b) { return b > 0 ? Math.round(a * 100 / b) : 0; }
+function mgMin(ms) { const m = Math.round((ms || 0) / 60000); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+function mgField(label, input, hint) {
+  const l = el('label', null, 'mg-field');
+  l.appendChild(el('span', label, 'mg-lbl'));
+  l.appendChild(input);
+  if (hint) { l.appendChild(el('span', hint, 'muted small')); }
+  return l;
+}
+function mgSelect(options, value) {
+  const s = el('select');
+  options.forEach(o => { const op = el('option', o[1]); op.value = o[0]; if (String(o[0]) === String(value)) { op.selected = true; } s.appendChild(op); });
+  return s;
+}
+async function mgPlay(p) {
+  const r = await api('/api/auth/handoff', { app: 'missing', return: MG_GAME + '?p=' + enc(p.id), remember: '1' });
+  location.href = r.ok ? r.data.url : MG_GAME;
+}
+async function loadMissingPlayers() {
+  const root = $('mgPlayers'); root.textContent = '';
+  const intro = el('div', null, 'box');
+  intro.appendChild(el('b', 'Spot What\'s Missing'));
+  intro.appendChild(el('div', 'A calm picture game: two pictures, something is missing from the second one. Players point at it (or use the keyboard, a switch, or type the name), '
+    + 'hear its name and earn a star. Add each player here - children never sign in. They play at vistr.memoryq.com/missing.', 'muted'));
+  const links = el('div', null, 'row');
+  links.style.marginTop = '8px';
+  const guide = el('a', 'Guide for parents, teachers and carers (PDF)', 'btn');
+  guide.href = MG_GAME + 'carers-guide.pdf'; guide.target = '_blank'; guide.rel = 'noopener';
+  const open = el('a', 'Open the game', 'btn'); open.href = MG_GAME; open.target = '_blank'; open.rel = 'noopener';
+  links.appendChild(guide); links.appendChild(open);
+  intro.appendChild(links);
+  root.appendChild(intro);
+  const r = await api('/api/missing/players');
+  if (!r.ok) { root.appendChild(el('div', r.error, 'error')); return; }
+  MG.players = r.data.players || [];
+  if (r.data.gameId) { intro.appendChild(el('div', 'Your Spot What\'s Missing game ID: ' + r.data.gameId, 'muted small')); }
+  const list = el('div', null, 'mg-cards');
+  MG.players.forEach(p => {
+    const c = el('div', null, 'box mg-card');
+    const top = el('div', null, 'row');
+    top.appendChild(el('span', MG_AV[p.avatar] || MG_AV.star, 'mg-av'));
+    const who = el('div', null, 'grow');
+    who.appendChild(el('b', p.nickname));
+    who.appendChild(el('div', 'Level ' + p.level + ' \u00b7 ' + (p.lang === 'sw' ? 'Kiswahili' : 'English') + ' \u00b7 ' + (p.lastPlayed ? 'played ' + ago(p.lastPlayed) : 'not played yet'), 'muted small'));
+    top.appendChild(who);
+    c.appendChild(top);
+    const b = el('div', null, 'row');
+    const play = el('button', 'Play now', 'primary'); play.addEventListener('click', () => mgPlay(p));
+    const set = el('button', 'Settings'); set.addEventListener('click', () => mgEdit(p));
+    const prog = el('button', 'Progress'); prog.addEventListener('click', () => { MG.current = p.id; show('missing', 'progress'); });
+    const del = el('button', 'Delete', 'danger');
+    del.addEventListener('click', async () => {
+      if (!confirm('Delete ' + p.nickname + ' and all of their games? This cannot be undone.')) { return; }
+      const q = await api('/api/missing/players/delete', { id: p.id });
+      toast(q.ok ? p.nickname + ' was deleted' : q.error); loadMissingPlayers();
+    });
+    [play, set, prog, del].forEach(x => b.appendChild(x));
+    c.appendChild(b);
+    list.appendChild(c);
+  });
+  root.appendChild(list);
+  if (!MG.players.length) { root.appendChild(el('div', 'No players yet - add the first one.', 'muted')); }
+  const add = el('button', '+ Add a player', 'primary');
+  add.addEventListener('click', () => mgEdit(null));
+  root.appendChild(add);
+  const form = el('div'); form.id = 'mgForm';
+  root.appendChild(form);
+}
+function mgEdit(p) {
+  const box = $('mgForm'); box.textContent = '';
+  const s = (p && p.settings) || {};
+  const f = el('div', null, 'box');
+  f.appendChild(el('b', p ? 'Settings for ' + p.nickname : 'A new player'));
+  f.appendChild(el('div', 'Only a first name or nickname - no surnames, birthdays or photos.', 'muted small'));
+  const nick = el('input'); nick.maxLength = 24; nick.value = p ? p.nickname : ''; nick.placeholder = 'e.g. Zawadi';
+  const avs = el('div', null, 'mg-avs');
+  let avatar = p ? p.avatar : 'star';
+  Object.keys(MG_AV).forEach(k => {
+    const a = el('button', MG_AV[k], 'mg-avb' + (k === avatar ? ' on' : '')); a.type = 'button'; a.title = k; a.setAttribute('aria-label', k);
+    a.addEventListener('click', () => { avatar = k; avs.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === a)); });
+    avs.appendChild(a);
+  });
+  const age = mgSelect([['child', 'A child'], ['teen', 'A teenager'], ['adult', 'An adult']], p ? p.age : 'child');
+  const lang = mgSelect([['en', 'English'], ['sw', 'Kiswahili']], p ? p.lang : 'en');
+  const level = mgSelect(MG_LEVELS.map((t, i) => [i + 1, t]), p ? p.level : 1);
+  const minutes = mgSelect([[0, 'A number of pictures (below)'], [3, '3 minutes'], [5, '5 minutes'], [10, '10 minutes'], [15, '15 minutes'], [20, '20 minutes']], s.minutes || '5');
+  const pictures = mgSelect([[0, 'As the level says (3 to 8)'], [3, '3'], [4, '4'], [5, '5'], [6, '6'], [8, '8'], [10, '10'], [12, '12']], s.pictures || '0');
+  const voice = mgSelect([['1', 'On - instructions and names are spoken'], ['0', 'Off']], s.voice || '1');
+  const hints = mgSelect([['on', 'On'], ['sooner', 'Sooner (for players who get upset when stuck)'], ['later', 'Later'], ['off', 'Off']], s.hints || 'on');
+  const timer = mgSelect([['0', 'Off'], ['1', 'On (levels 4 and 5 only)']], s.timer || '0');
+  const typing = mgSelect([['0', 'Off'], ['1', 'On - can type the name (level 3 and up)']], s.typing || '0');
+  const scan = mgSelect([['0', 'Off - mouse, touch or keyboard arrows'], ['1', 'On - areas light up in turn; a switch, Space or a tap picks one']], s.scan || '0');
+  const speed = mgSelect([[1200, 'Fast (1.2 s)'], [2000, 'Medium (2 s)'], [3000, 'Slow (3 s)'], [4500, 'Very slow (4.5 s)']], s.scanSpeed || '2000');
+  const chosen = (s.categories || '').split(';').filter(Boolean);
+  const kinds = el('div', null, 'row');
+  const boxes = MG_KINDS.map(k => {
+    const l = el('label', null, 'mg-chk'); const c = el('input'); c.type = 'checkbox'; c.value = k; c.checked = !chosen.length || chosen.indexOf(k) >= 0;
+    l.appendChild(c); l.appendChild(document.createTextNode(' ' + k)); kinds.appendChild(l); return c;
+  });
+  const grid = el('div', null, 'mg-grid');
+  [mgField('First name or nickname', nick), mgField('Who is playing', age), mgField('Language', lang), mgField('Level', level, 'Choose by what they can do today, not by age. The game suggests changes - you decide.'),
+    mgField('Session length', minutes, 'A session always ends at the end of a picture.'), mgField('Pictures per session', pictures), mgField('Voice', voice),
+    mgField('Hints (a soft glow, then an arrow)', hints, 'Hints never cost stars.'), mgField('Timer', timer), mgField('Typing', typing),
+    mgField('One-switch scanning', scan), mgField('Scanning speed', speed)].forEach(x => grid.appendChild(x));
+  f.appendChild(mgField('Picture', avs));
+  f.appendChild(grid);
+  f.appendChild(mgField('Kinds of pictures', kinds));
+  const msg = el('div', null, 'error');
+  const save = el('button', p ? 'Save' : 'Add the player', 'primary');
+  save.addEventListener('click', async () => {
+    const cats = boxes.filter(c => c.checked).map(c => c.value);
+    const form = { nickname: nick.value.trim(), avatar, age: age.value, lang: lang.value, level: level.value, minutes: minutes.value, pictures: pictures.value, voice: voice.value,
+      hints: hints.value, timer: timer.value, typing: typing.value, scan: scan.value, scanSpeed: speed.value, categoriesSet: '1',
+      categories: cats.length === MG_KINDS.length ? '' : cats.join(',') };
+    if (p) { form.id = p.id; }
+    if (!form.nickname) { msg.textContent = 'Give the player a first name or nickname.'; return; }
+    if (!cats.length) { msg.textContent = 'Tick at least one kind of picture.'; return; }
+    const q = await api('/api/missing/players/save', form);
+    if (!q.ok) { msg.textContent = q.error; return; }
+    toast(p ? 'Saved' : q.data.player.nickname + ' was added'); loadMissingPlayers();
+  });
+  const cancel = el('button', 'Cancel'); cancel.addEventListener('click', () => { box.textContent = ''; });
+  f.appendChild(msg); f.appendChild(save); f.appendChild(cancel);
+  box.appendChild(f);
+  nick.focus();
+  f.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+/** One column per session: the share of things found without a hint (one series - the title names it, so no legend). */
+function mgChart(sessions) {
+  const W = 640, H = 200, L = 40, B = 26, T = 12, n = sessions.length;
+  const slot = (W - L - 8) / Math.max(n, 1), bw = Math.min(24, Math.max(4, slot - 2));
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H); svg.setAttribute('class', 'mg-chart'); svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', 'Found without a hint, per session: ' + sessions.map(s => mgPct(s.noHint, s.found) + '%').join(', '));
+  const y = v => T + (H - T - B) * (1 - v / 100);
+  [0, 50, 100].forEach(v => {
+    const g = document.createElementNS(NS, 'line');
+    g.setAttribute('x1', L); g.setAttribute('x2', W - 4); g.setAttribute('y1', y(v)); g.setAttribute('y2', y(v)); g.setAttribute('class', 'mg-grid-line');
+    svg.appendChild(g);
+    const t = document.createElementNS(NS, 'text'); t.setAttribute('x', L - 6); t.setAttribute('y', y(v) + 4); t.setAttribute('text-anchor', 'end'); t.setAttribute('class', 'mg-axis');
+    t.textContent = v + '%'; svg.appendChild(t);
+  });
+  const tip = el('div', null, 'mg-tip'); tip.hidden = true;
+  sessions.forEach((s, i) => {
+    const v = mgPct(s.noHint, s.found), x = L + slot * i + (slot - bw) / 2, top = y(v), base = y(0), hgt = Math.max(0, base - top), r = Math.min(4, hgt, bw / 2);
+    const bar = document.createElementNS(NS, 'path');
+    bar.setAttribute('d', 'M' + x + ',' + base + 'V' + (top + r) + 'Q' + x + ',' + top + ' ' + (x + r) + ',' + top + 'H' + (x + bw - r) + 'Q' + (x + bw) + ',' + top + ' ' + (x + bw) + ',' + (top + r) + 'V' + base + 'Z');
+    bar.setAttribute('class', 'mg-bar');
+    svg.appendChild(bar);
+    const hit = document.createElementNS(NS, 'rect'); // a hover target bigger than the bar
+    hit.setAttribute('x', L + slot * i); hit.setAttribute('y', T); hit.setAttribute('width', slot); hit.setAttribute('height', H - T - B); hit.setAttribute('fill', 'transparent');
+    hit.addEventListener('mouseenter', () => {
+      tip.hidden = false;
+      tip.textContent = new Date(s.at).toLocaleDateString() + ' \u00b7 level ' + s.level + ' \u00b7 found ' + s.found + ', ' + v + '% without a hint \u00b7 ' + s.pictures + ' pictures, ' + s.passes + ' passed';
+      tip.style.left = Math.min(70, Math.max(0, (x / W) * 100 - 10)) + '%';
+      bar.classList.add('on');
+    });
+    hit.addEventListener('mouseleave', () => { tip.hidden = true; bar.classList.remove('on'); });
+    svg.appendChild(hit);
+    if (i === n - 1) { // label only the latest session
+      const t = document.createElementNS(NS, 'text'); t.setAttribute('x', x + bw / 2); t.setAttribute('y', Math.max(10, top - 5)); t.setAttribute('text-anchor', 'middle'); t.setAttribute('class', 'mg-val');
+      t.textContent = v + '%'; svg.appendChild(t);
+    }
+  });
+  const first = document.createElementNS(NS, 'text'), last = document.createElementNS(NS, 'text');
+  first.setAttribute('x', L); first.setAttribute('y', H - 6); first.setAttribute('class', 'mg-axis'); first.textContent = n ? new Date(sessions[0].at).toLocaleDateString() : '';
+  last.setAttribute('x', W - 4); last.setAttribute('y', H - 6); last.setAttribute('text-anchor', 'end'); last.setAttribute('class', 'mg-axis'); last.textContent = n > 1 ? new Date(sessions[n - 1].at).toLocaleDateString() : '';
+  svg.appendChild(first); svg.appendChild(last);
+  const wrap = el('div', null, 'mg-chart-wrap'); wrap.appendChild(svg); wrap.appendChild(tip);
+  return wrap;
+}
+function mgTable(head, rows) {
+  const t = el('table', null, 'mg-table');
+  const tr = el('tr'); head.forEach(x => tr.appendChild(el('th', x))); t.appendChild(tr);
+  rows.forEach(r => { const row = el('tr'); r.forEach(x => row.appendChild(el('td', String(x)))); t.appendChild(row); });
+  return t;
+}
+async function loadMissingProgress() {
+  const root = $('mgProgress'); root.textContent = '';
+  if (!MG.players.length) { const r = await api('/api/missing/players'); MG.players = r.ok ? r.data.players : []; }
+  if (!MG.players.length) { root.appendChild(el('div', 'Add a player first (Players tab).', 'muted')); return; }
+  if (!MG.players.some(p => p.id === MG.current)) { MG.current = MG.players[0].id; }
+  const pick = el('div', null, 'row');
+  MG.players.forEach(p => { const b = el('button', (MG_AV[p.avatar] || '') + ' ' + p.nickname, p.id === MG.current ? 'primary' : ''); b.addEventListener('click', () => { MG.current = p.id; loadMissingProgress(); }); pick.appendChild(b); });
+  root.appendChild(pick);
+  const r = await api('/api/missing/progress?player=' + enc(MG.current));
+  if (!r.ok) { root.appendChild(el('div', r.error, 'error')); return; }
+  const d = r.data, tt = d.totals, p = d.player;
+  if (!tt.sessions) { root.appendChild(el('div', p.nickname + ' has not played yet. Press "Play now" on the Players tab.', 'muted')); return; }
+  if (d.suggestion) {
+    const up = d.suggestion === 'up', to = p.level + (up ? 1 : -1);
+    const s = el('div', null, 'box mg-suggest');
+    s.appendChild(el('div', up ? p.nickname + ' found almost everything without hints in the last 3 sessions. Level ' + to + ' may be a good next step.'
+      : p.nickname + ' needed a lot of help in the last 2 sessions. Level ' + to + ' may feel better for now.'));
+    const b = el('button', 'Move to level ' + to, 'primary');
+    b.addEventListener('click', async () => { const q = await api('/api/missing/players/save', { id: p.id, level: String(to) }); toast(q.ok ? 'Now at level ' + to : q.error); loadMissingProgress(); });
+    s.appendChild(b); s.appendChild(el('span', ' Nothing changes unless you choose it.', 'muted small'));
+    root.appendChild(s);
+  }
+  const tiles = el('div', null, 'mg-tiles');
+  [['Sessions', tt.sessions], ['Time played', mgMin(tt.ms)], ['Pictures', tt.pictures], ['Things found', tt.found], ['Found without a hint', mgPct(tt.noHint, tt.found) + '%'], ['Stars', tt.stars]]
+    .forEach(x => { const t = el('div', null, 'mg-tile'); t.appendChild(el('b', String(x[1]))); t.appendChild(el('span', x[0])); tiles.appendChild(t); });
+  root.appendChild(tiles);
+  const cbox = el('div', null, 'box');
+  cbox.appendChild(el('b', 'Found without a hint, session by session'));
+  cbox.appendChild(el('div', 'Look for the trend over weeks, not single days. Hover a column for that session.', 'muted small'));
+  cbox.appendChild(mgChart(d.sessions));
+  const det = el('details'); det.appendChild(el('summary', 'Show as a table'));
+  det.appendChild(mgTable(['Date', 'Level', 'Minutes', 'Pictures', 'Found', 'Without a hint', 'Passed', 'Average time to find', 'Stars'],
+    d.sessions.slice().reverse().map(s => [new Date(s.at).toLocaleString(), s.level, Math.round(s.ms / 60000), s.pictures, s.found, mgPct(s.noHint, s.found) + '%', s.passes, (s.meanMs / 1000).toFixed(1) + ' s', s.stars])));
+  cbox.appendChild(det);
+  root.appendChild(cbox);
+  const kbox = el('div', null, 'box');
+  kbox.appendChild(el('b', 'Hardest things first'));
+  kbox.appendChild(el('div', 'Good things to practise in daily life: "Where is your nose?"', 'muted small'));
+  kbox.appendChild(mgTable(['Thing', 'Found', 'Without a hint', 'Average time'], d.kinds.map(k => [k.name || k.kind, k.found, mgPct(k.noHint, k.found) + '%', (k.meanMs / 1000).toFixed(1) + ' s'])));
+  const sz = d.sizes;
+  kbox.appendChild(el('div', 'By size - big: ' + mgPct(sz.large.noHint, sz.large.found) + '% without a hint (' + sz.large.found + '), medium: ' + mgPct(sz.medium.noHint, sz.medium.found)
+    + '% (' + sz.medium.found + '), small: ' + mgPct(sz.small.noHint, sz.small.found) + '% (' + sz.small.found + ')', 'muted small'));
+  root.appendChild(kbox);
+  if (d.levels.length) { root.appendChild(el('div', 'Levels: ' + d.levels.map(l => 'level ' + l.level + ' from ' + new Date(l.at).toLocaleDateString()).join(', '), 'muted small')); }
+  const print = el('button', 'Print a one-page report', 'primary');
+  print.addEventListener('click', () => mgReport(d));
+  root.appendChild(print);
+}
+function mgReport(d) {
+  const tt = d.totals, p = d.player, e = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const recent = d.sessions.slice(-10).reverse();
+  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + e(p.nickname) + ' - Spot What\'s Missing</title><style>body{font-family:system-ui,sans-serif;color:#1b1f23;margin:28px;font-size:13px}'
+    + 'h1{font-size:22px;margin:0}table{border-collapse:collapse;width:100%;margin:8px 0 14px}th,td{border:1px solid #ccd;padding:4px 6px;text-align:left}th{background:#eef2f8}.t{display:flex;gap:18px;margin:12px 0}'
+    + '.t div{border:1px solid #ccd;border-radius:6px;padding:6px 10px}.t b{display:block;font-size:18px}.m{color:#556}</style></head><body>'
+    + '<h1>' + e(p.nickname) + ' - Spot What\'s Missing</h1><div class="m">Progress report, ' + new Date().toLocaleDateString() + ' \u00b7 level ' + p.level + ' \u00b7 '
+    + (p.lang === 'sw' ? 'Kiswahili' : 'English') + '</div><div class="t">'
+    + [['Sessions', tt.sessions], ['Time played', mgMin(tt.ms)], ['Pictures', tt.pictures], ['Things found', tt.found], ['Without a hint', mgPct(tt.noHint, tt.found) + '%']]
+      .map(x => '<div><b>' + e(x[1]) + '</b>' + e(x[0]) + '</div>').join('') + '</div>'
+    + '<h3>Last sessions</h3><table><tr><th>Date</th><th>Level</th><th>Pictures</th><th>Found</th><th>Without a hint</th><th>Passed</th><th>Average time</th></tr>'
+    + recent.map(s => '<tr><td>' + e(new Date(s.at).toLocaleDateString()) + '</td><td>' + s.level + '</td><td>' + s.pictures + '</td><td>' + s.found + '</td><td>' + mgPct(s.noHint, s.found) + '%</td><td>'
+      + s.passes + '</td><td>' + (s.meanMs / 1000).toFixed(1) + ' s</td></tr>').join('') + '</table>'
+    + '<h3>Hardest things first</h3><table><tr><th>Thing</th><th>Found</th><th>Without a hint</th><th>Average time</th></tr>'
+    + d.kinds.slice(0, 10).map(k => '<tr><td>' + e(k.name || k.kind) + '</td><td>' + k.found + '</td><td>' + mgPct(k.noHint, k.found) + '%</td><td>' + (k.meanMs / 1000).toFixed(1) + ' s</td></tr>').join('') + '</table>'
+    + (d.suggestion ? '<p>The game suggests ' + (d.suggestion === 'up' ? 'trying level ' + (p.level + 1) : 'going back to level ' + (p.level - 1)) + '.</p>' : '')
+    + '<p class="m">The game supports learning; it is not a diagnosis or a treatment. Share this with the player\'s teacher, therapist or doctor - they can say how it fits their plan.</p>'
+    + '<script>window.onload=function(){window.print()}<\/script></body></html>';
+  const w = window.open('', '_blank');
+  if (!w) { toast('Allow pop-ups for memoryq.com to print the report'); return; }
+  w.document.open(); w.document.write(html); w.document.close();
 }
 
 // ---------- posts (used by feed, walls, notifications) ----------
@@ -2340,6 +2662,15 @@ async function start() {
   $('app').hidden = false;
   $('hdrAv').src = '/api/profiles/avatar?u=' + enc(me.username) + '&v=' + photoVer;
   $('adminLink').hidden = me.role !== 'ADMIN';
+  MODR = [];
+  if (me.role !== 'ADMIN' && !AS_MODE) {   // moderators: their part of the admin panel is one tap away
+    const mr = await api('/api/mod/me');
+    MODR = mr.ok && Array.isArray(mr.data.rights) ? mr.data.rights : [];
+    if (MODR.length) { $('adminLink').hidden = false; $('adminLink').title = 'Admin (what you look after)'; }
+  }
+  const gr = await api('/api/games');   // games not public yet stay hidden (the super-admin and their moderators see them)
+  GOPEN = {};
+  if (gr.ok && Array.isArray(gr.data.games)) { gr.data.games.forEach(g => { GOPEN[g.key] = !!g.open; }); }
   if (AS_MODE && !$('asBanner')) {
     const b = document.createElement('div'); b.id = 'asBanner';
     b.style.cssText = 'position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:60;background:#b26a00;color:#fff;padding:8px 14px;border-radius:20px;font:600 13px system-ui;box-shadow:0 4px 14px rgba(0,0,0,.3)';
@@ -2473,7 +2804,7 @@ async function loadMyVideos() {
     const status = v.status === 'processing' ? 'Preparing - it will be ready in a few minutes'
       : v.status === 'failed' ? 'Could not be prepared' + (v.error ? ': ' + v.error : '')
       : v.paused === 'admin' ? 'Paused by Memoryq (contact support@memoryq.com)'
-      : v.paused ? 'Paused - only you can see it' : (v.featured ? 'Showing \u00B7 on Memoryq TV' : 'Showing');
+      : v.paused ? 'Paused - only you can see it' : (v.featured ? 'Showing \u00B7 on Mkarimu STV' : 'Showing');
     const title = vh('input', { value: v.title, maxlength: 120 });
     const desc = vh('textarea', { rows: 2, maxlength: 2000 }, v.description);
     const edit = vh('div', { hidden: true, style: 'margin-top:8px' }, title, desc,
@@ -2531,7 +2862,7 @@ async function loadMyStreams() {
     root.appendChild(vh('div', { class: 'card' },
       vh('b', {}, x.title || x.channel), x.live ? vh('span', { class: 'chip', style: 'background:#e5484d;color:#fff;margin-left:6px' }, 'LIVE') : null,
       vh('div', { class: 'muted small' }, new Date(x.start).toLocaleString() + ' \u00b7 ' + sDur(x.durationMs)
-        + (v ? ' \u00b7 kept as a video' + (v.onTv ? ' \u00b7 on Mkarimu TV' : '') : (recs.length ? ' \u00b7 recording kept 30 days' : ''))),
+        + (v ? ' \u00b7 kept as a video' + (v.onTv ? ' \u00b7 on Mkarimu STV' : '') : (recs.length ? ' \u00b7 recording kept 30 days' : ''))),
       vh('div', { class: 'row', style: 'gap:6px;margin-top:8px;flex-wrap:wrap' },
         recs.map(y => vh('button', { on: { click: () => { player.style.display = 'block'; player.src = y.url; player.play().catch(() => {}); window.scrollTo(0, player.offsetTop - 60); } } }, 'Watch')),
         v && v.status === 'ready' ? vh('button', { on: { click: () => openVideo(v.id) } }, 'Watch the video') : null,

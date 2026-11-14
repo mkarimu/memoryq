@@ -363,7 +363,7 @@ public final class Recordings {
         return keep(rel, title, false);
     }
 
-    /** Keeps a finished recording as a video; onTv = it also plays on Mkarimu TV once it is ready. */
+    /** Keeps a finished recording as a video; onTv = it also plays on Mkarimu STV once it is ready. */
     public VideoStore.Video keep(String rel, String title, boolean onTv) throws IOException {
         Path f = fileOf(rel);
         if (f == null) {
@@ -404,10 +404,12 @@ public final class Recordings {
             }
             SessionStore.Session s = token.isEmpty() ? null : sessions.get(token);
             UserStore.Info me = s == null ? null : users.info(s.username);
-            if (me == null || me.role != UserStore.Role.ADMIN) {
+            String right = "list".equals(op) || "file".equals(op) ? "streams.view" : "streams.recordings";
+            if (me == null || me.role != UserStore.Role.ADMIN && !Moderators.may(me, right)) {
                 json(ex, 403, "{\"error\":\"admins only\"}");
                 return;
             }
+            Moderators.note(me, ex, right);
             boolean post = "POST".equalsIgnoreCase(ex.getRequestMethod());
             String body = post ? new String(AudioTools.readAll(ex.getRequestBody()), StandardCharsets.UTF_8) : "";
             switch (op) {

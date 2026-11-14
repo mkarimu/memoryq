@@ -25,10 +25,10 @@ import java.util.Set;
 public final class AdSense {
 
     static final String DEFAULT_CLIENT = "ca-pub-2298775225198657";
-    static final Set<String> DEFAULT_OFF = new LinkedHashSet<String>(Arrays.asList("/admin", "/studio", "/djpro", "/login"));
+    static final Set<String> DEFAULT_OFF = new LinkedHashSet<String>(Arrays.asList("/admin", "/studio", "/djpro", "/login", "/licence", "/master", "/master/join"));
     /** The pages a member of the public can open (the ones that can carry ads). */
     static final String[] PAGES = {"/", "/me", "/world", "/tv", "/market", "/download", "/terms", "/privacy", "/vstream-legal",
-        "/admin", "/studio", "/djpro", "/login"};
+        "/admin", "/studio", "/djpro", "/login", "/licence", "/master", "/master/join"};
 
     private static volatile AdSense current;
 

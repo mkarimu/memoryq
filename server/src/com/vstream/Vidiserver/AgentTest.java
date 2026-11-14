@@ -169,6 +169,9 @@ public final class AgentTest {
         r = http("POST", "/api/admin/downloads/upload?app=vstream&version=1.2.0&released=2026-10-20&note=" + URLEncoder.encode("Faster start", "UTF-8"), apk2, admin);
         checkTrue("a new version (version, release date)", r[0].equals("200") && r[1].contains("\"version\":\"1.2.0\"") && r[1].contains("\"downloads\":1")
                 && r[1].contains("\"thisVersion\":0"));
+        r = get("/download/versions.json", null);
+        checkTrue("the apps can ask for the newest version (to offer an update)", r[1].contains("\"id\":\"vstream\"") && r[1].contains("\"version\":\"1.2.0\"")
+                && r[1].contains("/download/vstream.apk") && !r[1].contains("\"id\":\"memoryq\""));
         r = get("/download", null);
         checkTrue("the page: the new version, its date, all downloads; the old one in the version history",
                 r[1].contains("Vstream 1.2.0") && r[1].contains("October 20, 2026") && r[1].contains("downloads: 1")

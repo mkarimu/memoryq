@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radio Server licences - Memoryq</title>
+<meta name="description" content="Run your own radio streaming server with Memoryq: a Single licence or a Reseller licence with 10 to 500 channels. Pay by card, PayPal or M-Pesa.">
+<style>
+  :root { --bg: #f2f4f7; --card: #fff; --ink: #17202a; --muted: #5f6e7d; --line: #e0e6ed; --soft: #f6f8fa; --accent: #2f6fed; --accent-soft: #e8efff;
+          --good: #2e7d32; --bad: #c62828; --warn: #b26a00; --night: #16202a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1419; --card: #182029; --ink: #e6ebf0; --muted: #8b9aa8; --line: #2a3542; --soft: #1e2833; --accent: #5b8cff; --accent-soft: #1f2d4a;
+            --good: #5cb860; --bad: #ef6b6b; --warn: #e0a24a; }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.5; }
+  a { color: var(--accent); }
+  header { background: var(--night); color: #fff; }
+  header .in { max-width: 1040px; margin: 0 auto; padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+  header a.brand { color: #fff; font-weight: 800; font-size: 20px; text-decoration: none; }
+  header .tag { color: #9fb0bf; font-size: 14px; }
+  header .grow { flex: 1; }
+  header .who { color: #c9d4dd; font-size: 14px; }
+  header button { background: transparent; color: #fff; border: 1px solid #3a4a5a; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 28px; margin: 0 0 6px; } h2 { font-size: 20px; margin: 0 0 10px; }
+  .lead { color: var(--muted); margin: 0 0 22px; max-width: 720px; }
+  button, .btn { font: inherit; font-size: 14px; cursor: pointer; padding: 9px 15px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+                 border-radius: 9px; text-decoration: none; display: inline-block; }
+  button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 650; }
+  button.danger { color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select { font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: var(--card); color: var(--ink); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin-bottom: 16px; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+  .toggle button { border: 0; border-radius: 0; padding: 8px 16px; }
+  .toggle button.on { background: var(--accent); color: #fff; }
+  .plans { display: grid; grid-template-columns: 1fr 1.3fr; gap: 16px; }
+  .plan { border: 2px solid var(--line); border-radius: 14px; padding: 20px; background: var(--card); display: flex; flex-direction: column; cursor: pointer; }
+  .plan.on { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .plan h3 { margin: 0; font-size: 18px; } .plan .price { font-size: 34px; font-weight: 800; margin: 8px 0 0; }
+  .plan .price small { font-size: 15px; font-weight: 500; color: var(--muted); }
+  .plan ul { padding-left: 18px; margin: 12px 0; color: var(--muted); font-size: 14px; } .plan li { margin: 3px 0; }
+  .save { display: inline-block; background: #e6f4ea; color: #1e6b2c; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  @media (prefers-color-scheme: dark) { .save { background: #1d3524; color: #8fd9a0; } }
+  .chan { display: flex; align-items: center; gap: 12px; margin: 10px 0 2px; }
+  .chan input[type=range] { flex: 1; accent-color: var(--accent); padding: 0; border: 0; background: transparent; height: 22px; }
+  .chan b { min-width: 92px; text-align: right; }
+  .pay { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+  .pay button { min-width: 140px; }
+  .mp { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .msg { padding: 10px 14px; border-radius: 10px; margin: 0 0 14px; font-weight: 600; }
+  .msg.ok { background: #e6f4ea; color: #1e6b2c; } .msg.bad { background: #fdecea; color: #a12622; } .msg.info { background: var(--accent-soft); color: var(--ink); }
+  @media (prefers-color-scheme: dark) { .msg.ok { background: #1d3524; color: #8fd9a0; } .msg.bad { background: #3a1d1d; color: #ffaaaa; } }
+  .lic { border: 1px solid var(--line); border-radius: 14px; background: var(--card); margin-bottom: 14px; overflow: hidden; }
+  .lic .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--soft); }
+  .lic .top h3 { margin: 0; font-size: 17px; } .lic .top .grow { flex: 1; }
+  .badge { font-size: 11px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; color: #fff; background: var(--muted); }
+  .badge.active { background: var(--good); } .badge.overdue { background: var(--warn); } .badge.expired, .badge.suspended { background: var(--bad); }
+  .badge.pending { background: #6b7a88; }
+  .lic .body { padding: 14px 18px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 18px; margin-bottom: 12px; }
+  .facts div span { display: block; font-size: 12px; color: var(--muted); } .facts div b { font-weight: 600; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #9aa6b2; margin-right: 5px; } .dot.on { background: var(--good); }
+  .cmd { background: #0f1720; color: #d9f2e6; font-family: ui-monospace, Consolas, Menlo, monospace; font-size: 13px; border-radius: 10px; padding: 12px 14px;
+         word-break: break-all; position: relative; margin: 8px 0; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; } th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; } .num { text-align: right; white-space: nowrap; }
+  details summary { cursor: pointer; color: var(--accent); margin-top: 8px; }
+  .pts { font-weight: 700; } .pts.up { color: var(--good); } .pts.down { color: var(--bad); }
+  @media (max-width: 760px) { .plans { grid-template-columns: 1fr; } h1 { font-size: 23px; } .pay button { flex: 1 1 45%; min-width: 0; } }
+</style>
+</head>
+<body>
+<header><div class="in"><a class="brand" href="/">Memoryq</a><span class="tag">Radio Server licences</span><span class="grow"></span>
+  <span class="who" id="who"></span><a class="btn" id="signIn" href="/login?next=/licence" style="background:transparent;color:#fff;border-color:#3a4a5a">Sign in</a>
+  <button id="signOut" hidden>Sign out</button></div></header>
+<main>
+  <div id="flash" hidden class="msg"></div>
+  <h1>Run your own radio streaming server</h1>
+  <p class="lead">Install Memoryq Radio Server on your own VPS with one command: AutoDJ, live DJs, listener statistics and a web Studio for every
+    channel. <b>Single</b> runs one station. <b>Reseller</b> runs 10 to 500 channels you sell to your own customers - the more channels, the less each one costs.</p>
+
+  <div class="toggle" id="period"><button data-p="monthly" class="on">Monthly</button><button data-p="annual">Annual <span class="save" id="saveTag">2 months free</span></button></div>
+  <div class="plans">
+    <div class="plan on" id="pSingle" data-k="single">
+      <h3>Single</h3>
+      <div class="price" id="singlePrice">-</div>
+      <ul><li>1 licence, 1 streaming channel</li><li>Streaming port <span id="sPort">8000</span></li><li>Studio, AutoDJ, live DJ, statistics</li><li>Your own server, your own domain</li></ul>
+    </div>
+    <div class="plan" id="pReseller" data-k="reseller">
+      <h3>Reseller</h3>
+      <div class="price" id="resPrice">-</div>
+      <div class="chan"><input type="range" id="channels" min="10" max="200" step="10" value="10" aria-label="Channels"><b id="chanText">10 channels</b></div>
+      <div class="small muted" id="perCh"></div>
+      <ul><li>Channels in steps of 10 (ports <span id="rPorts">8000-8009</span>)</li><li>Every 10 more channels: <span id="stepTxt">$0.25</span> less per channel</li>
+        <li>Sell stations to your own customers</li><li>More channels later: pay only the difference</li></ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:16px">
+    <h2 id="buyTitle">Pay and get your install command</h2>
+    <div id="buyOut"><p class="muted" style="margin:0">Sign in with your Memoryq account to buy a licence. <a href="/login?next=/licence">Sign in</a> or
+      <a href="/me">create a free account</a>.</p></div>
+    <div id="buyIn" hidden>
+      <div id="sumLine" style="font-size:17px;font-weight:650"></div>
+      <div class="pay" id="payBtns">
+        <button class="primary" data-m="stripe">&#x1F4B3; Card (credit / debit)</button>
+        <button data-m="paypal">PayPal</button>
+        <button data-m="mpesa">M-Pesa</button>
+        <button data-m="manual">Bank transfer</button>
+      </div>
+      <div class="mp" id="mpBox" hidden>
+        <label class="small">Safaricom number <input id="mpPhone" placeholder="0712 345 678" inputmode="tel" style="width:170px"></label>
+        <span class="small muted" id="mpKes"></span>
+        <button class="primary" id="mpGo">Send the M-Pesa request</button>
+      </div>
+      <p class="small muted" id="payNote" style="margin:10px 0 0">Need a custom deal (more than 500 channels, special period, invoice to a company)? Email
+        <a href="mailto:support@memoryq.com">support@memoryq.com</a>.</p>
+    </div>
+  </div>
+
+  <section id="mineBox" hidden>
+    <h2 style="margin-top:26px">Your licences</h2>
+    <div id="mine"></div>
+    <div class="card" id="invBox" hidden><h2>Payments</h2><table id="inv"></table></div>
+  </section>
+</main>
+<script src="/mq-auth.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let token = MQAuth.token();
+let data = null, kind = 'single', period = 'monthly', busy = false;
+function money(c) { const cur = (data && data.prices.currency) || 'usd'; const sym = cur === 'usd' ? '$' : cur.toUpperCase() + ' ';
+  return sym + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function day(t) { return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '-'; }
+function when(t) { return t ? new Date(t).toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-'; }
+function flash(text, how) { const f = $('flash'); f.textContent = text; f.className = 'msg ' + (how || 'info'); f.hidden = !text; if (text) { window.scrollTo(0, 0); } }
+async function api(path, form) {
+  const o = { headers: {} };
+  if (token) { o.headers.Authorization = 'Bearer ' + token; }
+  if (form) { o.method = 'POST'; o.headers['Content-Type'] = 'application/x-www-form-urlencoded'; o.body = new URLSearchParams(form).toString(); }
+  try { const r = await fetch(path, o); let d = {}; try { d = await r.json(); } catch (e) { }
+    if (r.status === 401 && token && path.indexOf('/api/licence/') === 0) { token = null; MQAuth.clear(); }
+    return { ok: r.ok, status: r.status, data: d }; } catch (e) { return { ok: false, status: 0, data: { error: 'No connection - try again.' } }; }
+}
+
+// ---- prices ----
+function channels() { return kind === 'single' ? 1 : +$('channels').value; }
+function priceOf(k, n, p) {
+  const P = data.prices;
+  if (k === 'single') { return p === 'annual' ? P.singleMonth * P.annualMonths : P.singleMonth; }
+  const steps = Math.floor((n - 1) / P.stepSize);
+  const per = Math.max(P.floor, P.channelMonth - P.stepOff * steps);
+  return p === 'annual' ? per * n * P.annualMonths : per * n;
+}
+function drawPrices() {
+  if (!data) { return; }
+  const P = data.prices, per = period === 'annual' ? '/year' : '/month';
+  $('saveTag').textContent = (12 - P.annualMonths) + ' month' + (12 - P.annualMonths === 1 ? '' : 's') + ' free';
+  $('channels').max = Math.min(P.maxChannels, 500); $('channels').step = P.stepSize; $('channels').min = P.stepSize;
+  $('singlePrice').innerHTML = esc(money(priceOf('single', 1, period))) + ' <small>' + per + '</small>';
+  const n = +$('channels').value;
+  $('resPrice').innerHTML = esc(money(priceOf('reseller', n, period))) + ' <small>' + per + '</small>';
+  $('chanText').textContent = n + ' channels';
+  const perCh = priceOf('reseller', n, 'monthly') / n;
+  $('perCh').textContent = money(perCh) + ' per channel per month' + (perCh <= P.floor ? ' (lowest price)' : '');
+  $('stepTxt').textContent = money(P.stepOff);
+  $('sPort').textContent = P.basePort; $('rPorts').textContent = P.basePort + '-' + (P.basePort + n - 1);
+  $('pSingle').classList.toggle('on', kind === 'single'); $('pReseller').classList.toggle('on', kind === 'reseller');
+  const total = priceOf(kind, channels(), period);
+  $('sumLine').textContent = (kind === 'single' ? 'Single licence' : 'Reseller licence, ' + n + ' channels') + ' - ' + money(total) + (period === 'annual' ? ' for 1 year' : ' for 1 month');
+  const M = P.methods;
+  document.querySelectorAll('#payBtns button').forEach(b => { b.disabled = !M[b.dataset.m]; b.title = M[b.dataset.m] ? '' : 'Not available yet'; });
+  $('mpKes').textContent = 'about KES ' + Math.ceil(total / 100 * (+P.kesPerUsd || 129)).toLocaleString();
+}
+document.querySelectorAll('#period button').forEach(b => b.onclick = () => { period = b.dataset.p; document.querySelectorAll('#period button').forEach(x => x.classList.toggle('on', x === b)); drawPrices(); });
+$('pSingle').onclick = () => { kind = 'single'; drawPrices(); };
+$('pReseller').onclick = () => { kind = 'reseller'; drawPrices(); };
+$('channels').oninput = () => { kind = 'reseller'; drawPrices(); };
+
+// ---- buying: a licence is made, then paid ----
+async function startPay(licenceId, method, extra) {
+  if (busy) { return; }
+  busy = true;
+  const r = await api('/api/licence/pay', Object.assign({ licence: licenceId, method: method }, extra || {}));
+  busy = false;
+  if (!r.ok) { flash(r.data.error || 'The payment could not start.', 'bad'); await load(); return; }
+  if (r.data.redirect) { location.href = r.data.redirect; return; }
+  if (r.data.waiting) { waitMpesa(r.data.invoice.id); return; }
+  if (r.data.manual) { flash('Invoice #' + r.data.invoice.id + ': pay ' + r.data.invoice.amount + ' by bank transfer with the reference ' + r.data.reference
+    + '. We emailed you the details; your licence starts when Memoryq confirms the payment.', 'info'); load(); }
+}
+let pendingMethod = null;
+document.querySelectorAll('#payBtns button').forEach(b => b.onclick = async () => {
+  if (b.dataset.m === 'mpesa') { $('mpBox').hidden = false; $('mpPhone').focus(); pendingMethod = 'mpesa'; return; }
+  await buy(b.dataset.m);
+});
+$('mpGo').onclick = () => buy('mpesa', { phone: $('mpPhone').value });
+async function buy(method, extra) {
+  const r = await api('/api/licence/new', { kind: kind, channels: channels(), period: period });
+  if (!r.ok) { flash(r.data.error || 'Could not make the licence.', 'bad'); return; }
+  await startPay(r.data.licence.id, method, extra);
+}
+async function waitMpesa(inv) {
+  flash('Check your phone: enter your M-Pesa PIN to pay. Waiting for Safaricom...', 'info');
+  for (let k = 0; k < 40; k++) {
+    await new Promise(ok => setTimeout(ok, 4000));
+    const r = await api('/api/licence/invoice?id=' + inv);
+    if (r.ok && r.data.status === 'paid') { flash('M-Pesa payment received - thank you! Your licence is active. Make the install command below.', 'ok'); load(); return; }
+    if (r.ok && r.data.status === 'failed') { flash('The M-Pesa payment did not go through: ' + (r.data.why || 'try again') + '.', 'bad'); load(); return; }
+  }
+  flash('No answer from M-Pesa yet. If you paid, reload this page in a minute.', 'info'); load();
+}
+
+// ---- your licences ----
+function drawMine() {
+  const box = $('mine'); box.innerHTML = '';
+  $('mineBox').hidden = !data.licences.length;
+  data.licences.slice().reverse().forEach(l => {
+    if (l.state === 'cancelled') { return; }
+    const d = document.createElement('div'); d.className = 'lic';
+    const live = l.state === 'active' || l.state === 'overdue';
+    d.innerHTML = '<div class="top"><h3>#' + l.id + ' ' + esc(l.label) + '</h3><span class="badge ' + esc(l.state) + '">' + esc(l.state) + '</span><span class="grow"></span>'
+      + '<span class="small muted">' + esc(l.period) + ' &middot; ' + esc(l.priceText) + (l.period === 'annual' ? '/year' : l.period === 'monthly' ? '/month' : '') + '</span></div>'
+      + '<div class="body"><div class="facts">'
+      + '<div><span>Paid until</span><b>' + (l.paidUntil ? day(l.paidUntil) : 'not paid yet') + '</b></div>'
+      + '<div><span>Streaming ports</span><b>' + l.firstPort + (l.lastPort > l.firstPort ? '-' + l.lastPort : '') + '</b></div>'
+      + '<div><span>Server</span><b>' + (l.bound ? '<span class="dot' + (l.online ? ' on' : '') + '"></span>' + esc(l.ip) + (l.host ? ' (' + esc(l.host) + ')' : '') : 'not installed yet') + '</b></div>'
+      + '<div><span>Last check-in</span><b>' + (l.lastSeen ? when(l.lastSeen) : '-') + '</b></div>'
+      + '<div><span>Version</span><b>' + (l.version ? esc(l.version) + (l.version !== l.latest ? ' (update: ' + esc(l.latest) + ')' : '') : '-') + '</b></div>'
+      + '<div><span>Account score</span><b>' + l.score + ' / 100</b></div></div>'
+      + '<div class="cmdArea"></div><div class="acts"></div>'
+      + '<details><summary>Activity</summary><table class="act"></table></details></div>';
+    const acts = d.querySelector('.acts'), area = d.querySelector('.cmdArea');
+    const btn = (t, cls, fn) => { const b = document.createElement('button'); b.textContent = t; if (cls) { b.className = cls; } b.onclick = fn; acts.appendChild(b); return b; };
+    if (l.state === 'pending') {
+      area.innerHTML = '<p class="small muted" style="margin:0">Waiting for payment.</p>';
+      ['stripe', 'paypal', 'mpesa', 'manual'].forEach(m => { if (data.prices.methods[m]) {
+        btn({ stripe: 'Pay by card', paypal: 'PayPal', mpesa: 'M-Pesa', manual: 'Bank transfer' }[m], m === 'stripe' ? 'primary' : '', () => {
+          if (m === 'mpesa') { const ph = prompt('Your Safaricom number (e.g. 0712 345 678):'); if (ph) { startPay(l.id, 'mpesa', { phone: ph }); } return; }
+          startPay(l.id, m); }); } });
+      btn('Remove', 'danger', async () => { if (confirm('Remove this unpaid licence?')) { const r = await api('/api/licence/cancel', { licence: l.id }); if (r.ok) { load(); } } });
+    }
+    if (live) {
+      if (!l.bound) {
+        area.innerHTML = l.hasKey && !l.keyUsed && l.keyExpires > Date.now()
+          ? '<p class="small muted" style="margin:0">An install command was made (valid until ' + when(l.keyExpires) + '). It is shown only once - make a new one if you lost it.</p>'
+          : '<p class="small" style="margin:0">Next: make your install command and paste it into your server (SSH, as root).</p>';
+        btn(l.hasKey ? 'New install command' : 'Make the install command', 'primary', () => newKey(l, area));
+      } else {
+        area.innerHTML = '<p class="small muted" style="margin:0">Installed on ' + esc(l.ip) + '. To move to another server or IP, make a new install command - the old server stops.</p>';
+        btn('Moved server / new IP', '', () => { if (confirm('Make a new install command? The server ' + l.ip + ' will stop working with this licence.')) { newKey(l, area); } });
+      }
+      btn('Renew' + (l.paidUntil ? ' (adds ' + (l.period === 'annual' ? '1 year' : l.period === 'monthly' ? '1 month' : l.customDays + ' days') + ')' : ''), '', () => renew(l));
+      if (l.kind === 'reseller' && l.state === 'active') {
+        btn('More channels', '', () => upgrade(l));
+      }
+    } else if (l.state === 'expired') {
+      btn('Renew now', 'primary', () => renew(l));
+    }
+    const at = d.querySelector('.act');
+    const evs = data.activity.filter(e => e.licence === l.id).slice(0, 20);
+    at.innerHTML = '<tr><th>When</th><th>What</th><th>Details</th><th class="num">Score</th></tr>' + evs.map(e => '<tr><td>' + when(e.at) + '</td><td>' + esc(e.kind)
+      + '</td><td>' + esc(e.detail) + '</td><td class="num"><span class="pts ' + (e.points > 0 ? 'up' : e.points < 0 ? 'down' : '') + '">' + (e.points > 0 ? '+' : '') + (e.points || '') + '</span></td></tr>').join('');
+    box.appendChild(d);
+  });
+  const inv = data.invoices;
+  $('invBox').hidden = !inv.length;
+  $('inv').innerHTML = '<tr><th>#</th><th>Date</th><th>For</th><th>Method</th><th>Status</th><th class="num">Amount</th></tr>' + inv.map(i => '<tr><td>' + i.id + '</td><td>'
+    + day(i.created) + '</td><td>Licence #' + i.licence + ' - ' + esc(i.what) + (i.what === 'upgrade' ? ' to ' + i.channels + ' ch.' : '') + '</td><td>' + esc(i.method)
+    + '</td><td>' + esc(i.status) + '</td><td class="num">' + esc(i.amount) + '</td></tr>').join('');
+}
+async function newKey(l, area) {
+  const r = await api('/api/licence/key', { licence: l.id });
+  if (!r.ok) { flash(r.data.error || 'Could not make the install command.', 'bad'); return; }
+  area.innerHTML = '<p class="small" style="margin:0 0 4px"><b>Your install command</b> - shown only this once. Paste it into your server\'s SSH prompt (Ubuntu 22.04 / 24.04 or Debian 12). '
+    + 'It works on one server, until ' + when(r.data.expires) + '.</p><div class="cmd" id="cmd' + l.id + '">' + esc(r.data.command) + '</div>';
+  const cp = document.createElement('button'); cp.className = 'primary'; cp.textContent = 'Copy the command';
+  cp.onclick = async () => { try { await navigator.clipboard.writeText(r.data.command); cp.textContent = 'Copied'; } catch (e) { prompt('Copy:', r.data.command); } };
+  area.appendChild(cp);
+  data.licences = data.licences.map(x => x.id === l.id ? r.data.licence : x);
+}
+function askMethod() {
+  const m = Object.keys(data.prices.methods).filter(k => data.prices.methods[k]);
+  const names = { stripe: 'card', paypal: 'paypal', mpesa: 'mpesa', manual: 'bank' };
+  const a = (prompt('Pay by: ' + m.map(k => names[k]).join(', ') + '?', 'card') || '').trim().toLowerCase();
+  const k = m.find(x => names[x] === a || x === a);
+  if (!a) { return null; }
+  if (!k) { alert('Type one of: ' + m.map(x => names[x]).join(', ')); return null; }
+  return k;
+}
+async function renew(l) {
+  const m = askMethod(); if (!m) { return; }
+  const extra = m === 'mpesa' ? { phone: prompt('Your Safaricom number (e.g. 0712 345 678):') || '' } : {};
+  startPay(l.id, m, extra);
+}
+async function upgrade(l) {
+  const n = +prompt('How many channels in total? (now ' + l.channels + '; 10, 20, 30...)', String(l.channels + 10));
+  if (!n || n <= l.channels) { return; }
+  if (!confirm('Upgrade to ' + n + ' channels: you pay the difference for the days left in this period. Continue?')) { return; }
+  const m = askMethod(); if (!m) { return; }
+  const extra = m === 'mpesa' ? { phone: prompt('Your Safaricom number:') || '' } : {};
+  startPay(l.id, m, Object.assign({ what: 'upgrade', channels: n }, extra));
+}
+
+// ---- loading, sign-in, coming back from Stripe / PayPal ----
+async function load() {
+  if (token) {
+    const r = await api('/api/licence/mine');
+    if (r.ok) { data = r.data; }
+  }
+  if (!token || !data || !data.licences) {
+    const p = await api('/api/licence/prices');
+    if (p.ok) { data = { prices: p.data, licences: [], invoices: [], activity: [] }; }
+  }
+  $('buyOut').hidden = !!token; $('buyIn').hidden = !token;
+  $('signIn').hidden = !!token; $('signOut').hidden = !token;
+  drawPrices(); drawMine();
+}
+$('signOut').onclick = () => { MQAuth.clear(); token = null; data = null; $('who').textContent = ''; load(); };
+(async () => {
+  if (token) { const me = await api('/api/me'); if (me.ok && me.data.username) { $('who').textContent = me.data.username; } else if (me.status === 401) { token = null; MQAuth.clear(); } }
+  const qs = new URLSearchParams(location.search);
+  if (qs.get('paid') && token) {
+    flash('Checking your payment...', 'info');
+    const form = { invoice: qs.get('invoice') || '' };
+    if (qs.get('session')) { form.session = qs.get('session'); }
+    if (qs.get('token')) { form.token = qs.get('token'); }
+    const r = await api('/api/licence/confirm', form);
+    flash(r.ok ? 'Payment received - thank you! Your licence is active: make the install command below.' : (r.data.error || 'The payment could not be confirmed.'), r.ok ? 'ok' : 'bad');
+    history.replaceState(null, '', '/licence');
+  } else if (qs.get('cancelled')) {
+    flash('The payment was cancelled - nothing was charged.', 'info');
+    history.replaceState(null, '', '/licence');
+  }
+  await load();
+})();
+</script>
+</body>
+</html>

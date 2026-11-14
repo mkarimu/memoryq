@@ -14,7 +14,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.List;
 
 /**
- * The video site: videos on the video disk (moved there once), Mkarimu TV at mkarimu.net, live recordings
+ * The video site: videos on the video disk (moved there once), Mkarimu STV at mkarimu.net, live recordings
  * (list, watch, keep as a video, delete, tidy), and the nightly backup (data, videos, songs; set-aside copies).
  */
 public final class VideoHostTest {
@@ -51,14 +51,14 @@ public final class VideoHostTest {
                 && MediaDisks.recordingsDir() == null);
         System.setProperty("vstream.mediaRoot", media.toString());
 
-        System.out.println("-- Mkarimu TV at mkarimu.net --");
+        System.out.println("-- Mkarimu STV at mkarimu.net --");
         Path pages = dir.resolve("pages");
         Files.createDirectories(pages);
         Files.write(pages.resolve("admin.html"), "<html>admin</html>".getBytes(StandardCharsets.UTF_8));
         Files.write(pages.resolve("home.html"), "<html>Memoryq home</html>".getBytes(StandardCharsets.UTF_8));
         Path realTv = Paths.get("tv.html");
         Files.write(pages.resolve("tv.html"), Files.isRegularFile(realTv) ? Files.readAllBytes(realTv)
-                : ("<title>Memoryq TV - live now</title><a class=\"brand\" href=\"/\">Memoryq <small>TV</small></a>"
+                : ("<title>Mkarimu STV - live now</title><a class=\"brand\" href=\"/\">Mkarimu <small>STV</small></a>"
                 + "<a class=\"golive\" href=\"/vstream-legal\">Go live</a><a href=\"/me#videos/play/1\">c</a>").getBytes(StandardCharsets.UTF_8));
         UserStore us = new UserStore(dir.resolve("users.txt"), new LiveChannelRegistry(), c -> { });
         us.init(dir.resolve("none.txt"));
@@ -88,11 +88,11 @@ public final class VideoHostTest {
         checkTrue("memoryq.com shows its own home page", r[1].contains("Memoryq home"));
         check("memoryq.com/tv is the TV wall until mkarimu.net is in use", get(port, "/tv", null, "memoryq.com")[0], "200");
         r = get(port, "/", null, "mkarimu.net");
-        checkTrue("mkarimu.net's home page is the TV wall, called Mkarimu TV", r[0].equals("200") && r[1].contains("Mkarimu TV")
-                && !r[1].contains("Memoryq TV") && !r[1].contains("Memoryq home"));
+        checkTrue("mkarimu.net's home page is the TV wall, called Mkarimu STV", r[0].equals("200") && r[1].contains("Mkarimu STV")
+                && !r[1].contains("Memoryq home"));
         checkTrue("signing in, comments and going live stay on Memoryq", r[1].contains("https://memoryq.com/vstream-legal")
                 && (r[1].contains("https://memoryq.com/me#") || !r[1].contains("/me#")));
-        checkTrue("www.mkarimu.net too", get(port, "/", null, "www.mkarimu.net")[1].contains("Mkarimu TV"));
+        checkTrue("www.mkarimu.net too", get(port, "/", null, "www.mkarimu.net")[1].contains("Mkarimu STV"));
         r = get(port, "/tv", null, "memoryq.com");
         checkTrue("then memoryq.com/tv sends people to mkarimu.net", r[0].equals("302") && "https://mkarimu.net/".equals(r[2]));
 
@@ -130,7 +130,7 @@ public final class VideoHostTest {
         }
         checkTrue("owned by the channel's broadcaster, ready to play", kept != null && kept.owner.equals("admin") | kept.owner.equals("anna")
                 && VideoStore.READY.equals(kept.status) && Files.isRegularFile(store.fileOf(kept)));
-        checkTrue("'Keep as video' does not put it on Mkarimu TV", !kept.featured);
+        checkTrue("'Keep as video' does not put it on Mkarimu STV", !kept.featured);
         Path tvRec = chan.resolve("2026-10-19_17-00-00-000001.mp4");
         Files.write(tvRec, clip);
         Files.setLastModifiedTime(tvRec, FileTime.fromMillis(System.currentTimeMillis() - 7200000L));
@@ -141,7 +141,7 @@ public final class VideoHostTest {
             List<VideoStore.Video> vs = store.list(v -> v.title.equals("Evening Praise"));
             onTv = vs.isEmpty() ? null : vs.get(0);
         }
-        checkTrue("'Keep + Mkarimu TV' makes it a video on the TV wall", r[0].equals("200") && onTv != null && onTv.featured);
+        checkTrue("'Keep + Mkarimu STV' makes it a video on the TV wall", r[0].equals("200") && onTv != null && onTv.featured);
         checkTrue("tidying removes recordings older than 30 days", rec.tidy() == 1 && !Files.exists(old) && Files.exists(now));
         r = post(port, "/api/admin/recordings/delete", "path=live/CHANNEL-3/2026-10-19_19-00-00-000001.mp4", admin);
         checkTrue("the admin can delete one (the empty channel folder goes too)", r[0].equals("200") && !Files.exists(chan));

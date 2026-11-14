@@ -40,7 +40,7 @@ public final class VideoStore {
         public String status = READY;
         /** "" = showing, "owner" = paused by its owner, "admin" = paused by the super-admin. */
         public String paused = "";
-        /** Shown on Memoryq TV. */
+        /** Shown on Mkarimu STV. */
         public boolean featured;
         public int pos;
         public long created;
@@ -292,7 +292,7 @@ public final class VideoStore {
         return out;
     }
 
-    /** What Memoryq TV plays: featured, ready and not paused, in the admin's order. */
+    /** What Mkarimu STV plays: featured, ready and not paused, newest first. */
     public synchronized List<Video> tv() {
         List<Video> out = new ArrayList<Video>();
         for (Video v : videos.values()) {
@@ -300,7 +300,8 @@ public final class VideoStore {
                 out.add(v.copy());
             }
         }
-        out.sort(Comparator.comparingInt((Video v) -> v.pos).thenComparing(Comparator.comparingLong((Video v) -> v.created).reversed()));
+        // the newest video first (so the TV never opens on the same old one); the admin's position only separates ties
+        out.sort(Comparator.comparingLong((Video v) -> v.created).reversed().thenComparingInt((Video v) -> v.pos));
         return out;
     }
 

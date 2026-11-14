@@ -567,12 +567,13 @@ public final class WallApi {
                 send(ex, 401, error("sign in required"));
                 return;
             }
-            if (me.role != UserStore.Role.ADMIN) {
+            String path = ex.getRequestURI().getPath();
+            String method = ex.getRequestMethod();
+            if (me.role != UserStore.Role.ADMIN && !(Moderators.may(me, "posts.hide") && !path.equals("/api/admin/wall/settings"))) {
                 send(ex, 403, error("admin only"));
                 return;
             }
-            String path = ex.getRequestURI().getPath();
-            String method = ex.getRequestMethod();
+            Moderators.note(me, ex, "posts.hide");
             switch (path) {
                 case "/api/admin/wall/status":
                     if (requireMethod(ex, method, "GET")) {

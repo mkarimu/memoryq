@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Join a live show - Memoryq</title>
+<meta name="description" content="You are invited to a live show on Memoryq. Allow your camera and microphone and join.">
+<style>
+  :root { --bg: #0b0f14; --panel: #131a22; --line: #263241; --ink: #e7edf3; --muted: #8a9aab; --accent: #3d7bff; --air: #ff3b3b; --good: #35c46a; }
+  * { box-sizing: border-box; } [hidden] { display: none !important; }
+  body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .card { width: 100%; max-width: 560px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  h1 { font-size: 21px; margin: 0 0 4px; } p { color: var(--muted); margin: 0 0 14px; line-height: 1.45; }
+  video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; object-fit: cover; display: block; transform: scaleX(-1); }
+  .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  button, select { font: inherit; padding: 11px 16px; border-radius: 10px; border: 1px solid var(--line); background: #18212b; color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); font-weight: 700; flex: 1; }
+  button.live { background: var(--air); border-color: var(--air); }
+  .state { font-weight: 700; } .state.on { color: var(--good); } .err { color: #ff8a8a; }
+  .meter { height: 6px; background: #0a0e13; border-radius: 3px; overflow: hidden; margin-top: 8px; } .meter i { display: block; height: 100%; width: 0; background: var(--good); }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1 id="h">Join the live show</h1>
+  <p id="sub">Checking your invitation...</p>
+  <div id="main" hidden>
+    <video id="me" autoplay playsinline muted></video>
+    <div class="meter"><i id="lvl"></i></div>
+    <div class="row">
+      <select id="cam" title="Camera"></select><select id="mic" title="Microphone"></select>
+    </div>
+    <div class="row"><button class="primary" id="join">Join the show</button><button id="mute">Mute</button></div>
+    <p class="small" style="margin:12px 0 0"><span class="state" id="state">Not connected</span> &middot; Use headphones so the show's sound does not echo. Keep this page open while you are on.</p>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const code = new URLSearchParams(location.search).get('c') || '';
+let info = null, stream = null, pc = null, muted = false, retry = null;
+function iceDone(p) { return new Promise(res => { if (p.iceGatheringState === 'complete') { res(); return; } const t = setTimeout(res, 2500); p.addEventListener('icegatheringstatechange', () => { if (p.iceGatheringState === 'complete') { clearTimeout(t); res(); } }); }); }
+async function devices() {
+  const list = await navigator.mediaDevices.enumerateDevices();
+  const fill = (sel, kind) => { const cur = sel.value; sel.innerHTML = list.filter(d => d.kind === kind).map((d, i) => '<option value="' + d.deviceId + '">' + (d.label || kind + ' ' + (i + 1)) + '</option>').join(''); if (cur) { sel.value = cur; } };
+  fill($('cam'), 'videoinput'); fill($('mic'), 'audioinput');
+}
+async function camera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); }
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: $('cam').value ? { deviceId: { exact: $('cam').value }, width: 1280, height: 720 } : { width: 1280, height: 720 },
+    audio: $('mic').value ? { deviceId: { exact: $('mic').value }, echoCancellation: true, noiseSuppression: true } : { echoCancellation: true, noiseSuppression: true } });
+  $('me').srcObject = stream;
+  stream.getAudioTracks().forEach(t => { t.enabled = !muted; });
+  const ac = new (window.AudioContext || window.webkitAudioContext)(), an = ac.createAnalyser(); an.fftSize = 512; ac.createMediaStreamSource(stream).connect(an);
+  const a = new Uint8Array(512);
+  (function m() { an.getByteTimeDomainData(a); let p = 0; for (const x of a) { p = Math.max(p, Math.abs(x - 128)); } $('lvl').style.width = Math.min(100, p * 1.2) + '%'; requestAnimationFrame(m); })();
+  if (pc) { const s = pc.getSenders(); stream.getTracks().forEach(t => { const x = s.find(y => y.track && y.track.kind === t.kind); if (x) { x.replaceTrack(t); } }); }
+}
+async function join() {
+  clearTimeout(retry);
+  $('state').textContent = 'Connecting...'; $('state').className = 'state';
+  const p = new RTCPeerConnection(); pc = p;
+  stream.getTracks().forEach(t => p.addTransceiver(t, { direction: 'sendonly', streams: [stream] }));
+  p.onconnectionstatechange = () => {
+    if (pc !== p) { return; }
+    if (p.connectionState === 'connected') { $('state').textContent = 'You are connected - the host puts you on air'; $('state').className = 'state on'; }
+    if (p.connectionState === 'failed') { $('state').textContent = 'Connection lost - trying again...'; retry = setTimeout(join, 3000); }
+  };
+  try {
+    const o = await p.createOffer(); await p.setLocalDescription(o); await iceDone(p);
+    const r = await fetch(info.whipUrl, { method: 'POST', headers: { 'Content-Type': 'application/sdp' }, body: p.localDescription.sdp });
+    if (!r.ok) { throw new Error(r.status === 401 ? 'this invitation was ended by the host' : 'the server said ' + r.status); }
+    await p.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+    $('join').textContent = 'Leave'; $('join').classList.add('live');
+  } catch (e) { $('state').textContent = 'Could not connect: ' + e.message; $('state').className = 'state err'; pc = null; }
+}
+function leave() { clearTimeout(retry); if (pc) { try { pc.close(); } catch (e) { } pc = null; } $('join').textContent = 'Join the show'; $('join').classList.remove('live'); $('state').textContent = 'You left'; $('state').className = 'state'; }
+$('join').onclick = () => pc ? leave() : join();
+$('mute').onclick = () => { muted = !muted; stream.getAudioTracks().forEach(t => { t.enabled = !muted; }); $('mute').textContent = muted ? 'Unmute' : 'Mute'; };
+$('cam').onchange = camera; $('mic').onchange = camera;
+(async () => {
+  const r = await fetch('/api/master/guest?c=' + encodeURIComponent(code)); let d = {}; try { d = await r.json(); } catch (e) { }
+  if (!r.ok) { $('sub').textContent = d.error || 'This invitation is not valid.'; $('sub').className = 'err'; return; }
+  info = d;
+  $('h').textContent = 'Hello ' + d.name + ' - join ' + d.host + "'s live show";
+  $('sub').textContent = 'Allow your camera and microphone, check how you look, then press Join. The host decides when you are on air.';
+  $('main').hidden = false;
+  try { await camera(); await devices(); } catch (e) { $('state').textContent = 'The camera or microphone could not start: ' + e.message; $('state').className = 'state err'; }
+})();
+</script>
+</body>
+</html>

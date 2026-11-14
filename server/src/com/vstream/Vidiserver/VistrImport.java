@@ -207,7 +207,18 @@ public final class VistrImport {
         return k;
     }
 
+    /** The super-admin's username (the game trusts only the super-admin's sign-in for its admin pages). */
+    String superAdmin() {
+        for (UserStore.Info i : users.listInfos()) {
+            if (i.role == UserStore.Role.ADMIN && !i.disabled) {
+                return i.username;
+            }
+        }
+        return "admin";
+    }
+
     private String[] vistr(String adminUser, String method, String path, String json) throws IOException {
+        adminUser = superAdmin();
         String k = key(adminUser);
         String[] r = web.call(method, vistrUrl + path + (path.contains("?") ? "&" : "?") + "key=" + java.net.URLEncoder.encode(k, "UTF-8"), json);
         if (r[0].equals("403")) { // the key ended: once more with a new one
@@ -391,6 +402,9 @@ public final class VistrImport {
 
     static final class Bad extends Exception {
         final int status;
+        /** On a 409 from the game: the Player ID the person already has, and whose (Memoryq username) it is. */
+        String existing = "";
+        String owner = "";
 
         Bad(int status, String message) {
             super(message);
@@ -430,11 +444,19 @@ public final class VistrImport {
         int status = 200;
         String out;
         try {
+            String op = ex.getRequestURI().getPath().substring("/api/admin/vistr/".length());
             String who = admin(ex);
+            if (who == null && op.equals("game")) {
+                // a moderator reads the word game's admin pages; the game is asked as the super-admin.
+                // The Lite/guest visitor list has its own right (visitors.vistr) and is not part of "Messages and reviews".
+                boolean visitors = "/api/admin/guests".equals(p(ex.getRequestURI().getRawQuery() == null ? "" : ex.getRequestURI().getRawQuery(), "p"));
+                if (Moderators.allowed(ex, sessions, users, visitors ? "visitors.vistr" : "games.vistr") != null) {
+                    who = superAdmin();
+                }
+            }
             if (who == null) {
                 throw new Bad(403, "super-admin only");
             }
-            String op = ex.getRequestURI().getPath().substring("/api/admin/vistr/".length());
             if (op.equals("players")) {
                 StringBuilder sb = new StringBuilder();
                 int w = 0;
@@ -451,6 +473,8 @@ public final class VistrImport {
                     }
                 }
                 out = sb.append("],\"waiting\":").append(w).append('}').toString();
+            } else if (op.equals("game")) {
+                out = game(who, ex.getRequestURI().getRawQuery());
             } else {
                 if (!"POST".equalsIgnoreCase(ex.getRequestMethod())) {
                     throw new Bad(405, "use POST");
@@ -547,9 +571,284 @@ public final class VistrImport {
         send(ex, status, out);
     }
 
+    /** The word game's own admin numbers, read here for Admin -> Games -> Vistr (all admin is on memoryq.com). */
+    static final String[] GAME_PATHS = {"/api/contact/messages", "/api/reviews/all", "/api/stats", "/api/admin/players", "/api/admin/activity", "/api/ads/stats", "/api/admin/guests"};
+
+    private String game(String who, String query) throws Bad, IOException {
+        String path = p(query == null ? "" : query, "p");
+        boolean ok = false;
+        for (String g : GAME_PATHS) {
+            ok |= g.equals(path);
+        }
+        if (!ok) {
+            throw new Bad(404, "not a game admin page");
+        }
+        StringBuilder qs = new StringBuilder();
+        for (String k : new String[] {"delete", "player", "status", "limit"}) {
+            String v = p(query, k);
+            if (!v.isEmpty()) {
+                qs.append(qs.length() == 0 ? "?" : "&").append(k).append('=').append(java.net.URLEncoder.encode(v, "UTF-8"));
+            }
+        }
+        String[] r = vistr(who, "GET", path + qs, null);
+        if (!r[0].equals("200")) {
+            String err;
+            try {
+                err = MiniJson.str(MiniJson.parse(r[1]), "error");
+            } catch (RuntimeException e) {
+                err = "";
+            }
+            throw new Bad(502, "Vistr: " + (err.isEmpty() ? "answered " + r[0] : err));
+        }
+        return r[1];
+    }
+
+    /** Profile fields, email (when emailOk), password, and a new username for accounts made by the import (renameOk). */
+    UserStore.Info editMember(String who, UserStore.Info i, String form, boolean emailOk, boolean renameOk) throws Exception {
+        List<String> changed = new ArrayList<String>();
+        String newName = p(form, "username");
+        if (renameOk && !newName.isEmpty() && !newName.equals(i.username)) {
+            String code = null;
+            synchronized (this) {
+                for (Row r : rows.values()) {
+                    if (r.made && r.mq.equalsIgnoreCase(i.username)) {
+                        code = r.code;
+                    }
+                }
+            }
+            if (code == null) {
+                throw new Bad(400, "only accounts brought in from Vistr can get a new username (others have chats, posts and friends under their name)");
+            }
+            try {
+                rename(who, code, newName);
+            } catch (UserStore.UserException e) {
+                throw new Bad(400, e.getMessage());
+            }
+            i = users.info(newName);
+            changed.add("username");
+        }
+        if (profiles != null) {
+            List<String> hobbies = null;
+            String hb = MediaAuthHttpServer.queryParam(form, "hobbies");
+            if (hb != null) {
+                hobbies = new ArrayList<String>();
+                for (String h : hb.split(",")) {
+                    if (!h.trim().isEmpty()) {
+                hobbies.add(h.trim());
+                    }
+                }
+            }
+            profiles.edit(i.username, MediaAuthHttpServer.queryParam(form, "firstName"), MediaAuthHttpServer.queryParam(form, "lastName"),
+                    MediaAuthHttpServer.queryParam(form, "stageName"), MediaAuthHttpServer.queryParam(form, "city"),
+                    MediaAuthHttpServer.queryParam(form, "country"), MediaAuthHttpServer.queryParam(form, "education"), hobbies, clock.getAsLong());
+            String color = MediaAuthHttpServer.queryParam(form, "color");
+            if (color != null) {
+                String okc = color.trim().isEmpty() ? "" : ProfileStore.checkColor(color.trim());
+                if (okc == null) {
+                    throw new Bad(400, "the colour must be a darker colour like #2f6fed (white writing goes on it)");
+                }
+                profiles.setColor(i.username, okc, clock.getAsLong());
+            }
+            profiles.flushIfDirty();
+            changed.add("profile");
+        }
+        String email = p(form, "email");
+        EmailService.Entry e = emails == null ? null : emails.get(i.username);
+        if (emailOk && emails != null && !email.isEmpty() && (e == null || !e.email.equalsIgnoreCase(email))) {
+            try {
+                emails.adminSet(i.username, email);
+            } catch (EmailService.EmailException x) {
+                throw new Bad(400, x.getMessage());
+            }
+            changed.add("email");
+        }
+        String pw = MediaAuthHttpServer.queryParam(form, "password");
+        if (pw != null && !pw.isEmpty()) {
+            try {
+                users.setPassword(i.username, pw);
+            } catch (UserStore.UserException x) {
+                throw new Bad(400, x.getMessage());
+            }
+            changed.add("password");
+        }
+        System.out.println("[admin] " + who + " edited " + i.username + ": " + changed);
+        return i;
+    }
+
+    /** The Vistr Player ID of a member (empty when none is known here). */
+    synchronized String gameIdOf(String username) {
+        for (Row r : rows.values()) {
+            if (r.mq.equalsIgnoreCase(username)) {
+                return r.code;
+            }
+        }
+        return "";
+    }
+
+    /**
+     * Gives a member a Vistr player (a Player ID), linked to the account: the game makes one (or reuses the player with
+     * the same email), and sets the Player ID asked for when it is free. Only for members with an email.
+     */
+    String assignGameId(String who, String username, String code) throws Bad, IOException {
+        return assignGameId(who, username, code, false);
+    }
+
+    /** The member's email for the game (a member without one is known to the game by a stand-in address). */
+    private String gameEmail(UserStore.Info i) {
+        EmailService.Entry e = emails == null ? null : emails.get(i.username);
+        return e == null || e.email == null || e.email.isEmpty() ? i.username.toLowerCase(java.util.Locale.ROOT) + "@users.memoryq.com" : e.email;
+    }
+
+    /**
+     * What the game already has for this member, changing nothing: {their Player ID or "", a player with their email that
+     * belongs to another member: its Player ID or "", that member}.
+     */
+    String[] peekGameId(String who, String username) throws Bad, IOException {
+        UserStore.Info i = users.info(username);
+        if (i == null) {
+            throw new Bad(404, "no such member");
+        }
+        String[] r = vistr(who, "POST", "/api/admin/player/assign", "{\"mq\":" + js(i.username) + ",\"email\":" + js(gameEmail(i)) + ",\"peek\":1}");
+        if (!r[0].equals("200")) {
+            throw new Bad(502, "Vistr answered " + r[0]);
+        }
+        Object o = MiniJson.parse(r[1]);
+        return new String[] {MiniJson.str(o, "player", "code"), MiniJson.str(o, "other", "code"), MiniJson.str(o, "other", "mq")};
+    }
+
+    /** Pauses a player in the game (cannot sign in or play) or lets them play again. */
+    void pausePlayer(String who, String code, boolean on) throws Bad, IOException {
+        String[] r = vistr(who, "POST", "/api/admin/player/pause", "{\"code\":" + js(code) + ",\"paused\":" + (on ? 1 : 0) + "}");
+        if (!r[0].equals("200")) {
+            throw new Bad(r[0].equals("404") ? 404 : 502, "Vistr: " + (MiniJson.str(safeParse(r[1]), "error").isEmpty() ? "answered " + r[0] : MiniJson.str(safeParse(r[1]), "error")));
+        }
+    }
+
+    /** Deletes a player in the game (its scores go; the number is never used again). */
+    void deletePlayer(String who, String code) throws Bad, IOException {
+        String[] r = vistr(who, "POST", "/api/admin/player/delete", "{\"code\":" + js(code) + "}");
+        if (!r[0].equals("200") && !r[0].equals("404")) {
+            throw new Bad(502, "Vistr: " + (MiniJson.str(safeParse(r[1]), "error").isEmpty() ? "answered " + r[0] : MiniJson.str(safeParse(r[1]), "error")));
+        }
+        synchronized (this) {
+            rows.remove(code);
+        }
+        save();
+    }
+
+    /** Every player in the game: {code, name, email, mq, paused (1/0), points, rating, lastSeen, games}. */
+    List<String[]> gamePlayers(String who) throws Bad, IOException {
+        String[] r = vistr(who, "GET", "/api/admin/players", null);
+        if (!r[0].equals("200")) {
+            throw new Bad(502, "Vistr answered " + r[0]);
+        }
+        Object o = safeParse(r[1]);
+        List<String[]> out = new ArrayList<String[]>();
+        Object l = MiniJson.at(o, "players");
+        int n = l instanceof List ? ((List<?>) l).size() : 0;
+        for (int j = 0; j < n; j++) {
+            out.add(new String[] {MiniJson.str(l, j, "playerCode"), MiniJson.str(l, j, "name"), MiniJson.str(l, j, "email"), MiniJson.str(l, j, "mq"),
+                "true".equals(MiniJson.str(l, j, "paused")) ? "1" : "0", MiniJson.str(l, j, "points"), MiniJson.str(l, j, "rating"), MiniJson.str(l, j, "lastSeen"),
+                MiniJson.str(l, j, "games")});
+        }
+        return out;
+    }
+
+    /** Games per player per day between two dates: Player ID -> (date -> games). */
+    java.util.Map<String, java.util.Map<String, Integer>> gameReport(String who, String from, String to) throws Bad, IOException {
+        String[] r = vistr(who, "GET", "/api/admin/report?from=" + from + "&to=" + to, null);
+        if (!r[0].equals("200")) {
+            throw new Bad(502, "Vistr answered " + r[0] + (r[0].equals("404") ? " (the game's server does not have the report yet - update it)" : ""));
+        }
+        Object o = safeParse(r[1]);
+        java.util.Map<String, java.util.Map<String, Integer>> out = new java.util.LinkedHashMap<String, java.util.Map<String, Integer>>();
+        Object pl = MiniJson.at(o, "players");
+        if (pl instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) pl).entrySet()) {
+                java.util.Map<String, Integer> days = new java.util.TreeMap<String, Integer>();
+                Object d = MiniJson.at(e.getValue(), "days");
+                if (d instanceof Map) {
+                    for (Map.Entry<?, ?> x : ((Map<?, ?>) d).entrySet()) {
+                        days.put(String.valueOf(x.getKey()), Integer.valueOf((int) MiniJson.num(d, x.getKey())));
+                    }
+                }
+                out.put(String.valueOf(e.getKey()), days);
+            }
+        }
+        return out;
+    }
+
+    private static Object safeParse(String t) {
+        try {
+            return MiniJson.parse(t);
+        } catch (RuntimeException x) {
+            return null;
+        }
+    }
+
+    /**
+     * change: the admin confirmed that the member's Player ID becomes a different number (otherwise the game keeps the one
+     * they have, and says so with a 409 that carries it).
+     */
+    String assignGameId(String who, String username, String code, boolean change) throws Bad, IOException {
+        UserStore.Info i = users.info(username);
+        if (i == null) {
+            throw new Bad(404, "no such member");
+        }
+        EmailService.Entry e = emails == null ? null : emails.get(i.username);
+        if (e == null || e.email == null || e.email.isEmpty()) {
+            throw new Bad(400, i.username + " has no email - add one first (a game ID needs an email)");
+        }
+        String c = code == null ? "" : code.replaceAll("\\D", "");
+        if (!c.isEmpty() && !c.matches("\\d{2,4}")) {
+            throw new Bad(400, "a Player ID is 2 to 4 digits");
+        }
+        String[] r = vistr(who, "POST", "/api/admin/player/assign", "{\"mq\":" + js(i.username) + ",\"email\":" + js(e.email) + (c.isEmpty() ? "" : ",\"code\":" + js(c))
+                + (change ? ",\"change\":1" : "") + "}");
+        Object o;
+        try {
+            o = MiniJson.parse(r[1]);
+        } catch (RuntimeException x) {
+            o = null;
+        }
+        if (!r[0].equals("200")) {
+            String err = MiniJson.str(o, "error");
+            Bad b = new Bad(r[0].equals("409") ? 409 : 502, r[0].equals("404") && err.isEmpty() ? "the game needs its update first (run the newest apply script)" : "Vistr: " + (err.isEmpty() ? "answered " + r[0] : err));
+            b.existing = MiniJson.str(o, "existing");
+            b.owner = MiniJson.str(o, "owner");
+            throw b;
+        }
+        String got = MiniJson.str(o, "player", "code");
+        synchronized (this) {
+            Row row = null;
+            for (Row x : rows.values()) {
+                if (x.mq.equalsIgnoreCase(i.username)) {
+                    row = x;
+                }
+            }
+            if (row != null) {
+                rows.remove(row.code);
+            } else {
+                row = new Row();
+                row.made = false;
+                row.mq = i.username;
+            }
+            row.code = got;
+            row.email = e.email;
+            row.name = MiniJson.str(o, "player", "name");
+            row.status = "linked";
+            row.note = "game ID given by " + who;
+            row.at = clock.getAsLong();
+            rows.put(row.code, row);
+        }
+        save();
+        System.out.println("[vistr] " + who + " gave " + i.username + " the Vistr Player ID " + got);
+        return got;
+    }
+
     // ---- the whole profile, for the super-admin ----
 
-    private String profileJson(UserStore.Info i) {
+    String profileJson(UserStore.Info i) {
         ProfileStore.Profile pr = profiles == null ? null : profiles.get(i.username);
         EmailService.Entry e = emails == null ? null : emails.get(i.username);
         Row from = null;
@@ -593,73 +892,7 @@ public final class VistrImport {
                 if (i == null) {
                     throw new Bad(404, "no such member");
                 }
-                List<String> changed = new ArrayList<String>();
-                String newName = p(form, "username");
-                if (!newName.isEmpty() && !newName.equals(i.username)) {
-                    String code = null;
-                    synchronized (this) {
-                        for (Row r : rows.values()) {
-                            if (r.made && r.mq.equalsIgnoreCase(i.username)) {
-                                code = r.code;
-                            }
-                        }
-                    }
-                    if (code == null) {
-                        throw new Bad(400, "only accounts brought in from Vistr can get a new username (others have chats, posts and friends under their name)");
-                    }
-                    try {
-                        rename(who, code, newName);
-                    } catch (UserStore.UserException e) {
-                        throw new Bad(400, e.getMessage());
-                    }
-                    i = users.info(newName);
-                    changed.add("username");
-                }
-                if (profiles != null) {
-                    List<String> hobbies = null;
-                    String hb = MediaAuthHttpServer.queryParam(form, "hobbies");
-                    if (hb != null) {
-                        hobbies = new ArrayList<String>();
-                        for (String h : hb.split(",")) {
-                            if (!h.trim().isEmpty()) {
-                                hobbies.add(h.trim());
-                            }
-                        }
-                    }
-                    profiles.edit(i.username, MediaAuthHttpServer.queryParam(form, "firstName"), MediaAuthHttpServer.queryParam(form, "lastName"),
-                            MediaAuthHttpServer.queryParam(form, "stageName"), MediaAuthHttpServer.queryParam(form, "city"),
-                            MediaAuthHttpServer.queryParam(form, "country"), MediaAuthHttpServer.queryParam(form, "education"), hobbies, clock.getAsLong());
-                    String color = MediaAuthHttpServer.queryParam(form, "color");
-                    if (color != null) {
-                        String okc = color.trim().isEmpty() ? "" : ProfileStore.checkColor(color.trim());
-                        if (okc == null) {
-                            throw new Bad(400, "the colour must be a darker colour like #2f6fed (white writing goes on it)");
-                        }
-                        profiles.setColor(i.username, okc, clock.getAsLong());
-                    }
-                    profiles.flushIfDirty();
-                    changed.add("profile");
-                }
-                String email = p(form, "email");
-                EmailService.Entry e = emails == null ? null : emails.get(i.username);
-                if (emails != null && !email.isEmpty() && (e == null || !e.email.equalsIgnoreCase(email))) {
-                    try {
-                        emails.adminSet(i.username, email);
-                    } catch (EmailService.EmailException x) {
-                        throw new Bad(400, x.getMessage());
-                    }
-                    changed.add("email");
-                }
-                String pw = MediaAuthHttpServer.queryParam(form, "password");
-                if (pw != null && !pw.isEmpty()) {
-                    try {
-                        users.setPassword(i.username, pw);
-                    } catch (UserStore.UserException x) {
-                        throw new Bad(400, x.getMessage());
-                    }
-                    changed.add("password");
-                }
-                System.out.println("[admin] " + who + " edited " + i.username + ": " + changed);
+                i = editMember(who, i, form, true, true);
                 out = profileJson(i);
             } else {
                 throw new Bad(404, "not found");

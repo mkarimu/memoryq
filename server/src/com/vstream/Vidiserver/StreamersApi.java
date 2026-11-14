@@ -31,7 +31,7 @@ import java.util.function.Predicate;
  *   GET  /api/admin/streamers/sessions?user=U             their streams (no user: the latest of everyone), with the
  *                                                         recordings and the kept video (on TV or not)
  *   POST /api/admin/streamers/keep    session, tv=1|0     keep the stream's recording as a video (and put it on TV)
- *   POST /api/admin/streamers/tv      session, on=1|0     the kept video on / off Mkarimu TV - back and forth
+ *   POST /api/admin/streamers/tv      session, on=1|0     the kept video on / off Mkarimu STV - back and forth
  *   POST /api/admin/streamers/delete  session             take it down: stop it if live, delete recordings and video
  *   POST /api/admin/streamers/restore session             count it again (the files are gone)
  *   GET/POST /api/admin/streamers/alerts  on=1|0          e-mail the admin when someone goes live
@@ -213,7 +213,7 @@ public final class StreamersApi {
                 out.add(new String[]{adminEmail, "Live now on Memoryq: " + who + " - " + (s.title.isEmpty() ? s.channel : s.title),
                         who + (anon ? " (anonymous tester account)" : "") + " started " + title + " on " + s.channel + " at "
                                 + BackupJob.when(s.start) + ".\n\nWatch: " + watch
-                                + "\nKeep it, put it on Mkarimu TV or take it down: https://" + host + "/admin (Videos -> Streamers)\n"});
+                                + "\nKeep it, put it on Mkarimu STV or take it down: https://" + host + "/admin (Videos -> Streamers)\n"});
             }
             Function<String, String> f = emailOf;
             for (String u : alertUsers) {
@@ -298,10 +298,13 @@ public final class StreamersApi {
     private void handleAdmin(HttpExchange ex) throws IOException {
         try {
             UserStore.Info me = me(ex);
-            if (me == null || me.role != UserStore.Role.ADMIN) {
+            String op = ex.getRequestURI().getPath().substring("/api/admin/streamers/".length());
+            // moderators: "see streams" for the lists, "keep or take down" for the changes (Profiler -> Moderators)
+            String right = op.equals("list") || op.equals("sessions") || op.equals("alerts") ? "streams.view" : "streams.recordings";
+            if (me == null || me.role != UserStore.Role.ADMIN && !Moderators.may(me, right)) {
                 throw new Bad(403, "admins only");
             }
-            String op = ex.getRequestURI().getPath().substring("/api/admin/streamers/".length());
+            Moderators.note(me, ex, right);
             String query = ex.getRequestURI().getRawQuery();
             boolean post = "POST".equalsIgnoreCase(ex.getRequestMethod());
             String form = post ? body(ex) : "";
@@ -348,7 +351,7 @@ public final class StreamersApi {
                     }
                     vs.setFeatured(s.videoId, on);
                     System.out.println("[streams] admin " + me.username + (on ? " put " : " took ") + "video " + s.videoId
-                            + (on ? " on" : " off") + " Mkarimu TV");
+                            + (on ? " on" : " off") + " Mkarimu STV");
                     break;
                 }
                 case "delete":

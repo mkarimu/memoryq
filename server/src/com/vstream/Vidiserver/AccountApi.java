@@ -197,6 +197,26 @@ public final class AccountApi {
                 servePage(ex, "/world", sibling("world.html"));
             }
         });
+        // Studio Master: the live-event video mixer, and the page a guest opens from an invite link
+        server.createContext("/master", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange ex) throws IOException {
+                servePage(ex, "/master", sibling("master.html"));
+            }
+        });
+        server.createContext("/master/join", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange ex) throws IOException {
+                servePage(ex, "/master/join", sibling("master-join.html"));
+            }
+        });
+        // Memoryq Radio Server licences: buy, pay, the install command (LicenseApi has the API)
+        server.createContext("/licence", new HttpHandler() {
+            @Override
+            public void handle(HttpExchange ex) throws IOException {
+                servePage(ex, "/licence", sibling("licence.html"));
+            }
+        });
         server.createContext("/vstream-legal", new HttpHandler() {
             @Override
             public void handle(HttpExchange ex) throws IOException {
@@ -228,10 +248,26 @@ public final class AccountApi {
 
     // ---- Routing ----
 
+    /** Sign-in and sign-up straight from the Vistr games (vistr.memoryq.com and the Vistr app): one Memoryq account. */
+    static final java.util.Set<String> GAME_PATHS = new java.util.HashSet<String>(java.util.Arrays.asList("/api/login", "/api/register",
+            "/api/register/verify", "/api/register/resend", "/api/logout"));
+
     private void handleApi(HttpExchange ex) throws IOException {
         try {
             String path = ex.getRequestURI().getPath();
             String method = ex.getRequestMethod();
+            String origin = ex.getRequestHeaders().getFirst("Origin");
+            if (GAME_PATHS.contains(path) && origin != null && !origin.equals("https://memoryq.com") && MissingGame.allowedOrigin(origin)) {
+                ex.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+                ex.getResponseHeaders().set("Vary", "Origin");
+                ex.getResponseHeaders().set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+                ex.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
+                if ("OPTIONS".equalsIgnoreCase(method)) {
+                    ex.sendResponseHeaders(204, -1);
+                    ex.close();
+                    return;
+                }
+            }
             if (path.startsWith("/api/admin/")) {
                 admin(ex, path, method);
                 return;
@@ -367,8 +403,9 @@ public final class AccountApi {
         EmailService es = email;
         if (newRole == UserStore.Role.CHATTER && es != null) {
             String address = MediaAuthHttpServer.queryParam(body, "email");
+            boolean game = "vistr".equals(MediaAuthHttpServer.queryParam(body, "app")); // the Vistr games: username and password are enough
             if (address == null || address.trim().isEmpty()) {
-                if (requireEmail) {
+                if (requireEmail && !game) {
                     send(ex, 400, error("an email address is needed to create an account - please update the app"));
                     return;
                 }
@@ -534,9 +571,13 @@ public final class AccountApi {
             return;
         }
         UserStore.Info me = users.info(s.username);
-        if (me == null || me.disabled || me.role != UserStore.Role.ADMIN) {
+        boolean modEnd = "/api/admin/kick".equals(path) && Moderators.may(me, "streams.end"); // a moderator may end a live stream
+        if (me == null || me.disabled || me.role != UserStore.Role.ADMIN && !modEnd) {
             send(ex, 403, error("admin only"));
             return;
+        }
+        if (modEnd) {
+            Moderators.note(me, ex, "streams.end");
         }
         switch (path) {
             case "/api/admin/users":
@@ -895,7 +936,7 @@ public final class AccountApi {
         return videoHostSeen;
     }
 
-    /** The TV wall as "Mkarimu TV"; signing in, comments and going live stay on Memoryq. */
+    /** The TV wall as "Mkarimu STV"; signing in, comments and going live stay on Memoryq. */
     private void serveTv(HttpExchange ex, String route) throws IOException {
         Path page = sibling("tv.html");
         try {
@@ -906,9 +947,7 @@ public final class AccountApi {
             }
             String main = System.getProperty("vstream.mediaHost", "memoryq.com");
             String html = new String(Files.readAllBytes(page), StandardCharsets.UTF_8)
-                    .replace("Memoryq TV", "Mkarimu TV")
-                    .replace("Memoryq <small>TV</small>", "Mkarimu <small>TV</small>")
-                    .replace("live on Memoryq right now", "live on Mkarimu TV right now")
+                    .replace("live on Memoryq right now", "live on Mkarimu STV right now")
                     .replace("href=\"/me#", "href=\"https://" + main + "/me#")
                     .replace("href=\"/vstream-legal\"", "href=\"https://" + main + "/vstream-legal\"");
             byte[] bytes = AdSense.inject(html, "/tv").getBytes(StandardCharsets.UTF_8);

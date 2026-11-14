@@ -220,12 +220,14 @@ public final class NewsApi {
                 send(ex, 401, error("sign in required"));
                 return;
             }
-            if (me.role != UserStore.Role.ADMIN) {
+            String path = ex.getRequestURI().getPath();
+            String method = ex.getRequestMethod();
+            boolean modOk = path.equals("/api/admin/news/status") || path.equals("/api/admin/news/items") || path.equals("/api/admin/news/items/hide");
+            if (me.role != UserStore.Role.ADMIN && !(modOk && Moderators.may(me, "posts.hide"))) {
                 send(ex, 403, error("admin only"));
                 return;
             }
-            String path = ex.getRequestURI().getPath();
-            String method = ex.getRequestMethod();
+            Moderators.note(me, ex, "posts.hide");
             switch (path) {
                 case "/api/admin/news/status":
                     if (requireMethod(ex, method, "GET")) {

@@ -12,7 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Memoryq TV: live channels ordered by prominence, re-ordered as viewers change, pictures, and the /tv page. */
+/** Mkarimu STV: live channels ordered by prominence, re-ordered as viewers change, pictures, and the /tv page. */
 public final class TvApiTest {
 
     private static int failures = 0;
@@ -21,7 +21,7 @@ public final class TvApiTest {
         Path dir = Files.createTempDirectory("memoryq-tv");
         Path page = dir.resolve("admin.html");
         Files.write(page, "<html>admin</html>".getBytes(StandardCharsets.UTF_8));
-        Files.write(dir.resolve("tv.html"), "<html><title>Memoryq TV</title></html>".getBytes(StandardCharsets.UTF_8));
+        Files.write(dir.resolve("tv.html"), "<html><title>Mkarimu STV</title></html>".getBytes(StandardCharsets.UTF_8));
         long[] now = {1768212000000L};
         List<LiveChannel> live = new ArrayList<LiveChannel>();
         LiveChannel a = new LiveChannel("CHANNEL-101", "ana", "rtmp://x/live/CHANNEL-101");
@@ -82,7 +82,7 @@ public final class TvApiTest {
         checkTrue("and listed with the channel", http(port, "/api/tv")[1].contains("\"thumb\":\"/api/tv/thumb/CHANNEL-101?t="));
         check("odd channel names are refused", http(port, "/api/tv/thumb/..%2Fusers.txt")[0], "404");
         r = http(port, "/tv");
-        checkTrue("the page is at /tv", r[0].equals("200") && r[1].contains("Memoryq TV"));
+        checkTrue("the page is at /tv", r[0].equals("200") && r[1].contains("Mkarimu STV"));
         live.remove(b);
         tv.sample();
         checkTrue("a channel that ends leaves the list", !http(port, "/api/tv")[1].contains("CHANNEL-102"));

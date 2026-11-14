@@ -245,6 +245,11 @@
       <div class="panel" id="panel-market-pending" hidden><div id="mkPending"></div></div>
       <div class="panel" id="panel-market-reports" hidden><div id="mkReports"></div></div>
       <div class="panel" id="panel-market-all" hidden><div id="mkAll"></div></div>
+      <div class="panel" id="panel-streaming-master" hidden><div id="smBox"></div></div>
+      <div class="panel" id="panel-licences-all" hidden><div id="licBox"></div></div>
+      <div class="panel" id="panel-licences-payments" hidden><div id="licPay"></div></div>
+      <div class="panel" id="panel-licences-activity" hidden><div id="licAct"></div></div>
+      <div class="panel" id="panel-licences-settings" hidden><div id="licSet"></div></div>
       <div class="panel" id="panel-mail-box" hidden><div id="mlBox"></div></div>
       <div class="panel" id="panel-mail-market" hidden><div id="mlMarket"></div></div>
       <div class="panel" id="panel-mail-blocked" hidden><div id="mlBlocked"></div></div>
@@ -427,8 +432,19 @@
 
       <div class="panel" id="panel-profiler-services" hidden><div id="svList"></div></div>
       <div class="panel" id="panel-profiler-vistr" hidden><div id="viList"></div></div>
+      <div class="panel" id="panel-profiler-users" hidden><div class="mmroot"></div></div>
+      <div class="panel" id="panel-profiler-moderators" hidden><div id="modBox"></div></div>
+      <div class="panel" id="panel-members-manage" hidden><div class="mmroot"></div></div>
+      <div class="panel" id="panel-streaming-modlive" hidden><div id="modLive"></div></div>
+      <div class="panel" id="panel-users-bots" hidden><div id="botUsers"></div></div>
       <div class="panel" id="panel-users-signin" hidden><div id="siBox"></div></div>
       <div class="panel" id="panel-games-vistr" hidden><div id="gmBox"></div></div>
+      <div class="panel" id="panel-games-missing" hidden><div id="msBox"></div></div>
+      <div class="panel" id="panel-games-all" hidden><div id="gamesAll"></div></div>
+      <div class="panel" id="panel-games-pvistr" hidden><div id="gp-vistr"></div></div>
+      <div class="panel" id="panel-games-perf" hidden><div id="gamePerf"></div></div>
+    <div class="panel" id="panel-games-earn" hidden><div id="gameEarn"></div></div>
+      <div class="panel" id="panel-games-pmissing" hidden><div id="gp-missing"></div></div>
       <div class="panel" id="panel-profiler-people" hidden>
         <h2>Profiler <span id="profInfo" class="muted"></span></h2>
         <div class="muted">Test people for trying out the app: real accounts, marked as test, with invented profiles
@@ -674,7 +690,11 @@ $('loginForm').addEventListener('submit', async (ev) => {
   const remember = $('remember').checked;
   const r = await api('/api/login', { username: $('u').value, password: $('p').value, remember: remember ? '1' : '0' });
   if (!r.ok) { $('loginError').textContent = r.data.error || 'Sign in failed'; return; }
-  if (r.data.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; }
+  if (r.data.role !== 'ADMIN') {   // a moderator: the parts the super-admin gave them
+    const m = await modRights(r.data.token);
+    if (!m || !m.rights.length) { $('loginError').textContent = 'This page is for the admin account and moderators.'; return; }
+    token = r.data.token; MQAuth.save(token, remember); $('p').value = ''; enterModerator(m); return;
+  }
   token = r.data.token;
   MQAuth.save(token, remember); // the same sign-in for memoryq.com/me and the page editor
   $('p').value = '';
@@ -682,7 +702,14 @@ $('loginForm').addEventListener('submit', async (ev) => {
 });
 $('remember').checked = MQAuth.rememberDefault();
 MQAuth.google($('gBtn'), { remember: () => $('remember').checked,
-  onDone: d => { if (d.role !== 'ADMIN') { $('loginError').textContent = 'This page is for the admin account.'; return; } token = d.token; enterAdmin(d.username); },
+  onDone: async d => {
+    if (d.role !== 'ADMIN') {
+      const m = await modRights(d.token);
+      if (!m || !m.rights.length) { $('loginError').textContent = 'This page is for the admin account and moderators.'; return; }
+      token = d.token; enterModerator(m); return;
+    }
+    token = d.token; enterAdmin(d.username);
+  },
   onError: msg => { $('loginError').textContent = msg; } }).then(ok => { $('gArea').hidden = !ok; });
 function enterAdmin(name) {
   $('login').hidden = true;
@@ -697,7 +724,12 @@ function enterAdmin(name) {
   const r = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + t } }).catch(() => null);
   if (!r || !r.ok) { return; }
   const me = await r.json().catch(() => ({}));
-  if (me.role !== 'ADMIN' || token) { return; }
+  if (token) { return; }
+  if (me.role !== 'ADMIN') {   // a moderator who is signed in already
+    const m = await modRights(t);
+    if (m && m.rights.length && !token) { token = t; enterModerator(m); }
+    return;
+  }
   token = t;
   enterAdmin(me.username || 'admin');
 })();
@@ -1605,6 +1637,7 @@ const NAV = [
   { id: 'users', label: 'Users', icon: '\uD83D\uDC64', tabs: [
     { id: 'all', label: 'All users', load: loadUsers },
     { id: 'create', label: 'Create user' },
+    { id: 'bots', label: 'Bot users', load: loadBotUsers, noAuto: true },
     { id: 'suspended', label: 'Suspended', load: async () => { await loadSuspensions(); await loadAudit(); } },
     { id: 'deletion', label: 'Deletion requests', load: loadProfiler, badge: 'deletions' },
     { id: 'signin', label: 'Sign-in (Google)', load: loadSignin, noAuto: true },
@@ -1616,13 +1649,14 @@ const NAV = [
     { id: 'alma', label: 'Alma questions', load: loadAlma, noAuto: true },
     { id: 'disks', label: 'Disks and backups', load: loadDisks, noAuto: true } ] },
   { id: 'videos', label: 'Videos', icon: '\uD83C\uDFAC', tabs: [
-    { id: 'tv', label: 'Memoryq TV', load: loadTvVideos, noAuto: true },
+    { id: 'tv', label: 'Mkarimu STV', load: loadTvVideos, noAuto: true },
     { id: 'all', label: 'All videos', load: loadAllVideos, noAuto: true },
     { id: 'rec', label: 'Live recordings', load: loadRecordings, noAuto: true },
     { id: 'streamers', label: 'Streamers', load: loadStreamers, noAuto: true } ] },
   { id: 'streaming', label: 'Streaming', icon: '\uD83D\uDCE1', tabs: [
     { id: 'live', label: 'Live channels', load: loadChannels },
-    { id: 'pool', label: 'Channel pool', load: loadPool } ] },
+    { id: 'pool', label: 'Channel pool', load: loadPool },
+    { id: 'master', label: 'Studio Master', load: loadMasterAccess, noAuto: true } ] },
   { id: 'chat', label: 'Chat', icon: '\uD83D\uDCAC', tabs: [
     { id: 'rooms', label: 'Rooms', load: loadChat },
     { id: 'reports', label: 'Reports', load: loadReports, badge: 'chatReports' },
@@ -1640,13 +1674,26 @@ const NAV = [
   { id: 'profiler', label: 'Profiler', icon: '\uD83E\uDDEA', tabs: [
     { id: 'people', label: 'Test people', load: loadProfiler },
     { id: 'services', label: 'Services per member', load: loadServices, noAuto: true },
-    { id: 'vistr', label: 'Vistr players', load: loadVistrPlayers, noAuto: true } ] },
+    { id: 'vistr', label: 'Vistr players', load: loadVistrPlayers, noAuto: true },
+    { id: 'users', label: 'All users', load: loadMembersMgr, noAuto: true },
+    { id: 'moderators', label: 'Moderators', load: loadModerators, noAuto: true } ] },
   { id: 'games', label: 'Games', icon: '\uD83C\uDFAE', tabs: [
-    { id: 'vistr', label: 'Vistr', load: loadGames, noAuto: true } ] },
+    { id: 'all', label: 'All games', load: loadGamesOverview, noAuto: true },
+    { id: 'pvistr', label: 'Vistr players', load: () => loadGamePlayers('vistr'), noAuto: true },
+    { id: 'perf', label: 'Performance report', load: loadPerformance, noAuto: true },
+      { id: 'earn', label: 'Earnings', load: loadEarnings, noAuto: true },
+    { id: 'vistr', label: 'Vistr word game', load: loadGames, noAuto: true },
+    { id: 'pmissing', label: 'Spot What\'s Missing players', load: () => loadGamePlayers('missing'), noAuto: true },
+    { id: 'missing', label: 'Spot What\'s Missing', load: loadMissingAdmin, noAuto: true } ] },
   { id: 'market', label: 'Marketplace', icon: '\uD83D\uDED2', tabs: [
     { id: 'pending', label: 'Waiting for approval', load: () => loadMarket('pending'), badge: 'marketPending' },
     { id: 'reports', label: 'Reports', load: loadMarketReports, badge: 'marketReports' },
     { id: 'all', label: 'All listings', load: () => loadMarket('') } ] },
+  { id: 'licences', label: 'Licences', icon: '\uD83D\uDD11', tabs: [
+    { id: 'all', label: 'Licences', load: loadLicences, noAuto: true },
+    { id: 'payments', label: 'Payments', load: loadLicPayments, noAuto: true },
+    { id: 'activity', label: 'Activity and score', load: loadLicActivity, noAuto: true },
+    { id: 'settings', label: 'Prices and payments', load: loadLicSettings, noAuto: true } ] },
   { id: 'mail', label: 'Mail', icon: '\u2709', tabs: [
     { id: 'box', label: 'Mailbox', load: loadMail, noAuto: true, badge: 'mailUnread' },
     { id: 'market', label: 'Marketplace enquiries', load: loadMailMarket, noAuto: true, badge: 'marketWaiting' },
@@ -1736,6 +1783,7 @@ async function show(cat, tab, how) {
 }
 
 async function updateBadges() {
+  if (MOD) { drawNav(); return; }   // moderators: no super-admin counts
   const [rep, prof, wall, mk] = await Promise.all([
     api('/api/admin/chat/reports?status=open'), api('/api/admin/profiler/status'), api('/api/admin/wall/status'), api('/api/admin/market/list?status=pending')]);
   badges.marketPending = mk.ok ? (mk.data.pending || 0) : 0;
@@ -2540,7 +2588,7 @@ $('createForm').addEventListener('submit', async (ev) => {
   if (r.ok) { $('newName').value = ''; $('newPass').value = ''; }
 });
 
-// ================= Videos (Memoryq TV playlist, every video) and one account's everything =================
+// ================= Videos (Mkarimu STV playlist, every video) and one account's everything =================
 function h(tag, attrs, ...kids) {
   const e = document.createElement(tag);
   Object.entries(attrs || {}).forEach(([k, v]) => {
@@ -2579,7 +2627,7 @@ function addVideoForms(box, reload) {
   const ytTitle = h('input', { placeholder: 'Title (optional - taken from YouTube)', style: 'flex:1;min-width:180px' });
   const add = h('button', { on: { click: async () => {
     if (!url.value.trim()) { flash('Paste a YouTube link first', false); return; }
-    if (await vAct('/api/videos/youtube', { url: url.value.trim(), title: ytTitle.value.trim() }, 'Added - it is on Memoryq TV now')) { url.value = ''; ytTitle.value = ''; reload(); }
+    if (await vAct('/api/videos/youtube', { url: url.value.trim(), title: ytTitle.value.trim() }, 'Added - it is on Mkarimu STV now')) { url.value = ''; ytTitle.value = ''; reload(); }
   } } }, 'Add YouTube video');
   const file = h('input', { type: 'file', accept: 'video/*' });
   const upTitle = h('input', { placeholder: 'Title (optional - the file name)', style: 'flex:1;min-width:180px' });
@@ -2603,10 +2651,10 @@ function addVideoForms(box, reload) {
     x.send(f);
   } } }, 'Upload');
   box.appendChild(h('div', { class: 'box' },
-    h('b', {}, 'Add a video to Memoryq TV'),
+    h('b', {}, 'Add a video to Mkarimu STV'),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' }, url, ytTitle, add),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center' }, file, upTitle, up, bar, note),
-    h('div', { class: 'muted', style: 'margin-top:6px;font-size:13px' }, 'Videos you add go on Memoryq TV straight away. Uploads are converted so they play in every browser and phone. Only add videos you have the rights to.')));
+    h('div', { class: 'muted', style: 'margin-top:6px;font-size:13px' }, 'Videos you add go on Mkarimu STV straight away. Uploads are converted so they play in every browser and phone. Only add videos you have the rights to.')));
 }
 
 async function loadTvVideos() {
@@ -2615,7 +2663,7 @@ async function loadTvVideos() {
   addVideoForms(root, loadTvVideos);
   const r = await api('/api/videos?scope=tv');
   const list = (r.ok && r.data.videos) || [];
-  root.appendChild(h('h3', { style: 'margin:18px 0 6px' }, 'Playing on Memoryq TV (' + list.length + ')'));
+  root.appendChild(h('h3', { style: 'margin:18px 0 6px' }, 'Playing on Mkarimu STV (' + list.length + ')'));
   root.appendChild(h('div', { class: 'muted', style: 'font-size:13px;margin-bottom:8px' }, 'Live streams always come first on https://memoryq.com/tv. When nobody is live, these play one after another in this order.'));
   if (!list.length) { root.appendChild(h('div', { class: 'box muted' }, 'No videos on TV yet - add a YouTube link or upload one above.')); return; }
   const t = h('table');
@@ -2657,7 +2705,7 @@ async function loadAllVideos() {
       h('td', {}, when(v.created)),
       h('td', { class: v.status === 'failed' ? 'error' : (paused ? 'muted' : '') }, videoStatus(v)),
       h('td', {}, v.views + ' / ' + v.comments),
-      h('td', {}, h('input', { type: 'checkbox', checked: v.featured, disabled: v.status !== 'ready', on: { change: async e => { await vAct('/api/videos/feature', { id: v.id, on: String(e.target.checked) }, e.target.checked ? 'On Memoryq TV' : 'Taken off TV'); } } })),
+      h('td', {}, h('input', { type: 'checkbox', checked: v.featured, disabled: v.status !== 'ready', on: { change: async e => { await vAct('/api/videos/feature', { id: v.id, on: String(e.target.checked) }, e.target.checked ? 'On Mkarimu STV' : 'Taken off TV'); } } })),
       h('td', {},
         v.status === 'ready' ? h('button', { on: { click: async () => { await vAct('/api/videos/pause', { id: v.id, paused: String(!paused) }, paused ? 'Showing again' : 'Paused - hidden from everyone but its owner'); loadAllVideos(); } } }, paused ? 'Show' : 'Pause') : null,
         h('button', { on: { click: async () => { if (confirm('Delete "' + v.title + '" by ' + v.owner + ' for good?')) { await vAct('/api/videos/delete', { id: v.id }, 'Deleted'); loadAllVideos(); } } } }, 'Delete'))));
@@ -2672,7 +2720,7 @@ async function loadRecordings() {
   if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load the recordings')); return; }
   const d = r.data;
   root.appendChild(h('div', { class: 'box muted' }, d.on
-    ? 'Every live channel is recorded to the video disk (' + d.disk + ') and kept ' + d.keepDays + ' days. Keep one as a video to make it permanent - it goes to the broadcaster\'s videos (Admin -> Videos -> All videos), where it can be put on Mkarimu TV.'
+    ? 'Every live channel is recorded to the video disk (' + d.disk + ') and kept ' + d.keepDays + ' days. Keep one as a video to make it permanent - it goes to the broadcaster\'s videos (Admin -> Videos -> All videos), where it can be put on Mkarimu STV.'
     : 'Recording is off: this server has no video disk (setup-disks.sh).'));
   if (!d.recordings.length) { root.appendChild(h('div', { class: 'box muted' }, 'No recordings yet.')); return; }
   const player = h('video', { controls: true, style: 'width:100%;max-width:720px;display:none;margin-bottom:8px;background:#000' });
@@ -2695,7 +2743,7 @@ async function loadRecordings() {
           const title = prompt('Title for this video:', (x.title || 'Live: ' + x.channel) + ' ' + new Date(x.started).toLocaleDateString());
           if (title === null) { return; }
           const q = await api('/api/admin/recordings/keep', { path: x.path, title: title, tv: '1' });
-          if (q.ok) { flash('Kept - it goes on Mkarimu TV as soon as it is prepared (a few minutes)', true); loadRecordings(); } else { flash(q.data.error || 'Could not keep it', false); } } } }, 'Keep + Mkarimu TV'),
+          if (q.ok) { flash('Kept - it goes on Mkarimu STV as soon as it is prepared (a few minutes)', true); loadRecordings(); } else { flash(q.data.error || 'Could not keep it', false); } } } }, 'Keep + Mkarimu STV'),
         x.recording ? null : h('button', { on: { click: async () => {
           if (!confirm('Delete this recording for good?')) { return; }
           const q = await api('/api/admin/recordings/delete', { path: x.path });
@@ -2762,13 +2810,13 @@ async function loadStreamSessions() {
     if (q.ok) { loadStreamers(); }
   };
   const t = h('table');
-  headerRow(t, ['Started', 'Streamer', 'Title', 'Length', 'Recording', 'Video / Mkarimu TV', '']);
+  headerRow(t, ['Started', 'Streamer', 'Title', 'Length', 'Recording', 'Video / Mkarimu STV', '']);
   list.forEach(x => {
     const recs = x.recordings || [];
     const done = recs.filter(y => !y.recording);
     const v = x.video;
     const tvBox = v ? h('label', {}, (() => { const cb = h('input', { type: 'checkbox' }); cb.checked = v.onTv;
-      cb.addEventListener('change', () => act('tv', { session: x.id, on: cb.checked ? '1' : '0' }, cb.checked ? 'On Mkarimu TV' : 'Off Mkarimu TV - still kept as a video')); return cb; })(), ' On TV') : null;
+      cb.addEventListener('change', () => act('tv', { session: x.id, on: cb.checked ? '1' : '0' }, cb.checked ? 'On Mkarimu STV' : 'Off Mkarimu STV - still kept as a video')); return cb; })(), ' On TV') : null;
     t.appendChild(h('tr', { style: x.removed ? 'opacity:.55' : '' },
       h('td', {}, when(x.start)), h('td', {}, x.user || '-'), h('td', {}, (x.title || x.channel) + ' \u00b7 ' + x.channel),
       h('td', {}, x.live ? h('b', { style: 'color:#e5484d' }, 'LIVE \u00b7 ' + dur(x.durationMs)) : dur(x.durationMs)),
@@ -2777,7 +2825,7 @@ async function loadStreamSessions() {
       h('td', {}, v ? h('div', {}, h('div', {}, v.title + (v.status !== 'ready' ? ' (' + v.status + ')' : '')), tvBox) : '-'),
       h('td', {},
         !x.removed && !v && done.length ? h('button', { on: { click: () => act('keep', { session: x.id, tv: '0' }, 'Kept as a video') } }, 'Keep as video') : null,
-        !x.removed && !v && done.length ? h('button', { on: { click: () => act('keep', { session: x.id, tv: '1' }, 'Kept - on Mkarimu TV when it is prepared') } }, 'Keep + Mkarimu TV') : null,
+        !x.removed && !v && done.length ? h('button', { on: { click: () => act('keep', { session: x.id, tv: '1' }, 'Kept - on Mkarimu STV when it is prepared') } }, 'Keep + Mkarimu STV') : null,
         !x.removed ? h('button', { style: 'color:#b42318', on: { click: () => {
           if (confirm('Take this stream down?' + (x.live ? ' It is stopped now.' : '') + ' Its recordings' + (v ? ' and the video' : '') + ' are deleted for good and it no longer counts for ' + x.user + '.')) { act('delete', { session: x.id }, 'Taken down'); } } } }, x.live ? 'Stop + take down' : 'Take down') : null,
         x.removed ? h('button', { on: { click: () => act('restore', { session: x.id }, 'It counts again (the files are gone)') } }, 'Count again') : null)));
@@ -3164,6 +3212,177 @@ async function loadAdSense() {
     h('p', { class: 'small muted' }, 'AdSense checks this file. In AdSense: Sites -> memoryq.com -> "I placed the code" -> Request review.')));
 }
 
+// ---- Licences (Memoryq Radio Server): every licence, its server, payments, activity and score; prices and payment keys ----
+let licData = null;
+let licFilter = 0;
+async function licLoad() {
+  const r = await api('/api/admin/licences');
+  if (!r.ok) { flash(r.data.error || 'Could not load the licences', false); return null; }
+  licData = r.data;
+  return licData;
+}
+function licMoney(c) { return '$' + (c / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function licScore(n) { return h('b', { style: 'color:' + (n >= 70 ? 'var(--good)' : n >= 40 ? '#b26a00' : 'var(--bad)') }, String(n)); }
+function licBadge(st) {
+  const col = { active: '#2e7d32', overdue: '#b26a00', expired: '#c62828', suspended: '#c62828', pending: '#6b7a88', cancelled: '#9aa6b2' }[st] || '#6b7a88';
+  return h('span', { class: 'pill', style: 'background:' + col }, st);
+}
+
+async function loadLicences() {
+  const d = await licLoad(); if (!d) { return; }
+  const box = $('licBox'); box.textContent = '';
+  const s = d.summary;
+  box.appendChild(h('div', { class: 'acchead' },
+    h('div', {}, h('b', {}, 'Memoryq Radio Server licences'), h('div', { class: 'small muted' }, 'Customers buy at ', h('a', { href: '/licence', target: '_blank' }, 'memoryq.com/licence'),
+      '; their servers check in every 5 minutes.')),
+    h('div', { class: 'accsum' }, h('div', {}, h('span', {}, 'Active licences'), h('b', {}, String(s.active))), h('div', {}, h('span', {}, 'Servers online'), h('b', {}, String(s.online))),
+      h('div', {}, h('span', {}, 'Channels sold'), h('b', {}, String(s.channels))), h('div', {}, h('span', {}, 'Per month'), h('b', {}, s.monthly)))));
+  // a custom deal made by the admin
+  const f = { owner: h('input', { placeholder: 'customer username', style: 'width:150px' }), kind: h('select', {}, h('option', { value: 'single' }, 'Single'), h('option', { value: 'reseller' }, 'Reseller')),
+    channels: h('input', { type: 'number', value: '10', step: '10', min: '10', style: 'width:80px' }), period: h('select', {}, h('option', { value: 'custom' }, 'custom'), h('option', { value: 'monthly' }, 'monthly'), h('option', { value: 'annual' }, 'annual')),
+    price: h('input', { placeholder: 'price $ (custom)', style: 'width:120px' }), days: h('input', { type: 'number', value: '30', style: 'width:70px', title: 'days (custom)' }),
+    paid: h('input', { type: 'checkbox' }), note: h('input', { placeholder: 'note', style: 'width:180px' }) };
+  box.appendChild(h('details', { class: 'box' }, h('summary', {}, 'New licence / custom deal'),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px' }, f.owner, f.kind, f.channels, 'channels', f.period, f.price, f.days, 'days',
+      h('label', {}, f.paid, ' already paid'), f.note,
+      h('button', { class: 'pri', on: { click: async () => {
+        const r = await api('/api/admin/licences/create', { owner: f.owner.value.trim(), kind: f.kind.value, channels: f.channels.value, period: f.period.value, price: f.price.value, days: f.days.value, paid: f.paid.checked ? '1' : '0', note: f.note.value });
+        flash(r.ok ? 'Licence made' : (r.data.error || 'Could not'), r.ok); if (r.ok) { loadLicences(); } } } }, 'Make it')),
+    h('p', { class: 'small muted' }, 'Custom: you set the price and how many days it buys. "Already paid" starts it at once (bank transfer, cash, a deal).')));
+  const t = h('table', { class: 'acc' });
+  t.appendChild(h('tr', {}, ['#', 'Customer', 'Licence', 'State', 'Paid until', 'Ports', 'Server', 'Last check-in', 'Version', 'Score', ''].map(x => h('th', {}, x))));
+  d.licences.forEach(l => {
+    const tr = h('tr', {},
+      h('td', {}, String(l.id)), h('td', {}, l.owner), h('td', {}, l.label, h('div', { class: 'small muted' }, l.period + ' \u00B7 ' + l.priceText)),
+      h('td', {}, licBadge(l.state)), h('td', {}, l.paidUntil ? new Date(l.paidUntil).toLocaleDateString() : '-'),
+      h('td', { class: 'num' }, l.firstPort + (l.lastPort > l.firstPort ? '-' + l.lastPort : '')),
+      h('td', {}, l.bound ? h('span', {}, h('span', { class: 'sdot ' + (l.online ? 'on' : 'off') }), ' ', l.ip, h('div', { class: 'small muted' }, l.host)) : h('span', { class: 'muted' }, l.hasKey ? 'key made, not installed' : '-')),
+      h('td', {}, l.lastSeen ? when(l.lastSeen) : '-', l.stats ? h('div', { class: 'small muted' }, l.stats) : null),
+      h('td', {}, l.version || '-', l.version && l.version !== l.latest ? h('div', { class: 'small warn' }, 'update: ' + l.latest) : null),
+      h('td', { class: 'num' }, licScore(l.score)),
+      h('td', {}, h('button', { on: { click: () => licEdit(l, tr) } }, 'Edit'), h('button', { on: { click: () => { licFilter = l.id; show('licences', 'activity'); } } }, 'Activity')));
+    t.appendChild(tr);
+  });
+  if (!d.licences.length) { t.appendChild(h('tr', {}, h('td', { colspan: 11, class: 'muted' }, 'No licences yet.'))); }
+  box.appendChild(t);
+}
+
+function licEdit(l, tr) {
+  const old = document.getElementById('licEditRow'); if (old) { old.remove(); }
+  const v = { status: h('select', {}, ['pending', 'active', 'suspended', 'cancelled'].map(x => h('option', { value: x, selected: l.status === x }, x))),
+    paidUntil: h('input', { type: 'date', value: l.paidUntil ? new Date(l.paidUntil).toISOString().slice(0, 10) : '' }),
+    channels: h('input', { type: 'number', value: l.channels, step: 10, style: 'width:80px', disabled: l.kind === 'single' }),
+    period: h('select', {}, ['monthly', 'annual', 'custom'].map(x => h('option', { value: x, selected: l.period === x }, x))),
+    price: h('input', { placeholder: 'price $ (custom)', value: l.period === 'custom' ? (l.price / 100).toFixed(2) : '', style: 'width:110px' }),
+    customDays: h('input', { type: 'number', value: l.customDays || 30, style: 'width:70px' }),
+    basePort: h('input', { type: 'number', value: l.firstPort, style: 'width:90px' }), note: h('input', { value: l.note, style: 'width:220px' }) };
+  const row = h('tr', { id: 'licEditRow' }, h('td', { colspan: 11 }, h('div', { class: 'box edit' },
+    h('div', { class: 'fgrid' }, h('label', {}, 'Status', v.status), h('label', {}, 'Paid until', v.paidUntil), h('label', {}, 'Channels', v.channels),
+      h('label', {}, 'Period', v.period), h('label', {}, 'Price (custom period)', v.price), h('label', {}, 'Days (custom period)', v.customDays),
+      h('label', {}, 'First port', v.basePort), h('label', {}, 'Note', v.note)),
+    h('div', { class: 'edfoot' },
+      h('button', { class: 'pri', on: { click: async () => {
+        const form = { id: l.id }; Object.keys(v).forEach(k => { if (!v[k].disabled) { form[k] = v[k].value; } });
+        if (form.period !== 'custom') { delete form.price; }
+        const r = await api('/api/admin/licences/edit', form); flash(r.ok ? 'Saved' : (r.data.error || 'Could not'), r.ok); if (r.ok) { loadLicences(); } } } }, 'Save'),
+      l.bound ? h('button', { on: { click: async () => { if (!confirm('Free the licence from ' + l.ip + '? That server stops; the customer makes a new install command.')) { return; }
+        const r = await api('/api/admin/licences/edit', { id: l.id, unbind: '1' }); flash(r.ok ? 'The server was freed' : (r.data.error || 'Could not'), r.ok); if (r.ok) { loadLicences(); } } } }, 'Free the server') : null,
+      h('span', { class: 'grow' }), h('button', { on: { click: () => row.remove() } }, 'Close')))));
+  tr.after(row);
+}
+
+async function loadLicPayments() {
+  const d = await licLoad(); if (!d) { return; }
+  const box = $('licPay'); box.textContent = '';
+  const t = h('table', { class: 'acc' });
+  t.appendChild(h('tr', {}, ['#', 'Date', 'Customer', 'Licence', 'For', 'Method', 'Reference', 'Status', 'Amount', ''].map(x => h('th', {}, x))));
+  d.invoices.forEach(i => {
+    t.appendChild(h('tr', {}, h('td', {}, String(i.id)), h('td', {}, when(i.created)), h('td', {}, i.owner), h('td', {}, '#' + i.licence),
+      h('td', {}, i.what + (i.what === 'upgrade' ? ' to ' + i.channels + ' ch.' : i.days ? ' (' + i.days + ' days)' : '')), h('td', {}, i.method + (i.method === 'mpesa' ? ' (KES ' + i.kes + ')' : '')),
+      h('td', { class: 'small' }, i.ref), h('td', {}, licBadge(i.status === 'paid' ? 'active' : i.status === 'open' ? 'pending' : 'expired'), ' ', i.status, i.note ? h('div', { class: 'small muted' }, i.note) : null),
+      h('td', { class: 'num' }, i.amount),
+      h('td', {}, i.status === 'open' || i.status === 'failed' ? h('button', { on: { click: async () => {
+        const ref = prompt('Mark invoice #' + i.id + ' (' + i.amount + ') as paid. Payment reference (bank, M-Pesa code...):', ''); if (ref === null) { return; }
+        const r = await api('/api/admin/licences/markpaid', { invoice: i.id, ref: ref }); flash(r.ok ? 'Marked paid - the licence is updated' : (r.data.error || 'Could not'), r.ok); if (r.ok) { loadLicPayments(); } } } }, 'Mark paid') : null)));
+  });
+  if (!d.invoices.length) { t.appendChild(h('tr', {}, h('td', { colspan: 10, class: 'muted' }, 'No payments yet.'))); }
+  box.appendChild(t);
+}
+
+async function loadLicActivity() {
+  const id = licFilter || 0;
+  const r = await api('/api/admin/licences/events' + (id ? '?licence=' + id : ''));
+  const box = $('licAct'); box.textContent = '';
+  if (!r.ok) { box.textContent = r.data.error || 'Could not load'; return; }
+  box.appendChild(h('p', { class: 'muted small' }, id ? 'Licence #' + id + ' only. ' : 'All licences. ', id ? h('a', { href: '#', on: { click: e => { e.preventDefault(); licFilter = 0; loadLicActivity(); } } }, 'Show all') : null,
+    ' Score: 50 + the points of the last 30 days (paying, activating, checking in add; old keys, wrong IP, offline, overdue take off).'));
+  const t = h('table', { class: 'acc' });
+  t.appendChild(h('tr', {}, ['When', 'Licence', 'Who', 'What', 'Details', 'IP', 'Points'].map(x => h('th', {}, x))));
+  r.data.events.forEach(e => t.appendChild(h('tr', {}, h('td', {}, when(e.at)), h('td', {}, '#' + e.licence), h('td', {}, e.user), h('td', {}, e.kind), h('td', {}, e.detail),
+    h('td', { class: 'small' }, e.ip), h('td', { class: 'num' }, h('b', { style: 'color:' + (e.points > 0 ? 'var(--good)' : e.points < 0 ? 'var(--bad)' : 'inherit') }, e.points ? (e.points > 0 ? '+' : '') + e.points : '')))));
+  if (!r.data.events.length) { t.appendChild(h('tr', {}, h('td', { colspan: 7, class: 'muted' }, 'Nothing yet.'))); }
+  box.appendChild(t);
+}
+
+async function loadLicSettings() {
+  const d = await licLoad(); if (!d) { return; }
+  const P = d.prices, K = d.keys;
+  const box = $('licSet'); box.textContent = '';
+  const inp = (val, w, ph) => h('input', { value: val == null ? '' : val, style: 'max-width:100%;width:' + (w === 300 ? '100%' : (w || 120) + 'px'), placeholder: ph || '' });
+  const v = { singleMonth: inp((P.singleMonth / 100).toFixed(2)), channelMonth: inp((P.channelMonth / 100).toFixed(2)), stepOff: inp((P.stepOff / 100).toFixed(2)),
+    stepSize: inp(P.stepSize, 70), floor: inp((P.floor / 100).toFixed(2)), annualMonths: inp(P.annualMonths, 70), maxChannels: inp(P.maxChannels, 80),
+    keyTtlHours: inp(P.keyTtlHours, 70), basePort: inp(P.basePort, 90) };
+  const k = { 'paypal.client': inp('', 300, K.paypalClient ? 'set (' + K.paypalClient + ') - type to change' : 'PayPal client ID'), 'paypal.secret': inp('', 300, K.paypalSecret ? 'set - type to change' : 'PayPal secret'),
+    'paypal.mode': h('select', {}, ['sandbox', 'live'].map(x => h('option', { value: x, selected: K.paypalMode === x }, x))),
+    'mpesa.key': inp('', 300, K.mpesaKey ? 'set - type to change' : 'Daraja consumer key'), 'mpesa.secret': inp('', 300, K.mpesaSecret ? 'set - type to change' : 'Daraja consumer secret'),
+    'mpesa.shortcode': inp(K.mpesaShortcode, 120, 'shortcode'), 'mpesa.passkey': inp('', 300, K.mpesaPasskey ? 'set - type to change' : 'Lipa na M-Pesa passkey'),
+    'mpesa.type': h('select', {}, [['paybill', 'Paybill'], ['till', 'Till (Buy Goods)']].map(x => h('option', { value: x[0], selected: K.mpesaType === x[0] }, x[1]))),
+    'mpesa.till': inp(K.mpesaTill, 120, 'till number'), 'mpesa.env': h('select', {}, ['sandbox', 'live'].map(x => h('option', { value: x, selected: K.mpesaEnv === x }, x))),
+    'mpesa.rate': inp(P.kesPerUsd, 80) };
+  const ex = h('div', { class: 'small muted' });
+  const drawEx = () => { const s = P.steps.slice(0, 6); ex.textContent = 'Now: ' + s.map(x => x.channels + ' ch = ' + licMoney(x.perChannel) + '/ch (' + licMoney(x.month) + '/month)').join(' \u00B7 '); };
+  drawEx();
+  box.appendChild(h('div', { class: 'box' }, h('h3', { style: 'margin-top:0' }, 'Prices (US dollars)'),
+    h('div', { class: 'fgrid' }, h('label', {}, 'Single, per month', v.singleMonth), h('label', {}, 'Reseller: per channel per month (first 10)', v.channelMonth),
+      h('label', {}, 'Less per channel for every step', v.stepOff), h('label', {}, 'Step (channels)', v.stepSize), h('label', {}, 'Lowest price per channel', v.floor),
+      h('label', {}, 'Annual = this many months', v.annualMonths), h('label', {}, 'Most channels per licence', v.maxChannels),
+      h('label', {}, 'Install key valid (hours)', v.keyTtlHours), h('label', {}, 'First streaming port', v.basePort)), ex));
+  box.appendChild(h('div', { class: 'box' }, h('h3', { style: 'margin-top:0' }, 'Card payments (Stripe)'),
+    h('p', { class: 'small' }, d.prices.methods.stripe ? 'Ready - the Stripe key of Radio -> Stations -> Plans is used.' : 'Not set: add the Stripe secret key in Admin -> Radio -> Stations -> Plans (it is shared).')));
+  box.appendChild(h('div', { class: 'box' }, h('h3', { style: 'margin-top:0' }, 'PayPal ', d.prices.methods.paypal ? h('span', { class: 'pill paid' }, 'ready') : h('span', { class: 'pill unpaid' }, 'not set')),
+    h('div', { class: 'fgrid' }, h('label', {}, 'Client ID', k['paypal.client']), h('label', {}, 'Secret', k['paypal.secret']), h('label', {}, 'Mode', k['paypal.mode'])),
+    h('p', { class: 'small muted' }, 'developer.paypal.com -> Apps & Credentials -> your app. Use sandbox to test, then live.')));
+  box.appendChild(h('div', { class: 'box' }, h('h3', { style: 'margin-top:0' }, 'M-Pesa (Safaricom Daraja) ', d.prices.methods.mpesa ? h('span', { class: 'pill paid' }, 'ready') : h('span', { class: 'pill unpaid' }, 'not set')),
+    h('div', { class: 'fgrid' }, h('label', {}, 'Consumer key', k['mpesa.key']), h('label', {}, 'Consumer secret', k['mpesa.secret']), h('label', {}, 'Business shortcode', k['mpesa.shortcode']),
+      h('label', {}, 'Passkey', k['mpesa.passkey']), h('label', {}, 'Account type', k['mpesa.type']), h('label', {}, 'Till number (Buy Goods)', k['mpesa.till']),
+      h('label', {}, 'Environment', k['mpesa.env']), h('label', {}, 'KES per US dollar', k['mpesa.rate'])),
+    h('p', { class: 'small muted' }, 'developer.safaricom.co.ke -> your app (Lipa na M-Pesa Online). Callback address for Safaricom: ', h('code', {}, K.mpesaCallback))));
+  box.appendChild(h('button', { class: 'pri', on: { click: async () => {
+    const form = {}; Object.keys(v).forEach(x => { form[x] = v[x].value; }); Object.keys(k).forEach(x => { if (k[x].value.trim()) { form[x] = k[x].value.trim(); } });
+    const r = await api('/api/admin/licences/settings', form);
+    flash(r.ok ? 'Saved' : (r.data.error || 'Could not save'), r.ok); if (r.ok) { loadLicSettings(); } } } }, 'Save prices and payments'));
+  box.appendChild(h('p', { class: 'small muted' }, 'Keys are kept in licence-secrets.txt on the server and never shown again. Bank transfer is always available: mark it paid in Payments.'));
+}
+
+// ---- Studio Master: who may use the live-event mixer ----
+async function loadMasterAccess() {
+  const r = await api('/api/admin/master');
+  const box = $('smBox'); box.textContent = '';
+  if (!r.ok) { box.textContent = r.data.error || 'Could not load'; return; }
+  const inp = h('input', { placeholder: 'member username', style: 'width:200px' });
+  box.appendChild(h('div', { class: 'box' }, h('b', {}, 'Studio Master'), ' - the live-event video mixer: ', h('a', { href: '/master', target: '_blank' }, 'memoryq.com/master'),
+    h('p', { class: 'small muted' }, 'Up to 5 slots (Vstream phones that are live, guests with an invite link, the Master-DJ\'s camera, videos), cut / mix / dip / wipe / slide / zoom, debate side by side, '
+      + 'picture-in-picture and a caption. GO LIVE sends the programme to the user\'s live channel (Live Channels, Mkarimu STV, recorded, their "Also stream to" copies) and, if chosen, its sound to a radio station. '
+      + 'You (super-admin) can always use it; give it to other members here.'),
+    h('div', { style: 'display:flex;gap:6px;align-items:center' }, inp, h('button', { class: 'pri', on: { click: async () => {
+      const q = await api('/api/admin/master', { add: inp.value.trim() }); flash(q.ok ? 'Studio Master is on for ' + inp.value.trim() : (q.data.error || 'Could not'), q.ok); if (q.ok) { loadMasterAccess(); } } } }, 'Give access'))));
+  const t = h('table', {}, h('tr', {}, h('th', {}, 'Members who may use Studio Master'), h('th', {}, '')));
+  (r.data.allowed || []).forEach(u => t.appendChild(h('tr', {}, h('td', {}, u), h('td', {}, h('button', { class: 'del', on: { click: async () => {
+    await api('/api/admin/master', { remove: u }); loadMasterAccess(); } } }, 'Remove')))));
+  if (!(r.data.allowed || []).length) { t.appendChild(h('tr', {}, h('td', { colspan: 2, class: 'muted' }, 'Only you (the super-admin) for now.'))); }
+  box.appendChild(t);
+}
+
 // ---- Global Radio (memoryq.com/world): every station on the globe, editing, the station finder bot ----
 const WR_STATUS = { active: 'on the globe', broken: 'silent (hidden)', removed: 'taken off', noplace: 'no place yet' };
 const WR_STATUS_BG = { active: '#2e7d32', broken: '#b26a00', removed: '#6b7a88', noplace: '#7b4fd6' };
@@ -3445,28 +3664,1053 @@ async function loadSignin() {
   root.appendChild(h('div', { class: 'box muted small' }, h('b', {}, 'Remember me for 30 days: '), 'every sign-in box has it (memoryq.com, admin, DJ Pro, World Radio, the Memoryq app, Vistr). Ticked: signed in on that device for 30 days, also across server updates. Not ticked: signed out when the browser closes (1 day at most).'));
 }
 
-// ---- Games -> Vistr: the word game's numbers and its admin page ----
+// ---- Games -> Vistr word game: everything its own admin page had, now here (memoryq.com is the one place for admin) ----
+const GM = { players: null, visits: null, sortBy: 'rating', sortDir: -1, act: '' };
+async function vistrGet(p, extra) {
+  const r = await api('/api/admin/vistr/game?p=' + encodeURIComponent(p) + (extra || ''));
+  if (!r.ok) { throw new Error(r.data.error || ('the game answered ' + r.status)); }
+  return r.data;
+}
+function gmCsv(name, rows) {
+  const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const a = h('a', { href: URL.createObjectURL(new Blob(['\ufeff' + rows.map(l => l.map(q).join(',')).join('\r\n')], { type: 'text/csv' })), download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function gmDur(ms) { if (!ms) { return '-'; } const m = Math.round(ms / 60000); return m < 1 ? '<1 min' : m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min'; }
+// Lite and guest visitors: Vistr Lite counts who uses it (a signed-in Vistr player, or a guest L-ID); read only.
+async function gmVisitors(body) {
+  const box = h('div', { class: 'box' }, h('b', {}, 'Lite and guest visitors '), h('span', { class: 'muted small' }, 'who uses vistr.memoryq.com/lite: Vistr players by ID, everyone else by a guest ID (L-1234) kept in their browser'));
+  body.appendChild(box);
+  let d;
+  try { d = await vistrGet('/api/admin/guests'); } catch (e) { box.appendChild(h('div', { class: 'muted', style: 'margin-top:6px' }, 'Not available yet (needs the newest game version): ' + e.message)); return; }
+  const tbl = (cols, rows) => rows.length ? h('div', { style: 'overflow-x:auto;margin-top:6px;max-height:380px;overflow-y:auto' }, h('table', {}, h('tr', {}, cols.map(c => h('th', {}, c[0]))),
+    rows.map(r => h('tr', {}, cols.map(c => h('td', {}, String(c[1](r) == null ? '' : c[1](r)))))))) : h('div', { class: 'muted', style: 'margin-top:6px' }, 'None yet.');
+  const t = x => x ? when(x) : '';
+  box.append(h('button', { style: 'float:right', on: { click: () => gmCsv('vistr-lite-visitors-' + new Date().toISOString().slice(0, 10) + '.csv', [['Kind', 'ID', 'From', 'Vistr ID', 'First seen', 'Last seen', 'Opens', 'Games', 'In app', 'In Lite']]
+      .concat(d.liteUsers.map(u => ['Vistr player', u.code, 'lite', u.code, u.firstSeen ? new Date(u.firstSeen).toISOString() : '', u.lastSeen ? new Date(u.lastSeen).toISOString() : '', u.opens, u.games, '', u.games]))
+      .concat(d.guests.map(g => ['Guest', g.code, g.from, g.linkedTo || g.claimedCode || '', new Date(g.firstSeen).toISOString(), new Date(g.lastSeen).toISOString(), g.opens, g.games, g.inApp, g.inLite]))) } }, 'Download CSV'),
+    h('div', { style: 'margin-top:6px' }, h('b', {}, 'Vistr players who used Lite '), h('span', { class: 'muted small' }, d.liteUsers.length + ' (counted on their Vistr ID automatically)')),
+    tbl([['Vistr ID', r => r.code], ['Name', r => r.name], ['First seen', r => t(r.firstSeen)], ['Last seen', r => t(r.lastSeen)], ['Opens', r => r.opens], ['Games', r => r.games]], d.liteUsers),
+    h('div', { style: 'margin-top:10px' }, h('b', {}, 'Guest IDs '), h('span', { class: 'muted small' }, d.guests.length + ' (L-IDs given to a browser; "typed" = the person entered a Vistr ID, not checked)')),
+    tbl([['Guest ID', r => r.code], ['Vistr ID', r => r.linkedTo ? r.linkedTo : r.claimedCode ? r.claimedCode + ' (typed)' : ''], ['First seen', r => t(r.firstSeen)], ['Last seen', r => t(r.lastSeen)], ['Opens', r => r.opens], ['Games', r => r.games], ['In Lite', r => r.inLite]], d.guests));
+}
 async function loadGames() {
   const root = $('gmBox'); root.textContent = '';
-  const box = h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Vistr word game'), h('span', { class: 'muted' }, '  vistr.memoryq.com'));
-  root.appendChild(box);
-  const nums = h('div', { style: 'display:flex;gap:24px;margin:10px 0;flex-wrap:wrap' }, h('span', { class: 'muted' }, 'Loading the game numbers...'));
-  box.appendChild(nums);
-  box.appendChild(h('div', {},
-    h('button', { class: 'pri', on: { click: async () => {
-      const q = await api('/api/auth/handoff', { app: 'vistr-admin', return: 'https://vistr.memoryq.com/admin.html', remember: '1' });
-      if (!q.ok) { flash(q.data.error || 'Could not open the Vistr admin page', false); return; }
-      window.open(q.data.url, '_blank', 'noopener');
-    } } }, 'Open the Vistr admin page (game statistics, players, messages, reviews)'),
-    h('div', { class: 'muted small', style: 'margin-top:6px' }, 'You are signed in there with this super-admin account - no Vistr admin key needed.')));
+  const head = h('div', { class: 'box' }, h('div', { style: 'float:right' }, playLink('vistr')), h('b', { style: 'font-size:16px' }, 'Vistr word game'), h('span', { class: 'muted' }, '  vistr.memoryq.com - all its admin is here now'),
+    h('div', { class: 'muted small', style: 'margin-top:4px' }, 'Players, activity, messages, reviews and ad numbers come straight from the game server. The old vistr.memoryq.com/admin.html page now sends you here.'));
+  root.appendChild(head);
+  const body = h('div', {}, h('div', { class: 'muted' }, 'Asking the game...'));
+  root.appendChild(body);
+  const gmFull = !MOD || MOD.has('games.vistr'), gmSeeV = !MOD || MOD.has('visitors.vistr');
+  if (!gmFull) { body.textContent = ''; if (gmSeeV) { await gmVisitors(body); } return; }   // a moderator with only the visitors right
+  let st, pl, act, msgs, revs, ads;
   try {
-    const r = await fetch('https://vistr.memoryq.com/api/stats');
-    const d = await r.json();
-    nums.textContent = '';
-    nums.append(h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, (d.total || 0).toLocaleString()), h('div', { class: 'muted small' }, 'games played')),
-      h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, (d.today || 0).toLocaleString()), h('div', { class: 'muted small' }, 'today')));
-  } catch (e) { nums.textContent = 'The game server did not answer (vistr.memoryq.com).'; }
+    [st, pl, act, msgs, revs, ads] = await Promise.all([vistrGet('/api/stats'), vistrGet('/api/admin/players').catch(() => null),
+      vistrGet('/api/admin/activity', GM.act ? '&player=' + encodeURIComponent(GM.act) : '').catch(() => null), vistrGet('/api/contact/messages'),
+      vistrGet('/api/reviews/all'), vistrGet('/api/ads/stats').catch(() => ({}))]);
+  } catch (e) { body.textContent = ''; body.appendChild(h('div', { class: 'error' }, 'The game did not answer: ' + e.message)); return; }
+  GM.players = pl; GM.visits = act ? act.visits : null;
+  body.textContent = '';
+  // numbers
+  const days = Object.entries(st.byDay || {}).sort().slice(-14).reverse();
+  const big = (n, l) => h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, Number(n || 0).toLocaleString()), h('div', { class: 'muted small' }, l));
+  body.appendChild(h('div', { class: 'box' }, h('div', { style: 'display:flex;gap:28px;flex-wrap:wrap' }, big(st.total, 'games played'), big(st.today, 'today'),
+    big(st.solo, 'online solo'), big(st.duo, 'two-player'), big(st.offline, 'offline (app)'), big(st.players, 'players with an ID')),
+    days.length ? h('div', { class: 'muted small', style: 'margin-top:8px' }, 'Last 14 days: ' + days.map(d => d[0].slice(5) + ' ' + d[1]).join(' \u00b7 ')) : null));
+  // players
+  const pbox = h('div', { class: 'box' });
+  body.appendChild(pbox);
+  const drawPlayers = () => {
+    pbox.textContent = '';
+    if (!GM.players) { pbox.appendChild(h('div', { class: 'muted' }, 'The player list needs the newest game version.')); return; }
+    const on = new Set(GM.players.online || []);
+    const cols = [['playerCode', 'ID'], ['name', 'Name'], ['rank', 'Rank'], ['rating', 'Rating'], ['points', 'Points'], ['games', 'Games'], ['best', 'Best'],
+      ['wins', 'W-L-D'], ['words', 'Words'], ['onlineMs', 'Online'], ['lastSeen', 'Last seen'], ['joined', 'Joined'], ['email', 'Email'], ['mq', 'Memoryq']];
+    const rows = GM.players.players.slice().sort((a, b) => {
+      const x = a[GM.sortBy], y = b[GM.sortBy];
+      return (typeof x === 'number' || /^\d+$/.test(String(x || '')) ? Number(x || 0) - Number(y || 0) : String(x || '').localeCompare(String(y || ''))) * GM.sortDir;
+    });
+    pbox.append(h('b', {}, 'Players '), h('span', { class: 'muted' }, GM.players.players.length + ' with an ID \u00b7 online ' + (GM.players.online || []).length
+      + ' \u00b7 available ' + (GM.players.available || []).length + ' '),
+      h('button', { on: { click: () => gmCsv('vistr-players-' + new Date().toISOString().slice(0, 10) + '.csv', [cols.map(c => c[1])].concat(rows.map(p => cols.map(c => c[0] === 'wins' ? p.wins + '-' + p.losses + '-' + p.draws : c[0] === 'onlineMs' ? Math.round((p.onlineMs || 0) / 60000) : /lastSeen|joined/.test(c[0]) ? (p[c[0]] ? new Date(p[c[0]]).toISOString().slice(0, 10) : '') : p[c[0]])))) } }, 'Download (CSV)'),
+      h('div', { style: 'overflow-x:auto;margin-top:6px' }, h('table', {}, h('tr', {}, cols.map(c => h('th', { style: 'cursor:pointer;white-space:nowrap', on: { click: () => { GM.sortDir = GM.sortBy === c[0] ? -GM.sortDir : -1; GM.sortBy = c[0]; drawPlayers(); } } },
+        c[1] + (GM.sortBy === c[0] ? (GM.sortDir < 0 ? ' \u25bc' : ' \u25b2') : '')))),
+      rows.map(p => h('tr', {}, h('td', {}, (on.has(p.playerCode) ? '\u25cf ' : '') + p.playerCode), h('td', {}, p.name || ''), h('td', {}, p.rank || ''), h('td', {}, h('b', {}, String(p.rating))),
+        h('td', {}, Number(p.points || 0).toLocaleString()), h('td', {}, String(p.games)), h('td', {}, String(p.best)), h('td', {}, p.wins + '-' + p.losses + '-' + p.draws),
+        h('td', {}, String(p.words)), h('td', {}, gmDur(p.onlineMs)), h('td', {}, when(p.lastSeen)), h('td', {}, p.joined ? new Date(p.joined).toLocaleDateString() : '-'),
+        h('td', {}, p.email || ''), h('td', {}, p.mq || h('span', { class: 'muted' }, 'not linked')))))));
+  };
+  drawPlayers();
+  // activity
+  const abox = h('div', { class: 'box' });
+  body.appendChild(abox);
+  const who = h('input', { placeholder: 'Player ID (blank: everyone)', value: GM.act, inputmode: 'numeric', style: 'width:200px' });
+  abox.append(h('b', {}, 'Activity '), h('span', { class: 'muted small' }, 'online visits, last 90 days '), who,
+    h('button', { on: { click: () => { GM.act = who.value.replace(/\D/g, ''); loadGames(); } } }, 'Show'),
+    GM.visits ? h('button', { on: { click: () => gmCsv('vistr-activity-' + (GM.act || 'all') + '.csv', [['Player ID', 'Name', 'Logged in', 'Logged out', 'Minutes', 'Games', 'IP address', 'Device']].concat(GM.visits.map(v => [v.playerCode, v.name, v.start ? new Date(v.start).toISOString() : '', v.online ? 'online now' : (v.end ? new Date(v.end).toISOString() : ''), Math.round((v.duration || 0) / 6000) / 10, v.games, v.ip, v.app]))) } }, 'Download (CSV)') : null);
+  if (GM.visits) {
+    abox.appendChild(h('div', { style: 'overflow-x:auto;margin-top:6px;max-height:420px;overflow-y:auto' }, h('table', {}, h('tr', {}, ['ID', 'Name', 'Logged in', 'Logged out', 'Duration', 'Games', 'IP address', 'Device'].map(x => h('th', {}, x))),
+      GM.visits.slice(0, 300).map(v => h('tr', {}, h('td', {}, v.playerCode), h('td', {}, v.name || ''), h('td', {}, when(v.start)), h('td', {}, v.online ? h('b', { class: 'live' }, 'online now') : when(v.end)),
+        h('td', {}, gmDur(v.duration)), h('td', {}, String(v.games)), h('td', {}, v.ip || ''), h('td', {}, v.app || ''))))));
+  }
+  // messages
+  const mbox = h('div', { class: 'box' }, h('b', {}, 'Messages '), h('span', { class: 'muted' }, msgs.messages.length + ' from the game\'s Contact page'));
+  body.appendChild(mbox);
+  msgs.messages.slice().reverse().forEach(m => mbox.appendChild(h('div', { style: 'border-top:1px solid var(--line);padding:8px 0' },
+    h('b', {}, m.topic || 'Other'), h('span', { class: 'muted small' }, '  ' + when(m.at) + ' \u00b7 ' + (m.name || '(no name)') + ' <' + m.email + '>' + (m.playerCode ? ' \u00b7 Player ' + m.playerCode : '') + (m.app ? ' \u00b7 ' + m.app : '')),
+    h('div', { style: 'white-space:pre-wrap;margin:4px 0' }, m.message),
+    h('a', { href: 'mailto:' + m.email + '?subject=' + encodeURIComponent('Re: Vistr ' + (m.topic || '')) }, h('button', {}, 'Reply by email')),
+    h('button', { class: 'del', on: { click: async () => { if (!confirm('Delete this message?')) { return; } try { await vistrGet('/api/contact/messages', '&delete=' + encodeURIComponent(m.id)); flash('Deleted', true); loadGames(); } catch (e) { flash(e.message, false); } } } }, 'Delete'))));
+  // reviews
+  const rbox = h('div', { class: 'box' }, h('b', {}, 'Reviews '), h('span', { class: 'muted' }, revs.reviews.length + ' (held ones wait for you)'));
+  body.appendChild(rbox);
+  revs.reviews.forEach(r => rbox.appendChild(h('div', { style: 'border-top:1px solid var(--line);padding:8px 0' },
+    h('span', { class: r.status === 'shown' ? 'ok' : r.status === 'held' ? 'error' : 'muted' }, r.status), ' ', h('b', {}, '\u2605'.repeat(r.stars) + '\u2606'.repeat(5 - r.stars)),
+    h('span', { class: 'muted small' }, '  Player ' + r.playerCode + ' \u00b7 ' + when(r.updatedAt)), r.text ? h('div', { style: 'margin:4px 0' }, r.text) : null,
+    r.status !== 'shown' ? h('button', { on: { click: async () => { await vistrGet('/api/reviews/all', '&player=' + encodeURIComponent(r.playerCode) + '&status=shown').catch(e => flash(e.message, false)); loadGames(); } } }, 'Show') : null,
+    r.status !== 'hidden' ? h('button', { class: 'del', on: { click: async () => { await vistrGet('/api/reviews/all', '&player=' + encodeURIComponent(r.playerCode) + '&status=hidden').catch(e => flash(e.message, false)); loadGames(); } } }, 'Hide') : null)));
+  if (gmSeeV) { await gmVisitors(body); }
+  // the game's own ads
+  const ak = Object.keys(ads || {});
+  body.appendChild(h('div', { class: 'box' }, h('b', {}, 'The game\'s own ads '), h('span', { class: 'muted small' }, '(server/data/ads.json on the game server)'),
+    ak.length ? h('table', { style: 'margin-top:6px' }, h('tr', {}, h('th', {}, 'Ad'), h('th', {}, 'Views'), h('th', {}, 'Clicks')),
+      ak.map(k => h('tr', {}, h('td', {}, k), h('td', {}, String((ads[k] || {}).view || 0)), h('td', {}, String((ads[k] || {}).click || 0))))) : h('div', { class: 'muted' }, 'No ad numbers yet.')));
 }
+
+// ---- Games -> Spot What's Missing: numbers, the picture library, adding and correcting pictures ----
+const MS = { data: null };
+const MS_GAME = (() => { try { return localStorage.getItem('mg_game') || ''; } catch (e) { return ''; } })() || 'https://vistr.memoryq.com/missing/'; // a test server can be set
+/** Try the game as a player: a test player under the admin's own account ("Admin test"), at the level and language chosen. */
+async function tryMissing(level, lang) {
+  const w = window.open('', '_blank'); // opened now, so the browser does not block it
+  const r = await api('/api/missing/players');
+  const p = ((r.data && r.data.players) || []).find(x => x.nickname === 'Admin test');
+  const form = { nickname: 'Admin test', avatar: 'star', level: String(level), lang: lang, minutes: '0', pictures: '3', voice: '1', hints: 'on', categoriesSet: '1', categories: '' };
+  if (p) { form.id = p.id; }
+  const q = await api('/api/missing/players/save', form);
+  if (!q.ok) { if (w) { w.close(); } flash(q.data.error || 'Could not make the test player', false); return; }
+  const hd = await api('/api/auth/handoff', { app: 'missing', return: MS_GAME + '?p=' + encodeURIComponent(q.data.player.id), remember: '1' });
+  const url = hd.ok ? hd.data.url : MS_GAME;
+  if (w) { w.location.href = url; } else { location.href = url; }
+}
+async function apiJson(path, obj) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(obj) });
+  let data = {};
+  try { data = await r.json(); } catch (e) { }
+  return { ok: r.ok, status: r.status, data: data };
+}
+async function adminSvg(id) {
+  const r = await fetch('/api/admin/missing/svg?id=' + encodeURIComponent(id), { headers: { 'Authorization': 'Bearer ' + token } });
+  if (!r.ok) { throw new Error('could not load the picture (' + r.status + ')'); }
+  return r.text();
+}
+/** An SVG from the server shown safely in the admin page (no scripts or event attributes). */
+function svgNode(text) {
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const svg = doc.documentElement;
+  if (svg.nodeName !== 'svg') { throw new Error('not an SVG picture'); }
+  svg.querySelectorAll('script, foreignObject, image, a, use, style, iframe').forEach(n => n.remove());
+  svg.querySelectorAll('*').forEach(n => Array.from(n.attributes).forEach(a => { if (/^on/i.test(a.name) || /href$/i.test(a.name)) { n.removeAttribute(a.name); } }));
+  Array.from(svg.attributes).forEach(a => { if (/^on/i.test(a.name)) { svg.removeAttribute(a.name); } });
+  return document.importNode(svg, true);
+}
+async function loadMissingAdmin() {
+  const root = $('msBox'); root.textContent = '';
+  const r = await api('/api/admin/missing');
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  MS.data = r.data;
+  const n = r.data.numbers;
+  const big = (v, l) => h('div', {}, h('div', { style: 'font-size:26px;font-weight:800' }, Number(v || 0).toLocaleString()), h('div', { class: 'muted small' }, l));
+  const tryLevel = h('select', {}, [1, 2, 3, 4, 5].map(n => h('option', { value: n }, 'Level ' + n)));
+  const tryLang = h('select', {}, h('option', { value: 'en' }, 'English'), h('option', { value: 'sw' }, 'Kiswahili'));
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Spot What\'s Missing'), h('span', { class: 'muted' }, '  vistr.memoryq.com/missing - carers set up players at memoryq.com/me'),
+    h('div', { style: 'margin:8px 0 2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap' },
+      h('button', { class: 'pri', on: { click: () => tryMissing(tryLevel.value, tryLang.value) } }, '\u25b6 Try the game'), tryLevel, tryLang,
+      h('a', { href: MS_GAME, target: '_blank', rel: 'noopener' }, 'Open the game page'),
+      h('span', { class: 'muted small' }, ' - plays 3 pictures as "Admin test" (a player under your account; delete it at memoryq.com/me if you like).')),
+    h('div', { style: 'display:flex;gap:28px;flex-wrap:wrap;margin-top:8px' }, big(n.carers, 'carers'), big(n.players, 'players'), big(n.sessions, 'sessions'), big(n.sessions7, 'sessions this week'),
+      big(n.pictures, 'pictures played'), big(n.found, 'parts found'))));
+  const bar = h('div', { class: 'acctool' }, h('b', {}, 'Picture library '), h('span', { class: 'muted small' }, r.data.pictures.length + ' pictures \u00b7 ' + r.data.pictures.filter(p => p.enabled).length + ' switched on'),
+    h('span', { style: 'flex:1' }), h('button', { class: 'pri', on: { click: () => editPicture(null) } }, '+ Add a picture'));
+  root.appendChild(bar);
+  const grid = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px' });
+  root.appendChild(grid);
+  r.data.pictures.forEach(p => {
+    const thumb = h('div', { style: 'height:130px;display:flex;align-items:center;justify-content:center;background:#fffdf7;border-radius:6px;margin-bottom:6px' + (p.enabled ? '' : ';opacity:.4') });
+    adminSvg(p.id).then(t => { const s = svgNode(t); s.style.cssText = 'max-width:100%;max-height:126px'; thumb.appendChild(s); }).catch(() => { thumb.textContent = '?'; });
+    grid.appendChild(h('div', { class: 'box', style: 'margin:0' }, thumb,
+      h('b', {}, p.title.en), h('span', { class: 'muted' }, ' / ' + (p.title.sw || '-')),
+      h('div', { class: 'muted small' }, p.category + ' \u00b7 ' + p.parts.length + ' parts \u00b7 version ' + p.version + ' \u00b7 played ' + (p.plays || 0)
+        + (p.builtin ? (p.changed ? ' \u00b7 built-in (changed)' : ' \u00b7 built-in') : ' \u00b7 added')),
+      h('div', { style: 'margin-top:6px' },
+        h('label', { class: 'small' }, h('input', { type: 'checkbox', checked: p.enabled, on: { change: async e => {
+          const q = await api('/api/admin/missing/enable', { id: p.id, on: e.target.checked ? '1' : '0' });
+          flash(q.ok ? (e.target.checked ? 'Switched on: ' : 'Switched off: ') + p.title.en : (q.data.error || 'Could not'), q.ok); loadMissingAdmin();
+        } } }), ' In the game'),
+        h('button', { on: { click: () => editPicture(p) } }, 'Edit'),
+        !p.builtin || p.changed ? h('button', { class: 'del', on: { click: async () => {
+          if (!confirm(p.builtin ? 'Put "' + p.title.en + '" back as it was first made?' : 'Delete "' + p.title.en + '"? Games already played keep their numbers.')) { return; }
+          const q = await api('/api/admin/missing/delete', { id: p.id });
+          flash(q.ok ? (p.builtin ? 'Put back as it was' : 'Deleted') : (q.data.error || 'Could not'), q.ok); loadMissingAdmin();
+        } } }, p.builtin ? 'Put back the original' : 'Delete') : null)));
+  });
+}
+/** The picture editor: an SVG, its name in English and Kiswahili, and the parts that can go missing (click them in the picture). */
+async function editPicture(p) {
+  const root = $('msBox'); root.textContent = '';
+  const st = { svgText: '', parts: p ? p.parts.map(x => ({ id: x.id, kind: x.kind, size: x.size, twin: x.twin || '', en: (x.name || {}).en || '', sw: (x.name || {}).sw || '' })) : [] };
+  const back = h('button', { on: { click: loadMissingAdmin } }, '\u2190 Back to the library');
+  const fid = h('input', { value: p ? p.id : '', placeholder: 'e.g. red-bus', disabled: !!p, style: 'width:100%' });
+  const ten = h('input', { value: p ? p.title.en : '', placeholder: 'the red bus', style: 'width:100%' });
+  const tsw = h('input', { value: p ? (p.title.sw || '') : '', placeholder: 'basi jekundu', style: 'width:100%' });
+  const cat = h('select', {}, ['animals', 'faces', 'home', 'vehicles', 'food', 'nature', 'other'].map(c => h('option', { value: c, selected: p && p.category === c }, c)));
+  const ages = ['child', 'teen', 'adult'].map(a => h('input', { type: 'checkbox', value: a, checked: !p || !p.ages || !p.ages.length || p.ages.indexOf(a) >= 0 }));
+  const lic = h('input', { value: p ? (p.licence || '') : '', placeholder: 'who drew it / the licence (pictures must be yours or licensed)', style: 'width:100%' });
+  const file = h('input', { type: 'file', accept: '.svg,image/svg+xml' });
+  const prev = h('div', { style: 'background:#fffdf7;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:240px;display:flex;align-items:center;justify-content:center' }, h('span', { class: 'muted' }, p ? 'Loading...' : 'Choose an SVG file'));
+  const list = h('div', {});
+  const note = h('div', { class: 'muted small', style: 'margin:6px 0' }, 'Click a part in the picture to add it. Parts are the picture\'s top-level shapes or groups (draw each part as its own group in Inkscape or Illustrator). Twins (two eyes, two wheels) are never hidden together.');
+  const err = h('div', { class: 'error' });
+  let svgEl = null, hideTest = false;
+  const highlight = (id, on) => { const n = svgEl && svgEl.querySelector('[id="' + CSS.escape(id) + '"]'); if (n) { n.style.outline = on ? '3px solid #2f6fde' : ''; n.style.filter = on ? 'drop-shadow(0 0 4px #2f6fde)' : ''; } };
+  const drawList = () => {
+    list.textContent = '';
+    if (!st.parts.length) { list.appendChild(h('div', { class: 'muted' }, 'No parts yet.')); }
+    const ids = st.parts.map(x => x.id);
+    st.parts.forEach((x, i) => {
+      const inp = (k, ph, w) => h('input', { value: x[k], placeholder: ph, style: 'width:' + w, on: { input: e => { x[k] = e.target.value; } } });
+      const size = h('select', { on: { change: e => { x.size = e.target.value; } } }, ['large', 'medium', 'small'].map(z => h('option', { value: z, selected: x.size === z }, z)));
+      const twin = h('select', { on: { change: e => { x.twin = e.target.value; } } }, h('option', { value: '' }, '(no twin)'), ids.filter(y => y !== x.id).map(y => h('option', { value: y, selected: x.twin === y }, y)));
+      list.appendChild(h('div', { style: 'display:flex;gap:4px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);padding:5px 0', on: { mouseenter: () => highlight(x.id, true), mouseleave: () => highlight(x.id, false) } },
+        h('code', { style: 'min-width:110px' }, x.id), inp('en', 'English name', '120px'), inp('sw', 'Kiswahili', '120px'), inp('kind', 'kind (e.g. ear)', '100px'), size, twin,
+        h('button', { class: 'del', on: { click: () => { st.parts.splice(i, 1); drawList(); } } }, 'Remove')));
+    });
+  };
+  const show = text => {
+    prev.textContent = '';
+    try { svgEl = svgNode(text); } catch (e) { err.textContent = e.message; return; }
+    svgEl.style.cssText = 'max-width:100%;max-height:420px;cursor:pointer';
+    // top-level shapes without an id get one, so they can be chosen
+    let k = 1;
+    Array.from(svgEl.children).forEach(c => { if (!c.id && !/^(defs|title|desc)$/i.test(c.tagName)) { while (svgEl.querySelector('#part-' + k)) { k++; } c.id = 'part-' + k; } });
+    svgEl.addEventListener('click', e => {
+      let n = e.target;
+      while (n && n.parentNode !== svgEl && !(n.id && st.parts.some(x => x.id === n.id))) { n = n.parentNode; }
+      if (!n || n === svgEl || !n.id) { return; }
+      if (!st.parts.some(x => x.id === n.id)) {
+        const guess = n.getAttribute('data-name-en') || n.id.replace(/^(left|right|front|back)-|-\d+$/g, '').replace(/-/g, ' ');
+        st.parts.push({ id: n.id, kind: n.getAttribute('data-part') || guess, size: n.getAttribute('data-size') || 'medium', twin: n.getAttribute('data-twin') || '', en: guess, sw: n.getAttribute('data-name-sw') || '' });
+        drawList();
+      }
+    });
+    prev.appendChild(svgEl);
+    st.svgText = new XMLSerializer().serializeToString(svgEl);
+  };
+  file.addEventListener('change', () => {
+    const f = file.files[0]; if (!f) { return; }
+    if (f.size > 400000) { err.textContent = 'The picture is too big (400 KB at most).'; return; }
+    const rd = new FileReader(); rd.onload = () => { err.textContent = ''; st.parts = []; show(String(rd.result)); drawList(); st.changedSvg = true; }; rd.readAsText(f);
+  });
+  const save = h('button', { class: 'pri', on: { click: async () => {
+    err.textContent = '';
+    if (!svgEl) { err.textContent = 'Choose an SVG file first.'; return; }
+    const parts = st.parts.map(x => ({ id: x.id, kind: (x.kind || x.en).trim(), size: x.size, twin: x.twin, name: { en: x.en.trim(), sw: x.sw.trim() } }));
+    const never = [];
+    parts.forEach(x => { if (x.twin && !never.some(n => n.indexOf(x.id) >= 0 && n.indexOf(x.twin) >= 0)) { never.push([x.id, x.twin]); } });
+    if (svgEl) { Array.from(svgEl.querySelectorAll('*')).forEach(n => { n.style.outline = ''; n.style.filter = ''; n.style.visibility = ''; if (n.getAttribute('style') === '') { n.removeAttribute('style'); } }); }
+    const body = { id: fid.value.trim(), title: { en: ten.value.trim(), sw: tsw.value.trim() }, category: cat.value, ages: ages.filter(a => a.checked).map(a => a.value),
+      licence: lic.value.trim(), parts: parts, never: never, svg: new XMLSerializer().serializeToString(svgEl).replace(/ style="cursor: pointer; max-width: 100%; max-height: 420px;"| style="[^"]*max-height: 420px[^"]*"/, '') };
+    const q = await apiJson('/api/admin/missing/picture', body);
+    if (!q.ok) { err.textContent = q.data.error || 'Could not save'; return; }
+    flash('Saved: ' + q.data.picture.title.en + ' (version ' + q.data.picture.version + ')', true);
+    loadMissingAdmin();
+  } } }, 'Save the picture');
+  const test = h('button', { on: { click: () => {
+    hideTest = !hideTest;
+    st.parts.forEach(x => { const n = svgEl && svgEl.querySelector('[id="' + CSS.escape(x.id) + '"]'); if (n) { n.style.visibility = hideTest ? 'hidden' : ''; } });
+    test.textContent = hideTest ? 'Show all parts again' : 'Preview: hide all the parts';
+  } } }, 'Preview: hide all the parts');
+  root.append(back, h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, p ? 'Change "' + p.title.en + '"' : 'Add a picture'),
+    p && p.builtin ? h('div', { class: 'muted small' }, 'A built-in picture: your changes are kept as a copy, and "Put back the original" undoes them.') : null,
+    h('div', { class: 'fgrid', style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin-top:8px' },
+      h('label', {}, 'Short name (id, letters and dashes)', fid), h('label', {}, 'Name in English', ten), h('label', {}, 'Name in Kiswahili', tsw), h('label', {}, 'Kind of picture', cat)),
+    h('div', { class: 'small', style: 'margin:4px 0' }, 'For: ', ages.map(a => h('label', { style: 'margin-right:10px' }, a, ' ', a.value))),
+    h('label', { class: 'small' }, 'Artwork and licence', lic),
+    h('div', { style: 'margin:8px 0' }, p ? 'Replace the drawing (optional): ' : 'The drawing (SVG): ', file)),
+    h('div', { style: 'display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:12px;align-items:start' }, h('div', {}, prev, test),
+      h('div', { class: 'box', style: 'margin:0' }, h('b', {}, 'Parts that can go missing'), note, list)), err, save);
+  drawList();
+  if (p) {
+    try { show(await adminSvg(p.id)); } catch (e) { err.textContent = e.message; }
+  }
+}
+// ---- Suggestions while typing: the person who is already on Memoryq (one account and one player per person) ----
+let sgSeq = 0;
+function sgLabel(u) {
+  const g = Object.keys(u.games || {}).map(k => (k === 'vistr' ? 'Vistr ' : k === 'missing' ? 'Spot ' : k + ' ') + u.games[k]).join(', ');
+  return [u.name, u.email, g ? 'game IDs: ' + g : ''].filter(Boolean).join(' \u00b7 ');
+}
+/** Turns an input into a search with suggestions; onPick(user) when an existing person is chosen. */
+function suggestBox(input, onPick) {
+  const id = 'sg' + (++sgSeq);
+  const dl = h('datalist', { id: id });
+  input.setAttribute('list', id);
+  input.setAttribute('autocomplete', 'off');
+  input.after(dl);
+  let last = [], tm = 0;
+  input.addEventListener('input', () => {
+    clearTimeout(tm);
+    const v = input.value.trim();
+    const hit = last.find(u => u.username.toLowerCase() === v.toLowerCase());
+    if (hit && onPick && input.dataset.picked !== hit.username) { input.dataset.picked = hit.username; onPick(hit); return; }
+    if (v.length < 2) { return; }
+    tm = setTimeout(async () => {
+      const r = await api('/api/mod/suggest?q=' + encodeURIComponent(v));
+      if (!r.ok) { return; }
+      last = r.data.users || [];
+      dl.textContent = '';
+      last.forEach(u => dl.appendChild(h('option', { value: u.username, label: sgLabel(u) })));
+    }, 180);
+  });
+  return { users: () => last };
+}
+/** "Already on Memoryq": people like what is typed in an add form, each with a button to use them instead. */
+function dupHint(box, inputs, onUse) {
+  let tm = 0;
+  const check = () => {
+    clearTimeout(tm);
+    tm = setTimeout(async () => {
+      const seen = {}, found = [];
+      for (const i of inputs) {
+        const v = i.value.trim();
+        if (v.length < 3) { continue; }
+        const r = await api('/api/mod/suggest?q=' + encodeURIComponent(v));
+        ((r.ok && r.data.users) || []).forEach(u => { if (!seen[u.username]) { seen[u.username] = 1; found.push(u); } });
+      }
+      box.textContent = '';
+      if (!found.length) { return; }
+      box.appendChild(h('div', { class: 'small', style: 'margin:6px 0 2px;font-weight:600' }, 'Already on Memoryq - is it one of them? Use that account (one per person):'));
+      found.slice(0, 5).forEach(u => box.appendChild(h('div', { class: 'small', style: 'margin:2px 0' },
+        h('button', { on: { click: () => onUse(u) } }, 'Use ' + u.username), ' ', h('span', { class: 'muted' }, sgLabel(u)))));
+    }, 300);
+  };
+  inputs.forEach(i => i.addEventListener('input', check));
+}
+/** Opens a game in a new tab, signed in with this account. */
+async function playGame(game) {
+  if (game === 'missing') { tryMissing(1, 'en'); return; }
+  const w = window.open('', '_blank'); // opened now, so the browser does not block it
+  const home = 'https://vistr.memoryq.com/';
+  const r = await api('/api/auth/handoff', { app: 'vistr', return: home, remember: '1' });
+  const url = r.ok ? r.data.url : home;
+  if (w) { w.location.href = url; } else { location.href = url; }
+}
+function playLink(game) {
+  return h('button', { title: 'Opens the game in a new tab', on: { click: () => playGame(game) } }, '\u25b6 Play the game \u2197');
+}
+/** A game ID that would replace the one someone has: ask first (their points are on it). Returns the answer. */
+async function giveGameId(user, game, code, gameName) {
+  let q = await api('/api/mod/users/gameid', { u: user, game: game, code: code });
+  if (q.status === 409 && q.data.existing && (!q.data.owner || q.data.owner.toLowerCase() === user.toLowerCase())) {
+    if (!confirm(user + ' already has ' + gameName + ' ID ' + q.data.existing + ' - their points are on it.\n\nChange it to ' + code + '? They keep their points and sign in with ' + code + ' from now on.\n\nCancel keeps ' + q.data.existing + '.')) {
+      return { ok: true, kept: true, data: { gameId: q.data.existing } };
+    }
+    q = await api('/api/mod/users/gameid', { u: user, game: game, code: code, change: '1' });
+  }
+  return q;
+}
+
+// ---- Users you can manage: Profiler -> All users (super-admin: everyone) and the moderators' Users page ----
+const MM = { q: '' };
+function mmRoot() { const p = document.getElementById('panel-' + current.cat + '-' + current.tab); return p ? p.querySelector('.mmroot') : null; }
+async function loadMembersMgr() {
+  const root = mmRoot(); if (!root) { return; }
+  root.textContent = '';
+  const search = h('input', { type: 'search', placeholder: 'Search: username, name or email', value: MM.q, style: 'width:240px' });
+  const go = () => { MM.q = search.value.trim(); loadMembersMgr(); };
+  search.addEventListener('keydown', e => { if (e.key === 'Enter') { go(); } });
+  const r = await api('/api/mod/users' + (MM.q ? '?q=' + encodeURIComponent(MM.q) : ''));
+  setTimeout(() => suggestBox(search, u => { MM.q = u.username; loadMembersMgr(); }), 0);
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data;
+  const bar = h('div', { class: 'acctool' }, h('span', {}, search), h('button', { on: { click: go } }, 'Search'),
+    h('span', { class: 'muted small' }, d.total + ' user' + (d.total === 1 ? '' : 's') + (d.total > d.users.length ? ' (first ' + d.users.length + ' shown)' : '')),
+    h('span', { style: 'flex:1' }), d.canAdd ? h('button', { class: 'pri', on: { click: () => mmAdd(root) } }, '+ Add a user') : null);
+  root.appendChild(bar);
+  const form = h('div', { class: 'mmform' });
+  root.appendChild(form);
+  const t = h('table', {}, h('tr', {}, ['User', 'Email', 'Game IDs', ''].map(x => h('th', {}, x))));
+  d.users.forEach(u => {
+    const tags = [];
+    if (u.mine) { tags.push(h('span', { class: 'ok small' }, ' added by you')); } else if (u.addedBy) { tags.push(h('span', { class: 'muted small' }, ' added by ' + u.addedBy)); }
+    if (u.role !== 'CHATTER') { tags.push(h('span', { class: 'muted small' }, ' \u00b7 ' + u.role.toLowerCase())); }
+    if (u.moderator) { tags.push(h('span', { class: 'muted small' }, ' \u00b7 moderator')); }
+    if (u.disabled) { tags.push(h('span', { class: 'error small' }, ' \u00b7 switched off')); }
+    const have = (u.games || []).filter(g => g.id);
+    const gid = h('span', {}, have.length ? have.map(g => h('span', { class: 'small', style: 'display:inline-block;margin-right:8px', title: g.state === 'waiting' ? 'Saved here - not in the game yet: ' + g.note : '' },
+      g.name.replace(/^Vistr /, '') + ' ', h('b', {}, g.id), g.state === 'waiting' ? h('span', { class: 'error' }, ' (waiting)') : null)) : h('span', { class: 'muted' }, '-'));
+    if (u.canGameId) { gid.title = gid.title || 'Click to give or change game IDs'; gid.style.cursor = 'pointer'; gid.addEventListener('click', () => mmEdit(form, u)); }
+    t.appendChild(h('tr', {}, h('td', {}, h('b', {}, u.username), tags),
+      h('td', {}, u.email || (u.hasEmail ? h('span', { class: 'muted small' }, 'has an email') : h('span', { class: 'muted small' }, 'none'))),
+      h('td', {}, gid),
+      h('td', { style: 'white-space:nowrap' }, u.canModify || u.canEmail || u.canGameId ? h('button', { on: { click: () => mmEdit(form, u) } }, u.canModify ? 'Edit' : u.canEmail ? 'Edit email' : 'Game IDs') : null,
+        u.canRemove ? h('button', { class: 'del', on: { click: async () => {
+          if (!confirm('Remove ' + u.username + ' for good? Their chats and groups go too.')) { return; }
+          const q = await api('/api/mod/users/remove', { u: u.username }); flash(q.ok ? u.username + ' was removed' : (q.data.error || 'Could not remove'), q.ok); loadMembersMgr();
+        } } }, 'Remove') : null)));
+  });
+  root.appendChild(d.users.length ? t : h('div', { class: 'muted' }, MM.q ? 'Nobody matches.' : 'No users here yet.'));
+}
+async function mmGameId(user, game, code, remove) {
+  const q = await api('/api/mod/users/gameid', remove ? { u: user, game: game, remove: '1' } : { u: user, game: game, code: code });
+  return q;
+}
+function mmAdd(root) {
+  const form = root.querySelector('.mmform'); form.textContent = '';
+  const u = h('input', { placeholder: 'username (3-24 letters, numbers or _)', style: 'width:100%' }), pw = h('input', { type: 'password', placeholder: '8 characters or more', style: 'width:100%' });
+  const em = h('input', { type: 'email', placeholder: 'optional - needed for a game ID', style: 'width:100%' });
+  const game = h('input', { type: 'checkbox' }), gid = h('input', { placeholder: 'ID (empty: the game picks)', style: 'width:150px', inputmode: 'numeric' });
+  const err = h('div', { class: 'error' });
+  const dups = h('div', {});
+  dupHint(dups, [u, em], x => mmEdit(form, x));
+  form.appendChild(h('div', { class: 'box' }, h('b', {}, 'Add a user'),
+    h('div', { class: 'fgrid', style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin-top:6px' },
+      h('label', {}, 'Username', u), h('label', {}, 'Password', pw), h('label', {}, 'Email', em)), dups,
+    h('div', { class: 'small', style: 'margin:6px 0' }, h('label', {}, game, ' Give a Vistr game ID '), gid), err,
+    h('button', { class: 'pri', on: { click: async () => {
+      err.textContent = '';
+      if (game.checked && !em.value.trim()) { err.textContent = 'A game ID needs an email.'; return; }
+      const body = { username: u.value.trim(), password: pw.value, email: em.value.trim(), game: game.checked ? 'vistr' : '', gameId: game.checked ? gid.value.trim() : '' };
+      let q = await api('/api/mod/users/create', body);
+      if (q.status === 409 && q.data.existingUser) {
+        if (confirm(q.data.error + '\n\nOK: open ' + q.data.existingUser + ' (give the game ID there).\nCancel: stay here.')) { mmEdit(form, { username: q.data.existingUser }); }
+        return;
+      }
+      if (!q.ok) { err.textContent = q.data.error || 'Could not add'; return; }
+      flash(q.data.note ? q.data.note : q.data.row.username + ' was added' + (q.data.row.gameId ? ' (Vistr Player ID ' + q.data.row.gameId + ')' : ''), !q.data.note);
+      loadMembersMgr();
+    } } }, 'Add the user'), h('button', { on: { click: () => { form.textContent = ''; } } }, 'Cancel')));
+  u.focus();
+}
+async function mmEdit(form, u) {
+  form.textContent = '';
+  const r = await api('/api/mod/users/one?u=' + encodeURIComponent(u.username));
+  if (!r.ok) { flash(r.data.error || 'Could not load', false); return; }
+  const row = r.data.row, pf = r.data.profile || {};
+  const fields = [];
+  const inp = (k, label, v, type) => { const i = h('input', { value: v || '', type: type || 'text', style: 'width:100%' }); fields.push([k, i]); return h('label', {}, label, i); };
+  const grid = h('div', { class: 'fgrid', style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 12px;margin-top:6px' });
+  if (row.canModify) {
+    [['firstName', 'First name'], ['lastName', 'Last name'], ['stageName', 'Stage name'], ['city', 'Town'], ['country', 'Country'], ['education', 'Education'], ['hobbies', 'Hobbies (commas)']]
+      .forEach(x => grid.appendChild(inp(x[0], x[1], pf[x[0]])));
+  }
+  if (row.canEmail) { grid.appendChild(inp('email', 'Email', row.email)); }
+  if (row.canModify) { grid.appendChild(inp('password', 'New password (empty: keep)', '', 'password')); }
+  const err = h('div', { class: 'error' });
+  // Games: one ID per game (kept on memoryq.com; a game that is not reachable gets it later)
+  const games = [];
+  let gbox = null;
+  if (row.canGameId) {
+    gbox = h('div', { style: 'margin-top:10px;border-top:1px solid var(--line, #ddd);padding-top:8px' }, h('b', {}, 'Games'),
+      h('div', { class: 'muted small' }, 'Give ' + row.username + ' an ID in each game. Leave a box empty and press Give one to have an ID picked.'));
+    const gt = h('table', { style: 'margin-top:4px' });
+    (row.games || []).filter(g => !row.gamesMay || row.gamesMay.indexOf(g.game) >= 0).forEach(g => {
+      const box = h('input', { value: g.id || '', inputmode: 'numeric', placeholder: g.digits + ' digits', style: 'width:110px' });
+      const st = h('span', { class: 'small' });
+      const show = gg => {
+        st.textContent = '';
+        st.className = 'small ' + (gg.state === 'waiting' ? 'error' : 'muted');
+        st.textContent = gg.state === 'waiting' ? 'saved here, not in the game yet: ' + (gg.note || 'waiting') + ' (it is sent again every 10 minutes)'
+          : gg.id ? 'in use' : (gg.needsEmail && !row.email && !row.hasEmail ? 'needs an email first' : 'no ID yet');
+      };
+      show(g);
+      const give = async (remove) => {
+        const q = remove ? await mmGameId(row.username, g.game, '', true) : await giveGameId(row.username, g.game, box.value.trim(), g.name);
+        if (q.kept) { box.value = q.data.gameId; g.id = q.data.gameId; st.className = 'small muted'; st.textContent = 'kept ' + q.data.gameId + ' (their points are on it)'; return true; }
+        if (!q.ok) {
+          st.className = 'small error'; st.textContent = q.data.error || 'Could not';
+          if (q.data.owner && q.data.owner.toLowerCase() !== row.username.toLowerCase()) {
+            st.appendChild(h('button', { style: 'margin-left:6px', on: { click: () => mmEdit(form, { username: q.data.owner }) } }, 'Open ' + q.data.owner));
+          }
+          return false;
+        }
+        const ng = (q.data.row.games || []).filter(x => x.game === g.game)[0] || { id: '' };
+        g.id = ng.id; box.value = ng.id || ''; show(ng);
+        flash(remove ? g.name + ' ID taken away from ' + row.username : row.username + ' has ' + g.name + ' ID ' + ng.id + (q.data.waiting ? ' (saved; the game gets it when it can be reached)' : ''), true);
+        return true;
+      };
+      games.push({ g: g, box: box, give: give });
+      gt.appendChild(h('tr', {}, h('td', {}, g.name), h('td', {}, box),
+        h('td', { style: 'white-space:nowrap' }, h('button', { on: { click: () => give(false) } }, g.id ? 'Save ID' : 'Give one'),
+          g.id && g.game !== 'vistr' ? h('button', { class: 'del', on: { click: () => { if (confirm('Take ' + row.username + "'s " + g.name + ' ID away?')) { give(true); } } } }, 'Take away') : null,
+          g.paused ? h('span', { class: 'error small' }, ' paused') : null),
+        h('td', {}, st)));
+    });
+    gbox.appendChild(gt);
+  }
+  const title = row.canModify ? 'Edit ' : row.canEmail ? 'Email of ' : 'Game IDs of ';
+  form.appendChild(h('div', { class: 'box' }, h('b', {}, title + row.username), fields.length ? grid : null, gbox, err,
+    h('button', { class: 'pri', on: { click: async () => {
+      err.textContent = '';
+      if (fields.length) {
+        const body = { u: row.username };
+        fields.forEach(f => { if (f[0] !== 'password' || f[1].value) { body[f[0]] = f[1].value.trim(); } });
+        const q = await api('/api/mod/users/edit', body);
+        if (!q.ok) { err.textContent = q.data.error || 'Could not save'; return; }
+        row.hasEmail = row.hasEmail || !!body.email; row.email = body.email !== undefined ? body.email : row.email;
+      }
+      for (const x of games) {
+        if (x.box.value.trim() !== (x.g.id || '') && x.box.value.trim() !== '') {
+          if (!(await x.give(false))) { err.textContent = 'Saved, except the ' + x.g.name + ' ID (see beside it).'; return; }
+        }
+      }
+      flash('Saved: ' + row.username, true); form.textContent = ''; loadMembersMgr();
+    } } }, 'Save'), h('button', { on: { click: () => { form.textContent = ''; } } }, 'Cancel')));
+}
+
+// ---- Profiler -> Moderators: who may do what (the super-admin) ----
+async function loadModerators() {
+  const root = $('modBox'); root.textContent = '';
+  const [r, gr] = await Promise.all([api('/api/admin/moderators'), api('/api/admin/games')]);
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data;
+  const games = gr.ok ? gr.data.games : [];
+  const areas = [];
+  d.rights.forEach(x => { if (!x.game && areas.indexOf(x.area) < 0) { areas.push(x.area); } });
+  const who = h('input', { placeholder: 'member: username, name or email', style: 'width:240px' });
+  setTimeout(() => suggestBox(who), 0);
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'Moderators'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Members you trust with parts of this admin panel. They sign in at memoryq.com/admin with their own account and see only what you tick - each game too (the Games column). "Remove" and "modify" without "any" mean only the users they added themselves. Moderators never change you or each other. Everything they change is in the log below.'),
+    who, h('button', { class: 'pri', on: { click: () => { const u = who.value.trim(); if (!u) { return; } modCard(root, { username: u, rights: [], added: 0, since: 0, isNew: true }, d.rights, areas, games, true); } } }, 'Make moderator')));
+  const list = h('div', {});
+  root.appendChild(list);
+  if (!d.moderators.length) { list.appendChild(h('div', { class: 'muted', style: 'margin:8px 0' }, 'No moderators yet.')); }
+  d.moderators.forEach(m => modCard(list, m, d.rights, areas, games, false));
+  root.appendChild(h('div', { class: 'box' }, h('b', {}, 'What moderators did'),
+    d.log.length ? h('div', { style: 'max-height:360px;overflow-y:auto;margin-top:6px' }, h('table', {}, h('tr', {}, ['When', 'Who', 'What', 'User', ''].map(x => h('th', {}, x))),
+      d.log.map(l => h('tr', {}, h('td', {}, when(l.at)), h('td', {}, l.who), h('td', {}, l.action), h('td', {}, l.target), h('td', { class: 'muted small' }, l.detail)))))
+      : h('div', { class: 'muted' }, 'Nothing yet.')));
+}
+function gameBadge(g) {
+  return g.public ? h('span', { class: 'ok small', style: 'font-weight:600' }, 'Public')
+    : h('span', { class: 'small', style: 'font-weight:600;color:#b26a00' }, 'Not public yet');
+}
+function modCard(parent, m, rights, areas, games, isNew) {
+  const boxes = {};
+  const tick = (x, style) => { const c = h('input', { type: 'checkbox', checked: m.rights.indexOf(x.key) >= 0 }); boxes[x.key] = c; return h('label', { style: style }, c, ' ' + x.label); };
+  // left: the other parts of the admin panel
+  const left = h('div', { style: 'flex:2 1 420px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 16px;align-content:start' },
+    areas.map(a => h('div', {}, h('div', { class: 'muted small', style: 'font-weight:600;margin-bottom:2px' }, a),
+      rights.filter(x => !x.game && x.area === a).map(x => tick(x, 'display:block;font-size:13px')))));
+  // right: every game, one by one - a moderator sees a game only when it is ticked here
+  const gameKeys = [];
+  rights.forEach(x => { if (x.game && gameKeys.indexOf(x.game) < 0) { gameKeys.push(x.game); } });
+  const right = h('div', { style: 'flex:1 1 260px;border-left:3px solid var(--line, #ddd);padding-left:12px' },
+    h('div', { style: 'font-weight:700;margin-bottom:2px' }, 'Games'),
+    h('div', { class: 'muted small', style: 'margin-bottom:6px' }, m.username + ' sees only the games ticked here.'),
+    gameKeys.map(k => {
+      const g = games.find(x => x.key === k) || { key: k, name: k, public: true };
+      return h('div', { style: 'margin:0 0 10px' }, h('div', {}, h('b', {}, g.name), '  ', gameBadge(g)),
+        rights.filter(x => x.game === k).map(x => tick(x, 'display:block;font-size:13px;margin-left:4px')));
+    }));
+  const card = h('div', { class: 'box' }, h('b', { style: 'font-size:15px' }, m.username),
+    h('span', { class: 'muted small' }, isNew ? '  new moderator - tick the rights and games, then Save' : '  moderator since ' + new Date(m.since).toLocaleDateString() + ' \u00b7 added ' + m.added + ' user' + (m.added === 1 ? '' : 's') + (m.exists === false ? ' \u00b7 account gone' : '')),
+    h('div', { style: 'display:flex;flex-wrap:wrap;gap:12px 20px;margin:8px 0' }, left, right),
+    h('button', { class: 'pri', on: { click: async () => {
+      const keys = Object.keys(boxes).filter(k => boxes[k].checked);
+      const q = await api('/api/admin/moderators/save', { username: m.username, rights: keys.join(',') });
+      flash(q.ok ? (keys.length ? 'Saved: ' + m.username + ' (' + keys.length + ' rights)' : m.username + ' is no longer a moderator') : (q.data.error || 'Could not save'), q.ok);
+      if (q.ok) { loadModerators(); }
+    } } }, 'Save'),
+    isNew ? h('button', { on: { click: () => card.remove() } }, 'Cancel') : h('button', { class: 'del', on: { click: async () => {
+      if (!confirm('Take away all of ' + m.username + '\'s rights?')) { return; }
+      const q = await api('/api/admin/moderators/remove', { username: m.username }); flash(q.ok ? m.username + ' is a member again' : 'Could not', q.ok); loadModerators();
+    } } }, 'Remove moderator'));
+  if (isNew) { parent.insertBefore(card, parent.children[1] || null); } else { parent.appendChild(card); }
+}
+
+// ---- Games -> All games: every game, public or not yet (the super-admin decides) ----
+async function loadGamesOverview() {
+  const root = $('gamesAll'); if (!root) { return; }
+  root.textContent = '';
+  const r = await api('/api/admin/games');
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  root.appendChild(h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, 'All games'),
+    h('div', { class: 'muted small', style: 'margin-top:4px' }, 'A game that is not public yet is open only to you and to the moderators you tick for it (Profiler -> Moderators -> Games). '
+      + 'Members do not see it, and nobody else can sign in to it. Switch Public access on when it is ready for everyone.')));
+  r.data.games.forEach(g => {
+    const pages = { vistr: ['pvistr', 'vistr'], missing: ['pmissing', 'missing'] }[g.key] || [];
+    root.appendChild(h('div', { class: 'box' },
+      h('div', { style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap' }, h('b', { style: 'font-size:16px' }, g.name), gameBadge(g), h('span', { style: 'flex:1' }), playLink(g.key)),
+      h('div', { class: 'small', style: 'margin:6px 0' }, g.public ? 'Open to everyone.' : 'Only you and its moderators can open it.',
+        g.at > 0 ? h('span', { class: 'muted' }, '  (' + (g.public ? 'opened' : 'closed') + ' by ' + g.by + ', ' + when(g.at) + ')') : null),
+      h('div', { class: 'small' }, 'Moderators: ', g.moderators.length ? h('b', {}, g.moderators.join(', ')) : h('span', { class: 'muted' }, 'none yet - tick it on a moderator in Profiler -> Moderators'),
+        ' \u00b7 ' + g.players + ' member' + (g.players === 1 ? ' has' : 's have') + ' an ID'),
+      h('div', { style: 'margin-top:8px;display:flex;gap:6px;flex-wrap:wrap' },
+        h('button', { class: g.public ? 'del' : 'pri', on: { click: async () => {
+          const msg = g.public ? 'Take ' + g.name + ' off public access?\n\nMembers no longer see it on memoryq.com and cannot open it from there; only you and its moderators can.'
+            + (g.key === 'vistr' ? '\n\nvistr.memoryq.com itself stays online: players who sign in there with their Player ID can still play.' : '')
+            : 'Open ' + g.name + ' to everyone?\n\nEvery member and player can then see it and play it.';
+          if (!confirm(msg)) { return; }
+          const q = await api('/api/admin/games/save', { game: g.key, public: g.public ? '0' : '1' });
+          flash(q.ok ? g.name + (g.public ? ' is no longer public' : ' is public now - open to everyone') : (q.data.error || 'Could not'), q.ok);
+          loadGamesOverview();
+        } } }, g.public ? 'Switch Public access off' : 'Switch Public access on'),
+        pages[0] ? h('button', { on: { click: () => show('games', pages[0]) } }, 'Players') : null,
+        pages[1] ? h('button', { on: { click: () => show('games', pages[1]) } }, g.key === 'vistr' ? 'Messages, reviews, numbers' : 'Pictures and settings') : null)));
+  });
+}
+
+// ---- Moderators: the admin panel with only the parts they were given ----
+let MOD = null;
+async function modRights(t) {
+  try { const r = await fetch('/api/mod/me', { headers: { 'Authorization': 'Bearer ' + t } }); return r.ok ? r.json() : null; } catch (e) { return null; }
+}
+async function loadModLive() {
+  const root = $('modLive'); root.textContent = '';
+  let c = { channels: [] };
+  try { c = await (await fetch('/channels')).json(); } catch (e) { }
+  const list = c.channels || [];
+  const canEnd = MOD && MOD.has('streams.end');
+  root.appendChild(h('table', {}, h('tr', {}, ['Channel', 'Title', 'Broadcaster', 'Watching', ''].map(x => h('th', {}, x))),
+    list.length ? list.map(ch => h('tr', {}, h('td', {}, ch.channelId), h('td', {}, ch.title || ''), h('td', {}, ch.broadcasterId || ''), h('td', {}, String(ch.viewers || 0)),
+      h('td', {}, canEnd ? h('button', { class: 'del', on: { click: async () => {
+        if (!confirm('End the live stream on ' + ch.channelId + '?')) { return; }
+        const q = await api('/api/admin/kick', { channel: ch.channelId }); flash(q.ok ? 'Ended: ' + ch.channelId : (q.data.error || 'Could not'), q.ok); loadModLive();
+      } } }, 'End stream') : null)))
+      : h('tr', {}, h('td', { colspan: 5, class: 'muted' }, 'Nobody is live right now.'))));
+}
+// ---- Games -> Performance report: games per player per day and week (the super-admin; moderators when it is switched on for them) ----
+const PERF = { game: 'vistr', from: '', to: '', view: 'weeks', data: null, timer: null, stamp: '', lost: false };
+const PERF_GAMES = [['vistr', 'Vistr word game']];
+function perfDay(d) { return d.toISOString().slice(0, 10); }
+function perfAdd(day, n) { const x = new Date(day + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return perfDay(x); }
+function perfMonday(day) { const x = new Date(day + 'T00:00:00Z'); return perfAdd(day, -((x.getUTCDay() + 6) % 7)); }
+function perfPreset(kind) {
+  const today = perfDay(new Date());
+  const mon = perfMonday(today);
+  const m0 = today.slice(0, 8) + '01';
+  const prevEnd = perfAdd(m0, -1);
+  const r = { today: [today, today], thisweek: [mon, today], lastweek: [perfAdd(mon, -7), perfAdd(mon, -1)], last7: [perfAdd(today, -6), today], last28: [perfAdd(today, -27), today],
+    thismonth: [m0, today], lastmonth: [prevEnd.slice(0, 8) + '01', prevEnd] };
+  return r[kind];
+}
+function perfGames() { return PERF_GAMES.filter(g => !MOD || MOD.has('reports.' + g[0])); }
+function perfQuery() { return 'game=' + encodeURIComponent(PERF.game) + '&from=' + encodeURIComponent(PERF.from) + '&to=' + encodeURIComponent(PERF.to); }
+async function perfDownload(fmt) {
+  try {
+    const r = await fetch('/api/mod/report?' + perfQuery() + '&format=' + fmt, { headers: token ? { Authorization: 'Bearer ' + token } : {} });
+    if (!r.ok) { let m = ''; try { m = (await r.json()).error; } catch (e) { } flash(m || ('The report answered ' + r.status), false); return; }
+    const a = h('a', { href: URL.createObjectURL(await r.blob()), download: PERF.game + '-performance-' + PERF.from + '_to_' + PERF.to + '.' + fmt });
+    document.body.appendChild(a); a.click(); a.remove();
+  } catch (e) { flash('Could not download: ' + e.message, false); }
+}
+async function loadPerformance() {
+  const root = $('gamePerf'); if (!root) { return; }
+  root.textContent = '';
+  clearInterval(PERF.timer);
+  const games = perfGames();
+  if (!games.length) { root.appendChild(h('div', { class: 'box' }, 'The performance report is not switched on for you. Ask the super-admin.')); return; }
+  if (!games.some(g => g[0] === PERF.game)) { PERF.game = games[0][0]; }
+  if (!PERF.from) { const p = perfPreset('last28'); PERF.from = p[0]; PERF.to = p[1]; }
+  const from = h('input', { type: 'date', value: PERF.from }), to = h('input', { type: 'date', value: PERF.to });
+  const sel = h('select', { on: { change: () => { PERF.game = sel.value; show_(); } } }, games.map(g => h('option', { value: g[0], selected: g[0] === PERF.game }, g[1])));
+  const out = h('div', { style: 'margin-top:10px;overflow:auto;max-height:68vh' });
+  const show_ = async () => {
+    PERF.from = from.value; PERF.to = to.value;
+    out.textContent = ''; out.appendChild(h('div', { class: 'muted' }, 'Asking the game...'));
+    const r = await api('/api/mod/report?' + perfQuery());
+    out.textContent = '';
+    if (!r.ok) { out.appendChild(h('div', { class: 'error' }, r.data.error || ('The report answered ' + r.status))); PERF.data = null; return; }
+    PERF.data = r.data; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); draw();
+  };
+  const live = async () => {
+    if (document.hidden || !document.body.contains(root) || root.offsetParent === null || !PERF.data) { return; }
+    const r = await api('/api/mod/report?' + perfQuery() + '&live=1');
+    if (r.ok) { PERF.data = r.data; PERF.lost = false; PERF.stamp = new Date().toLocaleTimeString(); } else { PERF.lost = true; }
+    draw();
+  };
+  const preset = (label, kind) => h('button', { on: { click: () => { const p = perfPreset(kind); from.value = p[0]; to.value = p[1]; show_(); } } }, label);
+  const viewBtn = (label, v) => h('button', { class: PERF.view === v ? 'pri' : '', on: { click: () => { PERF.view = v; loadPerformanceView(); } } }, label);
+  const draw = () => {
+    out.textContent = '';
+    const d = PERF.data; if (!d) { return; }
+    const weekly = PERF.view === 'weeks';
+    const nPlay = d.rows.filter(r => r.today > 0).length;
+    out.appendChild(h('div', { class: 'box', style: 'margin:0 0 8px;padding:8px 10px;border-left:4px solid #2e9e5b' },
+      h('b', {}, 'Today (' + d.today + ' UTC): '), d.todayTotal + (d.todayTotal === 1 ? ' game' : ' games') + ' by ' + nPlay + (nPlay === 1 ? ' player' : ' players'),
+      h('span', { class: 'muted small', style: 'margin-left:10px' }, PERF.lost ? 'could not refresh - trying again' : 'updated ' + PERF.stamp + ' - updates by itself')));
+    const cols = weekly ? d.weeks : d.dates;
+    const num = v => h('td', { style: 'text-align:right;padding:3px 8px;' + (v ? '' : 'color:#9aa3ad') }, String(v));
+    const head = h('tr', {}, ['Email', 'Username', 'Game ID', 'Moderator'].map(t => h('th', { style: 'text-align:left;padding:4px 8px;position:sticky;top:0;background:#eef1f5' }, t)),
+      cols.map(c => h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap' }, weekly ? 'Week of ' + c.slice(5) : c.slice(5))),
+      h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5' }, 'Total'),
+      h('th', { style: 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#e3f4ea' }, 'Today'));
+    const rows = d.rows.map(r => h('tr', { style: 'border-top:1px solid #e3e7ec' },
+      h('td', { style: 'padding:3px 8px' }, r.email), h('td', { style: 'padding:3px 8px' }, r.username), h('td', { style: 'padding:3px 8px' }, r.gameId), h('td', { style: 'padding:3px 8px' }, r.moderator),
+      (weekly ? r.weekTotals : r.days).map(num), h('td', { style: 'text-align:right;padding:3px 8px;font-weight:700' }, String(r.total)),
+      h('td', { style: 'text-align:right;padding:3px 8px;font-weight:700;background:#f1faf4' }, String(r.today))));
+    const foot = h('tr', { style: 'border-top:2px solid #8a93a0;font-weight:700' }, h('td', { style: 'padding:4px 8px' }, 'All players'), h('td'), h('td'), h('td'),
+      (weekly ? d.weekTotalsAll : d.dayTotals).map(v => h('td', { style: 'text-align:right;padding:4px 8px' }, String(v))), h('td', { style: 'text-align:right;padding:4px 8px' }, String(d.total)), h('td', { style: 'text-align:right;padding:4px 8px;background:#f1faf4' }, String(d.todayTotal)));
+    out.appendChild(h('div', { class: 'muted small', style: 'margin-bottom:6px' }, d.rows.length + ' players, ' + d.total + ' games, ' + d.from + ' to ' + d.to + ' (' + d.scope + ')')); 
+    out.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, head), h('tbody', {}, rows, foot)));
+    if (!d.rows.length) { out.appendChild(h('div', { class: 'muted', style: 'margin-top:6px' }, 'No players to show yet.')); }
+  };
+  window.loadPerformanceView = draw;
+  root.appendChild(h('div', { class: 'box' },
+    h('b', { style: 'font-size:16px' }, 'Performance report'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Online games each player finished, per day and per week (dates are UTC; a week starts on Monday). Daily counts begin on the day the game was updated for this report; earlier games were only added up, not dated.'),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, 'Game', sel, 'From', from, 'To', to, h('button', { class: 'pri', on: { click: show_ } }, 'Show')),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, preset('Today', 'today'), preset('This week', 'thisweek'), preset('Last week', 'lastweek'), preset('Last 7 days', 'last7'), preset('Last 28 days', 'last28'), preset('This month', 'thismonth'), preset('Last month', 'lastmonth')),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' }, 'Show', viewBtn('Weekly totals', 'weeks'), viewBtn('Day by day', 'days'), h('span', { style: 'flex:1' }),
+      h('button', { on: { click: () => perfDownload('csv') } }, 'Download CSV'), h('button', { on: { click: () => perfDownload('pdf') } }, 'Download PDF')),
+    out));
+  show_();
+  PERF.timer = setInterval(live, 10000);
+}
+
+// ---- Games -> Earnings: what each player is paid. A day with at least N games pays one fixed amount; more games pay no extra, fewer pay nothing ----
+const EARN = { view: 'weeks', data: null, timer: null, stamp: '', lost: false };
+function earnMoney(c, cur) { return (c / 100).toFixed(2) + (cur ? ' ' + cur : ''); }
+function earnCalc(d) {
+  const th = d.pay.threshold, amt = d.pay.cents;
+  const wi = {}; d.weeks.forEach((w, i) => { wi[w] = i; });
+  const rows = d.rows.map(r => {
+    const dayC = r.days.map(n => (n >= th ? amt : 0));
+    const weekC = d.weeks.map(() => 0);
+    d.dates.forEach((dt, i) => { weekC[wi[perfMonday(dt)]] += dayC[i]; });
+    const paidDays = dayC.filter(c => c > 0).length;
+    const ti = d.dates.indexOf(d.today);
+    const todayGames = r.today || 0;
+    return { r: r, dayC: dayC, weekC: weekC, paidDays: paidDays, total: paidDays * amt, today: todayGames >= th ? amt : 0, todayGames: todayGames };
+  });
+  const sum = f => rows.reduce((a, x) => a + f(x), 0);
+  return { rows: rows, dayAll: d.dates.map((_, i) => sum(x => x.dayC[i])), weekAll: d.weeks.map((_, i) => sum(x => x.weekC[i])),
+    paidDays: sum(x => x.paidDays), total: sum(x => x.total), today: sum(x => x.today) };
+}
+function earnCsv(d, e, weekly) {
+  const cur = d.pay.currency, q = v => { v = String(v); if (/^[=+\-@\t\r]/.test(v)) { v = "'" + v; } return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const cols = weekly ? d.weeks.map(w => 'Week of ' + w) : d.dates;
+  const lines = [['Email', 'Username', 'Game ID', 'Moderator'].concat(cols, ['Days paid', 'Total payout (' + cur + ')']).map(q).join(',')];
+  e.rows.forEach(x => lines.push([x.r.email, x.r.username, x.r.gameId, x.r.moderator].concat((weekly ? x.weekC : x.dayC).map(c => (c / 100).toFixed(2)), [x.paidDays, (x.total / 100).toFixed(2)]).map(q).join(',')));
+  lines.push(['All players', '', '', ''].concat((weekly ? e.weekAll : e.dayAll).map(c => (c / 100).toFixed(2)), [e.paidDays, (e.total / 100).toFixed(2)]).map(q).join(','));
+  return '' + lines.join('\r\n') + '\r\n';
+}
+async function loadEarnings() {
+  const root = $('gameEarn'); if (!root) { return; }
+  root.textContent = '';
+  clearInterval(EARN.timer);
+  const games = perfGames();
+  if (!games.length) { root.appendChild(h('div', { class: 'box' }, 'The earnings report is not switched on for you. Ask the super-admin.')); return; }
+  if (!games.some(g => g[0] === PERF.game)) { PERF.game = games[0][0]; }
+  if (!PERF.from) { const p = perfPreset('last28'); PERF.from = p[0]; PERF.to = p[1]; }
+  const from = h('input', { type: 'date', value: PERF.from }), to = h('input', { type: 'date', value: PERF.to });
+  const sel = h('select', { on: { change: () => { PERF.game = sel.value; show_(); } } }, games.map(g => h('option', { value: g[0], selected: g[0] === PERF.game }, g[1])));
+  const out = h('div', { style: 'margin-top:10px;overflow:auto;max-height:64vh' });
+  const rule = h('div', { class: 'muted small', style: 'margin:4px 0 8px' });
+  const setBox = h('div');
+  const show_ = async () => {
+    PERF.from = from.value; PERF.to = to.value;
+    out.textContent = ''; out.appendChild(h('div', { class: 'muted' }, 'Asking the game...'));
+    const r = await api('/api/mod/report?' + perfQuery());
+    out.textContent = '';
+    if (!r.ok) { out.appendChild(h('div', { class: 'error' }, r.data.error || ('The report answered ' + r.status))); EARN.data = null; return; }
+    EARN.data = r.data; EARN.lost = false; EARN.stamp = new Date().toLocaleTimeString(); draw(); drawSettings();
+  };
+  const live = async () => {
+    if (document.hidden || !document.body.contains(root) || root.offsetParent === null || !EARN.data) { return; }
+    const r = await api('/api/mod/report?' + perfQuery() + '&live=1');
+    if (r.ok) { EARN.data = r.data; EARN.lost = false; EARN.stamp = new Date().toLocaleTimeString(); } else { EARN.lost = true; }
+    draw();
+  };
+  const preset = (label, kind) => h('button', { on: { click: () => { const p = perfPreset(kind); from.value = p[0]; to.value = p[1]; show_(); } } }, label);
+  const viewBtn = (label, v) => h('button', { class: EARN.view === v ? 'pri' : '', on: { click: () => { EARN.view = v; loadEarningsView(); } } }, label);
+  const drawSettings = () => {
+    setBox.textContent = '';
+    const d = EARN.data; if (!d || MOD) { return; }   // only the super-admin changes the rule
+    const th = h('input', { type: 'number', min: '1', max: '999', value: String(d.pay.threshold), style: 'width:70px' });
+    const am = h('input', { type: 'text', value: (d.pay.cents / 100).toFixed(2), style: 'width:90px' });
+    const cu = h('input', { type: 'text', value: d.pay.currency, maxlength: '6', style: 'width:70px' });
+    setBox.appendChild(h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0;padding:8px;background:#f4f6f9;border-radius:6px' },
+      h('b', {}, 'Pay rule'), 'Games a day', th, 'Pays', am, 'Currency', cu,
+      h('button', { class: 'pri', on: { click: async () => {
+        const r = await api('/api/admin/moderators/pay', { game: PERF.game, threshold: th.value, amount: am.value, currency: cu.value });
+        flash(r.ok ? 'Pay rule saved.' : (r.data.error || 'Could not save'), r.ok); if (r.ok) { show_(); }
+      } } }, 'Save')));
+  };
+  const draw = () => {
+    out.textContent = '';
+    const d = EARN.data; if (!d) { return; }
+    const cur = d.pay.currency, th = d.pay.threshold, e = earnCalc(d), weekly = EARN.view === 'weeks';
+    rule.textContent = 'Rule: a player with at least ' + th + ' games in a day (UTC) earns ' + earnMoney(d.pay.cents, cur) + ' for that day. More games pay no extra; fewer than ' + th + ' pay nothing. Total = paid days x ' + earnMoney(d.pay.cents, cur) + '.';
+    const nPaid = e.rows.filter(x => x.today > 0).length;
+    out.appendChild(h('div', { class: 'box', style: 'margin:0 0 8px;padding:8px 10px;border-left:4px solid #2e9e5b' },
+      h('b', {}, 'Today (' + d.today + ' UTC): '), nPaid + (nPaid === 1 ? ' player has' : ' players have') + ' reached ' + th + ' games, ' + earnMoney(e.today, cur) + ' earned so far',
+      h('span', { class: 'muted small', style: 'margin-left:10px' }, EARN.lost ? 'could not refresh - trying again' : 'updated ' + EARN.stamp + ' - updates by itself')));
+    const cols = weekly ? d.weeks : d.dates;
+    const thS = 'text-align:right;padding:4px 8px;position:sticky;top:0;background:#eef1f5;white-space:nowrap';
+    const head = h('tr', {}, ['Email', 'Username', 'Game ID', 'Moderator'].map(t => h('th', { style: 'text-align:left;padding:4px 8px;position:sticky;top:0;background:#eef1f5' }, t)),
+      cols.map(c => h('th', { style: thS }, weekly ? 'Week of ' + c.slice(5) : c.slice(5))),
+      h('th', { style: thS }, 'Days paid'), h('th', { style: thS }, 'Total payout (' + cur + ')'), h('th', { style: thS.replace('#eef1f5', '#e3f4ea') }, 'Today'));
+    const money = c => h('td', { style: 'text-align:right;padding:3px 8px;' + (c ? '' : 'color:#9aa3ad') }, (c / 100).toFixed(2));
+    const rows = e.rows.map(x => h('tr', { style: 'border-top:1px solid #e3e7ec' },
+      h('td', { style: 'padding:3px 8px' }, x.r.email), h('td', { style: 'padding:3px 8px' }, x.r.username), h('td', { style: 'padding:3px 8px' }, x.r.gameId), h('td', { style: 'padding:3px 8px' }, x.r.moderator),
+      (weekly ? x.weekC : x.dayC).map(money), h('td', { style: 'text-align:right;padding:3px 8px' }, String(x.paidDays)),
+      h('td', { style: 'text-align:right;padding:3px 8px;font-weight:700' }, (x.total / 100).toFixed(2)),
+      h('td', { style: 'text-align:right;padding:3px 8px;background:#f1faf4', title: x.todayGames + ' games today' }, (x.today / 100).toFixed(2))));
+    const foot = h('tr', { style: 'border-top:2px solid #8a93a0;font-weight:700' }, h('td', { style: 'padding:4px 8px' }, 'All players'), h('td'), h('td'), h('td'),
+      (weekly ? e.weekAll : e.dayAll).map(c => h('td', { style: 'text-align:right;padding:4px 8px' }, (c / 100).toFixed(2))),
+      h('td', { style: 'text-align:right;padding:4px 8px' }, String(e.paidDays)), h('td', { style: 'text-align:right;padding:4px 8px' }, (e.total / 100).toFixed(2)), h('td', { style: 'text-align:right;padding:4px 8px;background:#f1faf4' }, (e.today / 100).toFixed(2)));
+    out.appendChild(h('div', { class: 'muted small', style: 'margin-bottom:6px' }, e.rows.length + ' players, ' + e.paidDays + ' paid days, ' + earnMoney(e.total, cur) + ' for ' + d.from + ' to ' + d.to + ' (' + d.scope + ')'));
+    out.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, head), h('tbody', {}, rows, foot)));
+    if (!d.rows.length) { out.appendChild(h('div', { class: 'muted', style: 'margin-top:6px' }, 'No players to show yet.')); }
+  };
+  window.loadEarningsView = draw;
+  const dl = () => {
+    const d = EARN.data; if (!d) { return; }
+    const a = h('a', { href: URL.createObjectURL(new Blob([earnCsv(d, earnCalc(d), EARN.view === 'weeks')], { type: 'text/csv;charset=utf-8' })), download: PERF.game + '-earnings-' + d.from + '_to_' + d.to + '.csv' });
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+  root.appendChild(h('div', { class: 'box' },
+    h('b', { style: 'font-size:16px' }, 'Earnings'), rule, setBox,
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, 'Game', sel, 'From', from, 'To', to, h('button', { class: 'pri', on: { click: show_ } }, 'Show')),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, preset('Today', 'today'), preset('This week', 'thisweek'), preset('Last week', 'lastweek'), preset('This month', 'thismonth'), preset('Last month', 'lastmonth'),
+      h('button', { on: { click: () => { const t = perfDay(new Date()); from.value = perfAdd(t, -365); to.value = t; show_(); } } }, 'To date (365 days)')),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' }, 'Show', viewBtn('Weekly payout', 'weeks'), viewBtn('Day by day', 'days'), h('span', { style: 'flex:1' }),
+      h('button', { on: { click: dl } }, 'Download CSV')),
+    out));
+  show_();
+  EARN.timer = setInterval(live, 10000);
+}
+
+// ---- Users -> Bot users: dummy accounts that look like bots (the game's own bot players are not touched) ----
+async function loadBotUsers() {
+  const root = $('botUsers'); if (!root) { return; }
+  root.textContent = '';
+  const r = await api('/api/admin/moderators/botusers', {});
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  const list = r.data.users || [], ticks = {};
+  const remove = async (names, all) => {
+    const form = all ? { all: '1' } : { names: names.join(',') };
+    const q = await api('/api/admin/moderators/botusers/remove', form);
+    const bad = (q.data.failed || []).length;
+    flash(q.ok ? ('Removed ' + q.data.removed + ' bot user' + (q.data.removed === 1 ? '' : 's') + (bad ? ', ' + bad + ' could not be removed' : '')) : (q.data.error || 'Could not remove'), q.ok && !bad);
+    loadBotUsers();
+  };
+  const box = h('div', { class: 'box' },
+    h('b', { style: 'font-size:16px' }, 'Bot users'),
+    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Dummy accounts that look like bots: a username starting or ending in "bot", or an e-mail at bots.memoryq.com. The word-game bots that play with lone players behind the scenes stay as they are. The super-admin, moderators and broadcasters are never listed. Removing an account is permanent.'));
+  if (!list.length) {
+    box.appendChild(h('div', { style: 'margin-top:6px' }, 'No bot users found.'));
+    root.appendChild(box); return;
+  }
+  const rows = list.map(u => {
+    const cb = h('input', { type: 'checkbox', on: { change: () => { ticks[u.username] = cb.checked; } } });
+    return h('tr', { style: 'border-top:1px solid #e3e7ec' }, h('td', { style: 'padding:3px 8px' }, cb), h('td', { style: 'padding:3px 8px' }, u.username), h('td', { style: 'padding:3px 8px' }, u.email || '-'), h('td', { style: 'padding:3px 8px' }, u.kind), h('td', { style: 'padding:3px 8px' }, u.why));
+  });
+  box.appendChild(h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0' }, h('b', {}, list.length + ' found'),
+    h('button', { on: { click: () => { const names = Object.keys(ticks).filter(k => ticks[k]); if (!names.length) { flash('Tick the users to remove first', false); return; } if (confirm('Remove ' + names.length + ' bot user(s) for good?')) { remove(names, false); } } } }, 'Remove ticked'),
+    h('button', { class: 'del', on: { click: () => { if (confirm('Remove ALL ' + list.length + ' bot users for good? This cannot be undone.')) { remove([], true); } } } }, 'Remove all ' + list.length)));
+  box.appendChild(h('table', { style: 'border-collapse:collapse;font-size:13px' }, h('thead', {}, h('tr', {}, ['', 'Username', 'E-mail', 'Kind', 'Why it is listed'].map(t => h('th', { style: 'text-align:left;padding:4px 8px;background:#eef1f5' }, t)))), h('tbody', {}, rows)));
+  root.appendChild(box);
+}
+
+// ---- the moderator's Dashboard: every area they look after, one click away ----
+function loadModHome() {
+  const root = $('modHome'); if (!root) { return; }
+  root.textContent = '';
+  root.appendChild(h('div', { class: 'box' },
+    h('b', { style: 'font-size:17px' }, 'Your moderation dashboard'),
+    h('div', { class: 'muted small', style: 'margin-top:4px' }, 'Everything the super-admin has given you. Pick an area; the menu on the left always brings you back here.')));
+  NAV.forEach(c => {
+    if (c.id === 'overview') { return; }
+    const row = h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px' });
+    c.tabs.forEach(t => { row.appendChild(h('button', { class: 'pri', on: { click: () => show(c.id, t.id) } }, t.label)); });
+    root.appendChild(h('div', { class: 'box' }, h('b', {}, c.label), row));
+  });
+  root.appendChild(h('div', { class: 'box' }, h('button', { on: { click: () => { location.href = '/me'; } } }, '\u2190 Back to Memoryq')));
+}
+
+let NAV_ALL = null, MODSIG = '', modTimer = null;
+function modSig(r) { return r.slice().sort().join(','); }
+// the server holds the rights; this page asks every few seconds and rebuilds its menu when the super-admin changed them
+async function modPoll() {
+  if (document.hidden || !token) { return; }
+  const r = await api('/api/mod/me');
+  if (r.status === 403) { signOut('Your moderator access was removed.'); return; }
+  if (!r.ok || !r.data || !r.data.rights) { return; }
+  if (modSig(r.data.rights) !== MODSIG) { enterModerator(r.data); flash('Your access was updated by the super-admin.', true); }
+}
+function enterModerator(d) {
+  if (!NAV_ALL) { NAV_ALL = NAV.slice(); }
+  MODSIG = modSig(d.rights);
+  MOD = new Set(d.rights);
+  const anyUsers = d.rights.some(k => k.indexOf('users.') === 0);
+  const can = k => MOD.has(k);
+  const keep = { 'games/pvistr': can('players.vistr'), 'games/pmissing': can('players.missing'), 'games/perf': can('reports.vistr'), 'games/earn': can('reports.vistr'),
+    'games/vistr': can('games.vistr') || can('visitors.vistr'), 'games/missing': can('games.missing'), 'videos/rec': can('streams.view') || can('streams.recordings'),
+    'videos/streamers': can('streams.view') || can('streams.recordings'), 'market/pending': can('market.approve'), 'market/reports': can('market.approve'),
+    'market/all': can('market.approve'), 'wall/posts': can('posts.hide'), 'news/feed': can('posts.hide') };
+  const out = [];
+  if (anyUsers) { out.push({ id: 'members', label: 'Users', icon: '\ud83d\udc64', tabs: [{ id: 'manage', label: 'Users', load: loadMembersMgr, noAuto: true }] }); }
+  if (can('streams.view') || can('streams.end')) { out.push({ id: 'streaming', label: 'Live now', icon: '\ud83d\udce1', tabs: [{ id: 'modlive', label: 'Live now', load: loadModLive }] }); }
+  NAV_ALL.forEach(c => {
+    const tabs = c.tabs.filter(t => keep[c.id + '/' + t.id]);
+    if (tabs.length) { out.push(Object.assign({}, c, { tabs: tabs })); }
+  });
+  // a Dashboard first: the home of everything this moderator looks after (Back and the sidebar always lead here)
+  out.unshift({ id: 'overview', label: 'Dashboard', icon: '\u25ce', tabs: [{ id: 'modhome', label: 'Dashboard', load: loadModHome }] });
+  NAV.length = 0; out.forEach(c => NAV.push(c));
+  if (!$('panel-overview-modhome')) {
+    const mp = document.createElement('div'); mp.className = 'panel'; mp.id = 'panel-overview-modhome'; mp.hidden = true;
+    const mh = document.createElement('div'); mh.id = 'modHome'; mp.appendChild(mh);
+    const gp = $('panel-games-all'); gp.parentNode.insertBefore(mp, gp);
+  }
+  if (!$('modBack')) {
+    const bb = document.createElement('button'); bb.id = 'modBack'; bb.textContent = '\u2190 Back to Memoryq'; bb.style.marginRight = '8px';
+    bb.addEventListener('click', () => { location.href = '/me'; });
+    $('signOut').parentNode.insertBefore(bb, $('signOut'));
+  }
+  $('login').hidden = true;
+  $('app').hidden = false;
+  $('gearBtn').hidden = true;
+  $('serverInfo').textContent = 'signed in as ' + d.username + ' (moderator)';
+  clearInterval(modTimer); modTimer = setInterval(modPoll, 10000);
+  if (NAV.length < 2) { $('flash').textContent = 'You have no rights yet - ask the super-admin.'; return; }
+  const hsh = (location.hash || '').replace('#', '').split('/');
+  const okHash = NAV.some(c => c.id === hsh[0] && c.tabs.some(t => t.id === hsh[1]));
+  show(okHash ? hsh[0] : NAV[0].id, okHash ? hsh[1] : NAV[0].tabs[0].id);
+  updateBadges();
+  clearInterval(timer);
+  timer = setInterval(refresh, 10000);
+}
+
+// ---- Games -> a game's players: the super-admin, and moderators for the games ticked for them ----
+const GP = {};
+async function loadGamePlayers(game) {
+  const root = $('gp-' + game); if (!root) { return; }
+  root.textContent = '';
+  const r = await api('/api/mod/game?game=' + game);
+  if (!r.ok) { root.appendChild(h('div', { class: 'error' }, r.data.error || 'Could not load')); return; }
+  const d = r.data;
+  const st = GP[game] = GP[game] || { picked: {}, filter: '' };
+  st.picked = {};
+  const form = h('div', { class: 'mmform' });
+  root.appendChild(h('div', { class: 'box' },
+    h('div', { style: 'display:flex;align-items:center;gap:10px;flex-wrap:wrap' }, h('b', { style: 'font-size:16px' }, d.name + ' - players'), h('span', { style: 'flex:1' }), playLink(game)),
+    h('div', { class: 'muted small', style: 'margin-top:4px' }, d.admin ? 'Every player. Tick players to edit, pause or remove them.'
+      : 'Every player of this game. You can edit, pause or remove the players you added (their boxes can be ticked).'),
+    d.reachable ? null : h('div', { class: 'error small', style: 'margin-top:4px' }, 'The game cannot be reached right now: the IDs below are what memoryq.com has.')));
+  // add a player: someone already on Memoryq (suggestions) or someone new
+  const addBox = h('div', { class: 'box', hidden: true });
+  const addBtn = h('button', { class: 'pri', on: { click: () => { addBox.hidden = !addBox.hidden; if (!addBox.hidden) { who.focus(); } } } }, '+ Add player');
+  const who = h('input', { placeholder: 'username, name or email', style: 'width:240px' });
+  const wid = h('input', { placeholder: 'ID (empty: theirs, or a new one)', inputmode: 'numeric', style: 'width:200px' });
+  const wmsg = h('div', { class: 'small' });
+  const addExisting = async () => {
+    const u = who.value.trim(); wmsg.textContent = '';
+    if (!u) { return; }
+    const q = await giveGameId(u, game, wid.value.trim(), d.name);
+    if (q.kept) { flash(u + ' keeps ' + d.name + ' ID ' + q.data.gameId, true); loadGamePlayers(game); return; }
+    if (!q.ok) { wmsg.className = 'small error'; wmsg.textContent = q.data.error || 'Could not';
+      if (q.data.owner && q.data.owner.toLowerCase() !== u.toLowerCase()) { wmsg.appendChild(h('button', { style: 'margin-left:6px', on: { click: () => { who.value = q.data.owner; addExisting(); } } }, 'Use ' + q.data.owner)); }
+      return; }
+    flash(u + ' plays ' + d.name + ' with ID ' + q.data.gameId + (q.data.waiting ? ' (saved; the game gets it when it can be reached)' : ''), true);
+    loadGamePlayers(game);
+  };
+  const nu = h('input', { placeholder: 'username', style: 'width:150px' }), npw = h('input', { type: 'password', placeholder: 'password (8+)', style: 'width:140px' });
+  const nem = h('input', { type: 'email', placeholder: d.needsEmail ? 'email (needed)' : 'email (optional)', style: 'width:190px' });
+  const nid = h('input', { placeholder: 'ID (empty: picked)', inputmode: 'numeric', style: 'width:130px' });
+  const nmsg = h('div', { class: 'small' });
+  const dups = h('div', {});
+  dupHint(dups, [nu, nem], x => { who.value = x.username; who.focus(); wmsg.className = 'small'; wmsg.textContent = 'Now press "Add to the game" for ' + x.username + '.'; });
+  addBox.append(h('b', {}, 'Add a player to ' + d.name),
+    h('div', { style: 'margin:8px 0 4px;font-weight:600' }, 'Someone already on Memoryq'),
+    h('div', { class: 'muted small' }, 'Start typing - pick the person from the list. They keep the ID they already have in the game (and their points).'),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:4px' }, h('span', {}, who), wid, h('button', { class: 'pri', on: { click: addExisting } }, 'Add to the game')), wmsg,
+    h('div', { style: 'margin:12px 0 4px;font-weight:600' }, 'Someone new'),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center' }, nu, npw, nem, nid,
+      h('button', { on: { click: async () => {
+        nmsg.textContent = '';
+        if (d.needsEmail && !nem.value.trim()) { nmsg.className = 'small error'; nmsg.textContent = d.name + ' needs an email.'; return; }
+        const q = await api('/api/mod/users/create', { username: nu.value.trim(), password: npw.value, email: nem.value.trim(), game: game, gameId: nid.value.trim() });
+        if (q.status === 409 && q.data.existingUser) { nmsg.className = 'small error'; nmsg.textContent = q.data.error;
+          nmsg.appendChild(h('button', { style: 'margin-left:6px', on: { click: () => { who.value = q.data.existingUser; addExisting(); } } }, 'Add ' + q.data.existingUser + ' instead')); return; }
+        if (!q.ok) { nmsg.className = 'small error'; nmsg.textContent = q.data.error || 'Could not add'; return; }
+        flash(q.data.note ? q.data.note : q.data.row.username + ' was added to ' + d.name, !q.data.note);
+        loadGamePlayers(game);
+      } } }, 'Make the account and add')), dups, nmsg);
+  setTimeout(() => suggestBox(who, () => wid.focus()), 0);
+  // the action bar works on the ticked players
+  const count = h('span', { class: 'muted small' }, 'nothing ticked');
+  const picked = () => Object.keys(st.picked).filter(k => st.picked[k]).map(k => st.picked[k]);
+  const act = async (what) => {
+    const list = picked();
+    if (!list.length) { flash('Tick the players first (only the ones you added can be ticked).', false); return; }
+    if (what === 'edit') {
+      if (list.length !== 1 || !list[0].username) { flash('Tick one member to edit.', false); return; }
+      mmEdit(form, { username: list[0].username }); form.scrollIntoView({ behavior: 'smooth' }); return;
+    }
+    const names = list.map(p => p.username || '#' + p.id).join(', ');
+    let account = false;
+    if (what === 'remove') {
+      if (!confirm('Remove ' + names + ' from ' + d.name + '?' + (game === 'vistr' ? '\n\nTheir player is deleted in the game: points and scores go, and the Player ID is never used again.' : ''))) { return; }
+      const own = list.filter(p => p.madeByMe && p.username);
+      if (own.length) { account = confirm('Also delete the Memoryq account of ' + own.map(p => p.username).join(', ') + ' (you made ' + (own.length === 1 ? 'it' : 'them') + ')?\n\nOK: delete the account too.  Cancel: keep the account.'); }
+    }
+    const notes = [];
+    let done = 0;
+    for (const p of list) {
+      const body = p.username ? { game: game, u: p.username } : { game: game, code: p.id };
+      if (what === 'pause' || what === 'resume') { body.on = what === 'pause' ? '1' : '0'; }
+      if (account && p.madeByMe) { body.account = '1'; }
+      const q = await api(what === 'remove' ? '/api/mod/game/remove' : '/api/mod/game/pause', body);
+      if (q.ok) { done++; if (q.data.note) { notes.push((p.username || p.id) + ': ' + q.data.note); } } else { notes.push((p.username || p.id) + ': ' + (q.data.error || 'could not')); }
+    }
+    flash((what === 'pause' ? 'Paused' : what === 'resume' ? 'Can play again' : 'Removed') + ': ' + done + ' of ' + list.length + (notes.length ? ' - ' + notes.join('; ') : ''), notes.length === 0);
+    loadGamePlayers(game);
+  };
+  const filt = h('input', { type: 'search', placeholder: 'Filter this list', value: st.filter, style: 'width:180px' });
+  root.appendChild(h('div', { class: 'acctool', style: 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0' }, addBtn,
+    h('span', { style: 'width:12px' }), h('button', { on: { click: () => act('edit') } }, 'Edit'), h('button', { on: { click: () => act('pause') } }, 'Pause'),
+    h('button', { on: { click: () => act('resume') } }, 'Let play again'), h('button', { class: 'del', on: { click: () => act('remove') } }, 'Remove from game'), count,
+    h('span', { style: 'flex:1' }), filt));
+  root.appendChild(addBox);
+  root.appendChild(form);
+  const table = h('div', { style: 'overflow-x:auto' });
+  root.appendChild(table);
+  const others = h('div', {});
+  root.appendChild(others);
+  const tickBox = (p) => {
+    const c = h('input', { type: 'checkbox', disabled: !p.mine && !d.admin, title: p.mine || d.admin ? 'Tick to edit, pause or remove' : 'Added by ' + (p.by || 'someone else') + ' - only they or the super-admin can change this player' });
+    c.addEventListener('change', () => { const k = p.username || '#' + p.id; st.picked[k] = c.checked ? p : null; const n = picked().length; count.textContent = n ? n + ' ticked' : 'nothing ticked'; });
+    return c;
+  };
+  const status = p => p.paused ? h('span', { class: 'error' }, 'paused') : p.state === 'waiting' ? h('span', { class: 'error', title: p.note }, 'waiting for the game') : h('span', { class: 'ok' }, 'playing');
+  const draw = () => {
+    const f = st.filter.toLowerCase();
+    const rows = d.players.filter(p => !f || [p.username, p.name, p.email, p.id].join(' ').toLowerCase().indexOf(f) >= 0);
+    table.textContent = '';
+    table.appendChild(h('div', { class: 'muted small', style: 'margin:4px 0' }, d.players.length + (d.players.length === 1 ? ' member plays ' : ' members play ') + d.name
+      + (d.admin ? '' : ' - ' + d.players.filter(p => p.mine).length + ' added by you')));
+    table.appendChild(h('table', {}, h('tr', {}, ['', 'ID', 'Member', 'Name', 'Email', 'Points', 'Last seen', 'Added by', 'Status'].map(x => h('th', {}, x))),
+      rows.map(p => h('tr', { style: p.mine && !d.admin ? 'background:rgba(80,160,255,.07)' : '' }, h('td', {}, tickBox(p)), h('td', {}, h('b', {}, p.id)), h('td', {}, p.username),
+        h('td', {}, p.name || ''), h('td', { class: 'small' }, p.email || ''), h('td', {}, p.points ? Number(p.points).toLocaleString() : '-'),
+        h('td', { class: 'small' }, p.lastSeen ? when(Number(p.lastSeen)) : '-'), h('td', { class: 'small' }, p.mine && !d.admin ? 'you' : (p.by === 'the game' ? 'joined in the game' : p.by || '-')),
+        h('td', {}, status(p))))));
+    if (!rows.length) { table.appendChild(h('div', { class: 'muted' }, f ? 'Nobody matches.' : 'No players yet - press "+ Add player".')); }
+  };
+  filt.addEventListener('input', () => { st.filter = filt.value.trim(); draw(); });
+  draw();
+  if (d.admin && d.others && d.others.length) {
+    others.appendChild(h('div', { style: 'margin-top:14px;font-weight:600' }, 'Players who are not Memoryq members (' + d.others.length + ')'));
+    others.appendChild(h('div', { class: 'muted small' }, 'They joined in the Android app with an email. Tick to pause or remove.'));
+    others.appendChild(h('div', { style: 'overflow-x:auto' }, h('table', {}, h('tr', {}, ['', 'ID', 'Name', 'Email', 'Points', 'Last seen', 'Status'].map(x => h('th', {}, x))),
+      d.others.map(p => h('tr', {}, h('td', {}, tickBox(p)), h('td', {}, h('b', {}, p.id)), h('td', {}, p.name || ''), h('td', { class: 'small' }, p.email || ''),
+        h('td', {}, p.points ? Number(p.points).toLocaleString() : '-'), h('td', { class: 'small' }, p.lastSeen ? when(Number(p.lastSeen)) : '-'), h('td', {}, status(p)))))));
+  }
+}
+
 // ---- Every part of a member's profile, for the super-admin (Users -> Account details, Profiler -> Vistr players) ----
 async function memberEditor(username, after) {
   const box = h('div', { class: 'box', style: 'border-color:var(--accent)' }, h('span', { class: 'muted' }, 'Loading ' + username + '...'));
@@ -3561,7 +4805,7 @@ async function loadDisks(run) {
   if (!r.ok) { root.appendChild(h('div', { class: 'box error' }, r.data.error || 'Could not load')); if (!run) { return; } }
   const d = r.ok ? r.data : (await api('/api/admin/disks/status')).data;
   const t = h('table');
-  [['Video disk (Mkarimu TV)', d.video + (d.videoDir ? ' - ' + d.videoDir : '')], ['Backup disk', d.backup],
+  [['Video disk (Mkarimu STV)', d.video + (d.videoDir ? ' - ' + d.videoDir : '')], ['Backup disk', d.backup],
    ['Last backup', d.lastRun ? when(d.lastRun) + (d.lastOk === d.lastRun ? '' : ' (FAILED - last good one: ' + when(d.lastOk) + ')') : 'none yet (every night at 03:30)'],
    ['What it did', d.running ? 'running now...' : d.message], ['Live recordings', d.extra]].forEach(([k, v]) => t.appendChild(h('tr', {}, h('th', {}, k), h('td', {}, v))));
   root.appendChild(h('div', { class: 'box' }, t,

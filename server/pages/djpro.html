@@ -291,7 +291,7 @@
   <span class="chip" id="timeChip" hidden></span>
   <button id="recBtn" hidden title="Record your set to a file on this computer">&#9679; Rec</button>
   <button id="airBtn" hidden title="Your mix on the radio station (AutoDJ steps aside)">ON AIR</button>
-  <button id="liveBtn" hidden title="Your camera (with the mix) on Mkarimu TV - mkarimu.net. Works with or without ON AIR">ON LIVE</button>
+  <button id="liveBtn" hidden title="Your camera (with the mix) on Mkarimu STV - mkarimu.net. Works with or without ON AIR">ON LIVE</button>
   <button id="showBtn" hidden title="The show full screen - press Esc to come back">&#x26F6; FULL SHOW</button>
   <div class="seg" id="themeSeg" role="group" aria-label="Look">
     <button data-theme="bright" title="Bright">Bright</button><button data-theme="blend" title="Between bright and black">Blend</button><button data-theme="black" title="Black">Black</button>
@@ -407,7 +407,7 @@
     </section>
 
     <section class="card">
-      <div class="cardhead"><h3 class="grow">Video &middot; Mkarimu TV</h3><span class="chip" id="camChip">ON LIVE puts it on Mkarimu TV</span></div>
+      <div class="cardhead"><h3 class="grow">Video &middot; Mkarimu STV</h3><span class="chip" id="camChip">ON LIVE puts it on Mkarimu STV</span></div>
       <div class="cam" id="camBox"><canvas id="camCanvas" width="1280" height="720"></canvas>
         <div class="showbar" id="showBar"><span class="st" id="sbAir">OFF AIR</span><span class="st" id="sbVid">NOT ON TV</span><span id="sbTime"></span>
           <span style="flex:1"></span><button id="sbAirBtn">ON AIR</button><button id="sbLiveBtn">ON LIVE</button><button id="sbExit">Exit full show (Esc)</button></div></div>
@@ -1656,14 +1656,14 @@ $('cueOut').addEventListener('change', async () => {
 });
 function startCue() { const a = $('cueEl'); if (a.paused) { a.play().catch(() => {}); } }
 
-// ---------- video for Mkarimu TV: the camera only (the console picture is just the preview when the camera is off) ----------
-// ON LIVE sends it to a Live Channel on Mkarimu TV, with or without ON AIR. H.264 is asked for,
+// ---------- video for Mkarimu STV: the camera only (the console picture is just the preview when the camera is off) ----------
+// ON LIVE sends it to a Live Channel on Mkarimu STV, with or without ON AIR. H.264 is asked for,
 // so the web app, phones and TVs can all play it.
 let camStream = null, camVideo = null, camOn = false, camPc = null, camInfo = null, vidState = 'off', vidRetry = null, vidTries = 0;
 let videoOn = false, liveSince = 0;
 $('camBtn').addEventListener('click', async () => {
   if (camOn) {
-    if (videoOn && !confirm('The camera is on Mkarimu TV. Turn it off and leave Mkarimu TV?')) { return; }
+    if (videoOn && !confirm('The camera is on Mkarimu STV. Turn it off and leave Mkarimu STV?')) { return; }
     stopCamera();
   } else { await startCamera(); }
 });
@@ -1679,12 +1679,12 @@ async function startCamera() {
 function stopCamera() {
   if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
   camOn = false; camVideo = null; $('camBtn').textContent = 'Camera on'; $('camBtn').classList.remove('on');
-  if (videoOn) { goOffLive(true); } // Mkarimu TV shows the camera only, never the console
+  if (videoOn) { goOffLive(true); } // Mkarimu STV shows the camera only, never the console
   showVid();
 }
 $('camSel').addEventListener('change', async () => { if (camOn) { stopCamera(); await startCamera(); } });
-// ---------- ON LIVE: the camera (and the mix) on Mkarimu TV, with or without ON AIR; FULL SHOW: the picture full screen ----------
-$('liveBtn').addEventListener('click', () => { if (videoOn) { if (confirm('Leave Mkarimu TV? (ON AIR is not changed)')) { goOffLive(); } } else { goOnLive(); } });
+// ---------- ON LIVE: the camera (and the mix) on Mkarimu STV, with or without ON AIR; FULL SHOW: the picture full screen ----------
+$('liveBtn').addEventListener('click', () => { if (videoOn) { if (confirm('Leave Mkarimu STV? (ON AIR is not changed)')) { goOffLive(); } } else { goOnLive(); } });
 async function goOnLive() {
   if (!ctx) { toast('Start the console first'); return; }
   if (!camOn) { await startCamera(); }
@@ -1696,7 +1696,7 @@ async function goOnLive() {
 function goOffLive(quiet) {
   videoOn = false; stopVideo();
   $('liveBtn').classList.remove('live');
-  if (!quiet) { toast('Off Mkarimu TV' + (onAir ? ' - still ON AIR on the radio' : '')); }
+  if (!quiet) { toast('Off Mkarimu STV' + (onAir ? ' - still ON AIR on the radio' : '')); }
   showVid(); drawOv(); beat();
 }
 function inShow() { return document.fullscreenElement === $('camBox') || $('camBox').classList.contains('fs'); }
@@ -1727,7 +1727,7 @@ function drawShowBar() {
 function showVid() {
   const c = $('camChip'), h = $('vidChip');
   let text, cls = 'chip';
-  if (!videoOn) { text = camOn ? 'camera on - ON LIVE puts it on Mkarimu TV' : 'ON LIVE puts it on Mkarimu TV'; }
+  if (!videoOn) { text = camOn ? 'camera on - ON LIVE puts it on Mkarimu STV' : 'ON LIVE puts it on Mkarimu STV'; }
   else if (vidState === 'live' && camInfo) { text = 'ON MKARIMU TV \u00b7 ' + camInfo.channelId; cls = 'chip live'; }
   else if (vidState === 'connecting') { text = 'video connecting...'; cls = 'chip wait'; }
   else if (vidState === 'retry') { text = 'video lost - retrying'; cls = 'chip wait'; }
@@ -1735,8 +1735,8 @@ function showVid() {
   else { text = 'video off'; }
   c.textContent = text; c.className = cls;
   h.hidden = !videoOn;
-  h.textContent = vidState === 'live' && camInfo ? '\ud83d\udcfa Mkarimu TV: ' + camInfo.channelId : '\ud83d\udcfa ' + text;
-  h.className = cls; h.title = camInfo ? 'You are on Mkarimu TV (mkarimu.net) as "' + camInfo.title + '"' : 'Your channel on Mkarimu TV';
+  h.textContent = vidState === 'live' && camInfo ? '\ud83d\udcfa Mkarimu STV: ' + camInfo.channelId : '\ud83d\udcfa ' + text;
+  h.className = cls; h.title = camInfo ? 'You are on Mkarimu STV (mkarimu.net) as "' + camInfo.title + '"' : 'Your channel on Mkarimu STV';
   drawShowBar();
 }
 
@@ -1818,7 +1818,7 @@ async function startVideo() {
       if (pc.connectionState === 'connected') {
         vidState = 'live'; vidTries = 0; showVid();
         try { const p = tv.sender.getParameters(); if (!p.encodings || !p.encodings.length) { p.encodings = [{}]; } p.encodings[0].maxBitrate = 2500000; tv.sender.setParameters(p).catch(() => {}); } catch (e) { }
-        toast('You are ON LIVE on Mkarimu TV (' + camInfo.channelId + ')', 4000);
+        toast('You are ON LIVE on Mkarimu STV (' + camInfo.channelId + ')', 4000);
       }
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         if (pc.connectionState === 'disconnected') { return; }
@@ -1833,7 +1833,7 @@ async function startVideo() {
   } catch (e) {
     if (camPc) { try { camPc.close(); } catch (x) { } camPc = null; }
     vidState = 'retry'; showVid();
-    if (!vidTries) { toast('Mkarimu TV could not be reached yet: ' + e.message + ' - the console keeps trying', 5000); }
+    if (!vidTries) { toast('Mkarimu STV could not be reached yet: ' + e.message + ' - the console keeps trying', 5000); }
     vidTries++;
     vidRetry = setTimeout(startVideo, Math.min(60000, 8000 * vidTries));
   }
@@ -1922,14 +1922,14 @@ function openStudio() {
 function closeStudio() { $('studioOv').hidden = true; }
 $('ovBack').addEventListener('click', closeStudio);
 $('ovStop').addEventListener('click', () => {
-  if (!busy() || confirm('Stop Live DJ Pro?' + (onAir ? ' You go off air (AutoDJ comes back),' : '') + (videoOn ? ' you leave Mkarimu TV,' : '') + ' the decks, mic and camera stop.')) { stopAll(); }
+  if (!busy() || confirm('Stop Live DJ Pro?' + (onAir ? ' You go off air (AutoDJ comes back),' : '') + (videoOn ? ' you leave Mkarimu STV,' : '') + ' the decks, mic and camera stop.')) { stopAll(); }
 });
 window.addEventListener('message', (e) => { if (e.origin === location.origin && e.data && e.data.djpro === 'back') { closeStudio(); } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('studioOv').hidden) { closeStudio(); } });
 function busy() { return onAir || videoOn || ['A', 'B'].some(id => decks[id] && decks[id].playing) || !!micStream || camOn; }
 function liveText() {
-  if (onAir) { return 'ON AIR ' + fmtT((Date.now() - airSince) / 1000) + (videoOn ? ' \u00b7 ON LIVE on Mkarimu TV' + (vidState === 'live' && camInfo ? ' (' + camInfo.channelId + ')' : '') : '') + ' - listeners hear your mix'; }
-  if (videoOn) { return 'ON LIVE on Mkarimu TV ' + fmtT((Date.now() - liveSince) / 1000) + ' (not on the radio)'; }
+  if (onAir) { return 'ON AIR ' + fmtT((Date.now() - airSince) / 1000) + (videoOn ? ' \u00b7 ON LIVE on Mkarimu STV' + (vidState === 'live' && camInfo ? ' (' + camInfo.channelId + ')' : '') : '') + ' - listeners hear your mix'; }
+  if (videoOn) { return 'ON LIVE on Mkarimu STV ' + fmtT((Date.now() - liveSince) / 1000) + ' (not on the radio)'; }
   const p = ['A', 'B'].filter(id => decks[id] && decks[id].playing);
   return p.length ? 'Deck ' + p.join(' + ') + ' playing (not on air)' : 'Stopped - not on air';
 }

@@ -42,6 +42,16 @@ public class MediaAuthHttpServer {
     private final LiveChannelRegistry registry;
     private volatile java.util.function.Consumer<String> publishListener = null;
     private volatile CallPathAuth callAuth = null;
+    /** Studio Master's private paths master/SHOW/sN|gN (null = none). */
+    private volatile MasterPathAuth masterAuth = null;
+
+    public interface MasterPathAuth {
+        String deny(String action, String path, String token, String ip);
+    }
+
+    public void setMasterAuth(MasterPathAuth auth) {
+        this.masterAuth = auth;
+    }
     private final int requestedPort;
     private HttpServer httpServer;
 
@@ -267,7 +277,11 @@ public class MediaAuthHttpServer {
                     CallPathAuth callGate = callAuth;
                     Matcher callMatch = (callGate == null || path == null) ? null
                             : CALL_PATH.matcher(path.startsWith("/") ? path.substring(1) : path);
-                    if (callMatch != null && callMatch.matches()) {
+                    MasterPathAuth masterGate = masterAuth;
+                    String bare = path == null ? "" : (path.startsWith("/") ? path.substring(1) : path);
+                    if (masterGate != null && bare.startsWith("master/")) {
+                        reason = masterGate.deny(action, bare, queryParam(query, "token"), ip);
+                    } else if (callMatch != null && callMatch.matches()) {
                         reason = callGate.deny(action, callMatch.group(1), callMatch.group(2), queryParam(query, "token"));
                     } else {
                         reason = denyReason(registry, action, path, query, ip);

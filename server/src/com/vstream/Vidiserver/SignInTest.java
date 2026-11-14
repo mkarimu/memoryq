@@ -25,6 +25,7 @@ public final class SignInTest {
     static final String CID = "1234567890-abc123.apps.googleusercontent.com";
 
     public static void main(String[] args) {
+        System.setProperty("sun.net.http.allowRestrictedHeaders", "true"); // lets the test send Origin like a browser
         try {
             run();
         } catch (Throwable t) {
@@ -172,6 +173,22 @@ public final class SignInTest {
             checkTrue("the admin list", r[0].equals("200") && r[1].contains("\"username\":\"amina\",\"role\":\"CHATTER\",\"own\":true") && r[1].contains("\"catalog\":["));
             call(port, "/api/admin/services/user", "username=amina&reset=1", admin);
             checkTrue("back to the template", get(port, "/api/me", amina)[1].contains("\"services\":[\"home\",\"radio\",\"world\",\"market\"]"));
+            System.out.println("-- Signing in and up from the Vistr games --");
+            acc.setEmail(emails, true);
+            r = call(port, "/api/register", "username=web_kid&password=goodpass123", null);
+            checkTrue("memoryq.com sign-up still needs an email", r[0].equals("400") && us.info("web_kid") == null);
+            r = call(port, "/api/register", "username=game_kid&password=goodpass123&app=vistr", null);
+            checkTrue("a Vistr sign-up: username and password are enough (a Memoryq account at once)", r[0].equals("200") && r[1].contains("\"token\"")
+                    && us.info("game_kid") != null);
+            r = call(port, "/api/register", "username=game_kid&password=goodpass123&app=vistr", null);
+            checkTrue("a taken name is refused", r[0].equals("400") && r[1].contains("taken"));
+            String[] pre = preflight(port, "/api/auth/handoff", "https://vistr.memoryq.com");
+            checkTrue("the game's page may hand over a sign-in (CORS)", pre[0].equals("204") && pre[1].equals("https://vistr.memoryq.com"));
+            pre = preflight(port, "/api/login", "https://evil.example");
+            checkTrue("other sites may not", pre[1].isEmpty());
+            pre = preflight(port, "/api/login", "https://vistr.memoryq.com");
+            checkTrue("the game's page may sign in", pre[0].equals("204") && pre[1].equals("https://vistr.memoryq.com"));
+            acc.setEmail(null, false);
             ServiceAccess s3 = new ServiceAccess(dir.resolve("services.txt"), us, sessions);
             s3.init();
             checkTrue("kept across a restart", s3.template().toString().equals("[home, radio, world, market]"));
@@ -211,6 +228,16 @@ public final class SignInTest {
             }
         }
         return b.toByteArray();
+    }
+
+    private static String[] preflight(int port, String path, String origin) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path).openConnection();
+        c.setRequestMethod("OPTIONS");
+        c.setRequestProperty("Origin", origin);
+        c.setRequestProperty("Access-Control-Request-Method", "POST");
+        int code = c.getResponseCode();
+        String o = c.getHeaderField("Access-Control-Allow-Origin");
+        return new String[]{String.valueOf(code), o == null ? "" : o};
     }
 
     private static String[] call(int port, String path, String body, String token) throws Exception {

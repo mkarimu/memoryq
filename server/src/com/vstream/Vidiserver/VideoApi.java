@@ -34,11 +34,11 @@ import java.util.regex.Pattern;
  * Videos for everyone: YouTube links and uploaded files, with comments.
  *
  * Who can do what:
- *  - Everyone (no sign-in): watch public videos and read comments; Memoryq TV plays the featured ones.
+ *  - Everyone (no sign-in): watch public videos and read comments; Mkarimu STV plays the featured ones.
  *  - Signed-in members: add videos (upload a file or paste a YouTube link), change the title and description of
  *    their own, pause / show and delete their own, comment, edit and delete their own comments, and delete any
  *    comment on their own videos.
- *  - The super-admin: all of that for every video, plus choose which videos play on Memoryq TV (and their order);
+ *  - The super-admin: all of that for every video, plus choose which videos play on Mkarimu STV (and their order);
  *    the super-admin's own videos go on TV automatically. A video the super-admin paused stays paused for its owner.
  *  Guest accounts and suspended accounts cannot add, change or comment.
  *
@@ -631,7 +631,7 @@ public final class VideoApi {
         return importFile(owner, file, title, description, false);
     }
 
-    /** The same; onTv = it plays on Memoryq / Mkarimu TV as soon as it is prepared. */
+    /** The same; onTv = it plays on Memoryq / Mkarimu STV as soon as it is prepared. */
     public VideoStore.Video importFile(String owner, Path file, String title, String description, boolean onTv) throws IOException {
         String name = file.getFileName().toString();
         int dot = name.lastIndexOf('.');

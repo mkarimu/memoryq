@@ -39,11 +39,15 @@ public final class ServiceAccess {
         {"radio", "Radio", "/me#radio"},
         {"world", "World Radio", "/world"},
         {"videos", "Videos", "/me#videos"},
-        {"tv", "Memoryq TV", "/tv"},
+        {"tv", "Mkarimu STV", "/tv"},
         {"live", "On air (go live)", "/me#live"},
         {"market", "Marketplace", "/market"},
         {"vistr", "Vistr word game", "https://vistr.memoryq.com/"},
+        {"missing", "Spot What's Missing (carers)", "/me#missing"},
     };
+
+    /** The services before the list said which ones it knew: a service added later is switched on for everyone. */
+    static final List<String> FIRST_KEYS = Arrays.asList("home", "wall", "people", "chat", "calls", "radio", "world", "videos", "tv", "live", "market", "vistr");
 
     static final Set<String> KEYS = new LinkedHashSet<String>();
 
@@ -86,13 +90,29 @@ public final class ServiceAccess {
             return;
         }
         try {
+            List<String> known = null;
             for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
                 String[] f = line.split("\t", -1);
                 if (f.length >= 2 && f[0].equals("T")) {
                     template = parse(f[1]);
                 } else if (f.length >= 3 && f[0].equals("U")) {
                     own.put(f[1].toLowerCase(Locale.ROOT), parse(f[2]));
+                } else if (f.length >= 2 && f[0].equals("K")) {
+                    known = Arrays.asList(f[1].split(","));
                 }
+            }
+            boolean added = false;
+            for (String k : KEYS) {
+                if (!(known == null ? FIRST_KEYS : known).contains(k)) { // a new service: on for the template and every own list
+                    template = parse(String.join(",", template) + "," + k);
+                    for (Map.Entry<String, List<String>> e : own.entrySet()) {
+                        e.setValue(parse(String.join(",", e.getValue()) + "," + k));
+                    }
+                    added = true;
+                }
+            }
+            if (added) {
+                save();
             }
         } catch (IOException e) {
             System.out.println("[services] could not read " + file + ": " + e.getMessage());
@@ -103,7 +123,8 @@ public final class ServiceAccess {
         if (file == null) {
             return;
         }
-        StringBuilder sb = new StringBuilder("T\t").append(String.join(",", template)).append('\n');
+        StringBuilder sb = new StringBuilder("K\t").append(String.join(",", KEYS)).append('\n');
+        sb.append("T\t").append(String.join(",", template)).append('\n');
         for (Map.Entry<String, List<String>> e : own.entrySet()) {
             sb.append("U\t").append(e.getKey()).append('\t').append(String.join(",", e.getValue())).append('\n');
         }
