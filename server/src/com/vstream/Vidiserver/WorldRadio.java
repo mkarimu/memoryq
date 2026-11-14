@@ -193,7 +193,7 @@ public final class WorldRadio {
         return clock.getAsLong();
     }
 
-    /** Memoryq's own names (memoryq.com, mkarimu.net): its own radio streams may be added even when the server sees them inside. */
+    /** Memoryq's own names (memoryq.com, mkarimu.tv): its own radio streams may be added even when the server sees them inside. */
     public void setOwnHosts(String... hosts) {
         for (String h : hosts) {
             if (h != null && !h.trim().isEmpty()) {

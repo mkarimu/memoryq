@@ -448,7 +448,7 @@ public class VideoServerMain {
         world.init();
         world.setAi(RadioWriter.OpenAi.fromEnvironment());
         world.setOwnHosts(System.getProperty("vstream.publicHost", ""), System.getProperty("vstream.mediaHost", ""), "memoryq.com", "www.memoryq.com",
-                "mkarimu.net", "www.mkarimu.net");
+                "mkarimu.tv", "www.mkarimu.tv");
         Runtime.getRuntime().addShutdownHook(new Thread(world::flushIfDirty));
         api.addModule(world::register);
         // the station finder bot: Radio Browser + Wikidata daily, the Icecast directory weekly, every stream checked nightly
@@ -542,7 +542,7 @@ public class VideoServerMain {
                 .fact("Alma", () -> alma.askedToday() + " questions today, answers with " + (alma.aiReady() ? "OpenAI" : "built-in answers (no OpenAI key)"))
                 .fact("Downloads", downloads::available)
                 .fact("FFmpeg", () -> audioTools.ready() ? "ready" : "NOT installed")
-                .fact("Video disk (Mkarimu STV, mkarimu.net)", () -> MediaDisks.spaceLine(videoDir) + " - " + videoDir.toAbsolutePath())
+                .fact("Video disk (Mkarimu STV, mkarimu.tv)", () -> MediaDisks.spaceLine(videoDir) + " - " + videoDir.toAbsolutePath())
                 .fact("Backup disk", () -> backup.available() ? MediaDisks.spaceLine(MediaDisks.backupRoot()) + "; last backup "
                         + BackupJob.when(backup.lastRun()) + ": " + backup.lastMessage() : "not there (setup-disks.sh)")
                 .fact("Live recordings", () -> {

@@ -291,7 +291,7 @@
   <span class="chip" id="timeChip" hidden></span>
   <button id="recBtn" hidden title="Record your set to a file on this computer">&#9679; Rec</button>
   <button id="airBtn" hidden title="Your mix on the radio station (AutoDJ steps aside)">ON AIR</button>
-  <button id="liveBtn" hidden title="Your camera (with the mix) on Mkarimu STV - mkarimu.net. Works with or without ON AIR">ON LIVE</button>
+  <button id="liveBtn" hidden title="Your camera (with the mix) on Mkarimu STV - mkarimu.tv. Works with or without ON AIR">ON LIVE</button>
   <button id="showBtn" hidden title="The show full screen - press Esc to come back">&#x26F6; FULL SHOW</button>
   <div class="seg" id="themeSeg" role="group" aria-label="Look">
     <button data-theme="bright" title="Bright">Bright</button><button data-theme="blend" title="Between bright and black">Blend</button><button data-theme="black" title="Black">Black</button>
@@ -1736,7 +1736,7 @@ function showVid() {
   c.textContent = text; c.className = cls;
   h.hidden = !videoOn;
   h.textContent = vidState === 'live' && camInfo ? '\ud83d\udcfa Mkarimu STV: ' + camInfo.channelId : '\ud83d\udcfa ' + text;
-  h.className = cls; h.title = camInfo ? 'You are on Mkarimu STV (mkarimu.net) as "' + camInfo.title + '"' : 'Your channel on Mkarimu STV';
+  h.className = cls; h.title = camInfo ? 'You are on Mkarimu STV (mkarimu.tv) as "' + camInfo.title + '"' : 'Your channel on Mkarimu STV';
   drawShowBar();
 }
 

@@ -14,7 +14,7 @@ import java.nio.file.attribute.FileTime;
 import java.util.List;
 
 /**
- * The video site: videos on the video disk (moved there once), Mkarimu STV at mkarimu.net, live recordings
+ * The video site: videos on the video disk (moved there once), Mkarimu STV at mkarimu.tv, live recordings
  * (list, watch, keep as a video, delete, tidy), and the nightly backup (data, videos, songs; set-aside copies).
  */
 public final class VideoHostTest {
@@ -22,7 +22,7 @@ public final class VideoHostTest {
     private static int failures = 0;
 
     public static void main(String[] args) throws Exception {
-        System.setProperty("sun.net.http.allowRestrictedHeaders", "true"); // so the test can send Host: mkarimu.net
+        System.setProperty("sun.net.http.allowRestrictedHeaders", "true"); // so the test can send Host: mkarimu.tv
         Path dir = Files.createTempDirectory("memoryq-videohost");
         Path media = dir.resolve("srv-mkarimu");
         Path backupRoot = dir.resolve("srv-backup");
@@ -51,7 +51,7 @@ public final class VideoHostTest {
                 && MediaDisks.recordingsDir() == null);
         System.setProperty("vstream.mediaRoot", media.toString());
 
-        System.out.println("-- Mkarimu STV at mkarimu.net --");
+        System.out.println("-- Mkarimu STV at mkarimu.tv --");
         Path pages = dir.resolve("pages");
         Files.createDirectories(pages);
         Files.write(pages.resolve("admin.html"), "<html>admin</html>".getBytes(StandardCharsets.UTF_8));
@@ -86,15 +86,15 @@ public final class VideoHostTest {
         int port = http.getAddress().getPort();
         String[] r = get(port, "/", null, "memoryq.com");
         checkTrue("memoryq.com shows its own home page", r[1].contains("Memoryq home"));
-        check("memoryq.com/tv is the TV wall until mkarimu.net is in use", get(port, "/tv", null, "memoryq.com")[0], "200");
-        r = get(port, "/", null, "mkarimu.net");
-        checkTrue("mkarimu.net's home page is the TV wall, called Mkarimu STV", r[0].equals("200") && r[1].contains("Mkarimu STV")
+        check("memoryq.com/tv is the TV wall until mkarimu.tv is in use", get(port, "/tv", null, "memoryq.com")[0], "200");
+        r = get(port, "/", null, "mkarimu.tv");
+        checkTrue("mkarimu.tv's home page is the TV wall, called Mkarimu STV", r[0].equals("200") && r[1].contains("Mkarimu STV")
                 && !r[1].contains("Memoryq home"));
         checkTrue("signing in, comments and going live stay on Memoryq", r[1].contains("https://memoryq.com/vstream-legal")
                 && (r[1].contains("https://memoryq.com/me#") || !r[1].contains("/me#")));
-        checkTrue("www.mkarimu.net too", get(port, "/", null, "www.mkarimu.net")[1].contains("Mkarimu STV"));
+        checkTrue("www.mkarimu.tv too", get(port, "/", null, "www.mkarimu.tv")[1].contains("Mkarimu STV"));
         r = get(port, "/tv", null, "memoryq.com");
-        checkTrue("then memoryq.com/tv sends people to mkarimu.net", r[0].equals("302") && "https://mkarimu.net/".equals(r[2]));
+        checkTrue("then memoryq.com/tv sends people to mkarimu.tv", r[0].equals("302") && "https://mkarimu.tv/".equals(r[2]));
 
         System.out.println("-- Live recordings --");
         Path chan = media.resolve("recordings").resolve("live").resolve("CHANNEL-3");

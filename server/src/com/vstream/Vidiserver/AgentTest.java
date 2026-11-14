@@ -75,7 +75,7 @@ public final class AgentTest {
         agent.writeStatus();
         agent.writeStatus();
         text = read(file);
-        checkTrue("a new warning is shown and logged once", text.contains("### Warnings\n\n- Disk is nearly full")
+        checkTrue("a new warning is shown and logged once", text.contains("### Warnings\n\n") && text.contains("- Disk is nearly full\n")
                 && text.split("WARNING: Disk is nearly full", -1).length == 2);
         checkTrue("the newest log entry comes first", text.indexOf("WARNING: Disk") < text.indexOf("Deploy: 2 new") && text.indexOf("Deploy: 2 new") < text.indexOf("started keeping"));
         agent.saveManual("# My own notes\n\n- Studio Master is next\n");

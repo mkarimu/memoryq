@@ -62,7 +62,7 @@ public final class CentovaImportTest {
 
         System.out.println("-- The export arrives --");
         String accounts = "1\tadmin\t\t\t\t\t0\t0\t0\t0\tenabled\t\t\t0\t\n"
-                + "2\tmkarimu\tMkarimu Radio\tMkarimu Media Inc\thttp://mkarimu.net/\tmk@example.com\t10000\t512\t0\t0\tenabled\tAfrica/Nairobi\tGospel\t8005\tIceCast\n"
+                + "2\tmkarimu\tMkarimu Radio\tMkarimu Media Inc\thttp://mkarimu.tv/\tmk@example.com\t10000\t512\t0\t0\tenabled\tAfrica/Nairobi\tGospel\t8005\tIceCast\n"
                 + "3\tdcradio\tDominion Community Radio\t\t\t\t1000\t256\t0\t0\tdisabled\t\t\t8003\tIceCast"
                 + "\t1\t10\t5\t90\t0\t\t\t\t0\t0\t0\t\t0\t44100\t2\n"
                 + "4\tsomeone\tSomeone FM\t\t\tSome@Example.com\t100\t128\t0\t0\tsuspended\t\t\t8007\tIceCast"
@@ -162,7 +162,7 @@ public final class CentovaImportTest {
             check("DJs keep their Centova password", mk.livePass, "SourcePass2026");
             checkTrue("a short Centova password gets a new one", !dc.livePass.equals("short") && dc.livePass.length() >= 8);
             checkTrue("contact details, website, time zone", mk.company.equals("Mkarimu Media Inc") && mk.email.equals("mk@example.com")
-                    && mk.website.startsWith("http://mkarimu.net") && mk.timezone.equals("Africa/Nairobi") && dc.timezone.equals("America/New_York"));
+                    && mk.website.startsWith("http://mkarimu.tv") && mk.timezone.equals("Africa/Nairobi") && dc.timezone.equals("America/New_York"));
             checkTrue("Centova's limits (512 kbps becomes 320)", mk.limListeners == 10000 && mk.limKbps == 320 && dc.limListeners == 1000 && dc.limKbps == 256);
             java.util.List<RadioStore.Track> tr = store.tracks(mk.id);
             checkTrue("the songs, with Centova's titles", tr.size() == 3 && tr.stream().anyMatch(t -> t.title.equals("Song One") && t.artist.equals("Singer A")));

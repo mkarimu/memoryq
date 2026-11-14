@@ -164,7 +164,7 @@ public final class AccountApi {
                 if (isVideoHost(ex)) {
                     serveTv(ex, "/tv");
                 } else if (videoHostSeen) {
-                    // the TV wall lives at the video site now (mkarimu.net)
+                    // the TV wall lives at the video site now (mkarimu.tv)
                     try {
                         ex.getResponseHeaders().set("Location", "https://" + VIDEO_HOST + "/");
                         ex.sendResponseHeaders(302, -1);
@@ -916,10 +916,10 @@ public final class AccountApi {
      * The public homepage at the site address (home.html next to admin.html). Returns false when there is no
      * home.html, so the caller can send people to the web dashboard instead.
      */
-    // ---- The video site (mkarimu.net): the same server, with the TV wall as its home page ----
+    // ---- The video site (mkarimu.tv): the same server, with the TV wall as its home page ----
 
-    /** The video site's name (vstream.videoHost, default mkarimu.net). */
-    static final String VIDEO_HOST = System.getProperty("vstream.videoHost", "mkarimu.net").trim().toLowerCase(java.util.Locale.ROOT);
+    /** The video site's name (vstream.videoHost, default mkarimu.tv). */
+    static final String VIDEO_HOST = System.getProperty("vstream.videoHost", "mkarimu.tv").trim().toLowerCase(java.util.Locale.ROOT);
     /** Set once a visitor arrives through the video site's name (its DNS points here): memoryq.com/tv then sends people there. */
     private volatile boolean videoHostSeen;
 

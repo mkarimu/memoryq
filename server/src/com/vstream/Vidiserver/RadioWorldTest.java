@@ -29,7 +29,7 @@ public final class RadioWorldTest {
         System.out.println("-- The place is kept with the station --");
         checkTrue("no place to start with", !store.station(st.id).hasPlace() && store.station(st.id).worldOn);
         store.setPlace(st.id, true, -2.51643, 32.91751, "Mwanza", "Tanzania", "tz");
-        store.setWebsite(st.id, "http://mkarimu.net/");
+        store.setWebsite(st.id, "http://mkarimu.tv/");
         boolean refused = false;
         try {
             store.setPlace(st.id, null, 95.0, 10.0, null, null, null);
@@ -56,7 +56,7 @@ public final class RadioWorldTest {
         java.util.List<WorldRadio.Station> found = w.search("mkarimu", "", null, 5);
         checkTrue("on air with a place: on the globe", found.size() == 1 && found.get(0).source.equals("memoryq")
                 && found.get(0).url.equals("https://memoryq.com/radio/" + st.id + ".mp3") && found.get(0).slogan.equals("The voice of the lake zone")
-                && found.get(0).country.equals("Tanzania") && found.get(0).home.equals("http://mkarimu.net/"));
+                && found.get(0).country.equals("Tanzania") && found.get(0).home.equals("http://mkarimu.tv/"));
         checkTrue("searching the slogan finds it", w.search("lake zone", "", null, 5).size() == 1);
         checkTrue("no place: not on the globe", w.search("quiet", "", null, 5).isEmpty());
         store.setPlace(st.id, false, null, null, null, null, null);

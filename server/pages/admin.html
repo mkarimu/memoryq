@@ -3801,6 +3801,18 @@ async function loadGames() {
   body.appendChild(h('div', { class: 'box' }, h('b', {}, 'The game\'s own ads '), h('span', { class: 'muted small' }, '(server/data/ads.json on the game server)'),
     ak.length ? h('table', { style: 'margin-top:6px' }, h('tr', {}, h('th', {}, 'Ad'), h('th', {}, 'Views'), h('th', {}, 'Clicks')),
       ak.map(k => h('tr', {}, h('td', {}, k), h('td', {}, String((ads[k] || {}).view || 0)), h('td', {}, String((ads[k] || {}).click || 0))))) : h('div', { class: 'muted' }, 'No ad numbers yet.')));
+  // one section at a time (tabs) instead of one very long page
+  const kids = Array.from(body.children), first = kids.shift();
+  const names = ['Players', 'Activity', 'Messages', 'Reviews'], last = kids.length - 1;
+  const secs = kids.map((k, i) => [i < names.length ? names[i] : (i === last ? 'Game ads' : 'Visitors'), k]);
+  const merged = [];
+  secs.forEach(s => { const m = merged.find(x => x[0] === s[0]); if (m) { m[1].push(s[1]); } else { merged.push([s[0], [s[1]]]); } });
+  const strip = h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin:8px 0' });
+  const pick = n => { try { GM.tab = n; } catch (e) { } merged.forEach(m => m[1].forEach(el => { el.hidden = m[0] !== n; })); Array.from(strip.children).forEach(b => b.classList.toggle('pri', b.textContent.replace(/ \(\d+\)$/, '') === n)); };
+  const cnt = n => n === 'Messages' ? msgs.messages.length : n === 'Reviews' ? revs.reviews.length : n === 'Players' && GM.players ? GM.players.players.length : null;
+  merged.forEach(m => strip.appendChild(h('button', { on: { click: () => pick(m[0]) } }, m[0] + (cnt(m[0]) != null ? ' (' + cnt(m[0]) + ')' : ''))));
+  body.insertBefore(strip, kids[0]);
+  pick(GM.tab && merged.some(m => m[0] === GM.tab) ? GM.tab : 'Players');
 }
 
 // ---- Games -> Spot What's Missing: numbers, the picture library, adding and correcting pictures ----
@@ -4346,7 +4358,7 @@ async function loadPerformance() {
   if (!PERF.from) { const p = perfPreset('last28'); PERF.from = p[0]; PERF.to = p[1]; }
   const from = h('input', { type: 'date', value: PERF.from }), to = h('input', { type: 'date', value: PERF.to });
   const sel = h('select', { on: { change: () => { PERF.game = sel.value; show_(); } } }, games.map(g => h('option', { value: g[0], selected: g[0] === PERF.game }, g[1])));
-  const out = h('div', { style: 'margin-top:10px;overflow:auto;max-height:68vh' });
+  const out = h('div', { style: 'margin-top:10px;overflow:auto;max-height:calc(100vh - 300px);min-height:240px' });
   const show_ = async () => {
     PERF.from = from.value; PERF.to = to.value;
     out.textContent = ''; out.appendChild(h('div', { class: 'muted' }, 'Asking the game...'));
@@ -4459,7 +4471,7 @@ async function loadPerformance() {
   window.loadPerformanceView = draw;
   root.appendChild(h('div', { class: 'box' },
     h('b', { style: 'font-size:16px' }, 'Performance report'),
-    h('div', { class: 'muted small', style: 'margin:4px 0 8px' }, 'Online games each player finished, per day and per week. Days are cut in Los Angeles time (the same days as Weekly Champions); a week starts on Monday. Click a week to open it day by day: who played, when, and the points. Game results are the Android app, web results are the browser, each by word length 3 to 7. Single games are listed from the day the game server was updated for this report; earlier days only have totals. Games played offline in the app are not in this report.'),
+    h('details', { class: 'muted small', style: 'margin:2px 0 6px' }, h('summary', { style: 'cursor:pointer' }, 'How this report works'), 'Online games each player finished, per day and per week. Days are cut in Los Angeles time (the same days as Weekly Champions); a week starts on Monday. Click a week to open it day by day: who played, when, and the points. Game results are the Android app, web results are the browser, each by word length 3 to 7. Single games are listed from the day the game server was updated for this report; earlier days only have totals. Games played offline in the app are not in this report.'),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;align-items:center' }, 'Game', sel, 'From', from, 'To', to, h('button', { class: 'pri', on: { click: show_ } }, 'Show')),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:8px' }, preset('Today', 'today'), preset('This week', 'thisweek'), preset('Last week', 'lastweek'), preset('Last 7 days', 'last7'), preset('Last 28 days', 'last28'), preset('This month', 'thismonth'), preset('Last month', 'lastmonth')),
     h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center' }, 'Show', viewBtn('Weekly totals', 'weeks'), viewBtn('Day by day', 'days'), viewBtn('Game results (3-7)', 'game'), viewBtn('Web results (3-7)', 'web'), h('span', { style: 'flex:1' }),

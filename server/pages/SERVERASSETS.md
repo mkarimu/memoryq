@@ -14,8 +14,8 @@ refreshes the live status every 5 minutes.
 - Public pages: home (/), Mkarimu STV (/tv), web app (/me), Studio (/studio), DJ Pro (/djpro),
   downloads (/download), terms, privacy, Vstream legal (/vstream-legal).
 
-### Mkarimu STV (mkarimu.net) - the video site, on the same server
-- Its home page is the TV wall ("Mkarimu STV"); memoryq.com/tv sends people there once mkarimu.net is in use.
+### Mkarimu STV (mkarimu.tv) - the video site, on the same server
+- Its home page is the TV wall ("Mkarimu STV"); memoryq.com/tv sends people there once mkarimu.tv is in use.
 - Video disk /srv/mkarimu (400 GB on datastore2): videos, thumbnails, live recordings (every live channel, kept 30
   days; Admin - Videos - Live recordings: watch, keep as a video, delete; the oldest go first above 80% full).
 - Backup disk /srv/backup (100 GB on datastore1, the other drive): every night at 03:30 the data (last 14 nights),
