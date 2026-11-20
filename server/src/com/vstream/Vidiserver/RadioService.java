@@ -550,6 +550,16 @@ public final class RadioService {
             }
 
             @Override
+            public boolean fileOk(RadioStore.Track t) {
+                try {
+                    java.nio.file.Path p = store.pathOf(t);
+                    return p != null && java.nio.file.Files.isRegularFile(p) && java.nio.file.Files.size(p) > 0;
+                } catch (IOException e) {
+                    return false;
+                }
+            }
+
+            @Override
             public short[] speak(String text, String voice) {
                 return normalize(tools.speak(text, voice, false));
             }

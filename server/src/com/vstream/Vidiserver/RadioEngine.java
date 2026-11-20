@@ -75,6 +75,15 @@ public final class RadioEngine implements Runnable {
 
         void played(RadioStore.Track t);
 
+        /**
+         * The preloader: true when this track's file is actually there and ready to play right now. Checked
+         * before a track is ever picked, not discovered by trying to play it - a vanished or moved file is
+         * skipped here instead of reaching the air.
+         */
+        default boolean fileOk(RadioStore.Track t) {
+            return true;
+        }
+
         /** The next song from the station's playlists, or null to shuffle all songs. currentId = playing now (0). */
         default RadioStore.Track chooseNext(long currentId) {
             return null;
@@ -381,13 +390,49 @@ public final class RadioEngine implements Runnable {
         int[] acc = new int[BLOCK * 2];
         long start = System.nanoTime();
         long written = 0;
+        // A single bad track (a missing/corrupt file, a decoder hiccup, any surprise) must never take the whole
+        // station off the air: one block's worth of trouble is logged and skipped, not fatal. Only a genuinely
+        // broken station (errors with no good blocks between them) stops this loop, so a stuck station doesn't
+        // spin forever burning CPU in silence.
+        int troubleStreak = 0;
+        long troubleWindowStart = 0;
         try {
             while (running) {
-                step();
-                int n = mixBlock(acc, mix);
-                sink.write(mix, n);
-                written += n;
-                framesOut = written;
+                try {
+                    step();
+                    int n = mixBlock(acc, mix);
+                    sink.write(mix, n);
+                    written += n;
+                    framesOut = written;
+                    troubleStreak = 0;
+                } catch (Throwable t) {
+                    String track = current != null && current.track != null ? current.track.title : "(none)";
+                    System.out.println("[radio] station " + stationId + ": " + t + " while playing '" + track
+                            + "' - skipping to the next track");
+                    t.printStackTrace();
+                    // drop whatever was mid-flight and force a fresh pick next time round, instead of retrying
+                    // the same broken state forever
+                    try {
+                        if (current != null) {
+                            current.src.close();
+                        }
+                    } catch (Throwable ignore) { /* already broken; nothing more to do */ }
+                    current = null;
+                    planned = null;
+                    plannedTalk = null;
+                    talking = false;
+                    long now = System.currentTimeMillis();
+                    if (now - troubleWindowStart > 10_000) {
+                        troubleWindowStart = now;
+                        troubleStreak = 0;
+                    }
+                    if (++troubleStreak > 20) {
+                        System.out.println("[radio] station " + stationId + " stopped: too many errors in a row (" + troubleStreak + ")");
+                        break;
+                    }
+                    Thread.sleep(200);   // give a transient problem (a slow disk, a dying process) a moment to clear
+                    continue;
+                }
                 if (realtime) {
                     long due = start + written * 1_000_000_000L / RATE - 400_000_000L;
                     long wait = due - System.nanoTime();
@@ -401,8 +446,6 @@ public final class RadioEngine implements Runnable {
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-        } catch (IOException e) {
-            System.out.println("[radio] station " + stationId + " stopped: " + e.getMessage());
         } finally {
             running = false;
             for (Voice v : voices) {
@@ -756,8 +799,26 @@ public final class RadioEngine implements Runnable {
         return v;
     }
 
-    /** The next song from a shuffled bag; every song plays once before any repeats. */
+    private final Set<Long> warnedMissingFile = new java.util.HashSet<Long>();
+
+    /** The next song, but never one whose file just failed the preloader's check (see pickNextRaw). */
     private RadioStore.Track pickNext() {
+        for (int guard = 0; guard < 50; guard++) {
+            RadioStore.Track t = pickNextRaw();
+            if (t == null || content.fileOk(t)) {
+                return t;
+            }
+            if (warnedMissingFile.add(t.id)) {
+                System.out.println("[radio] station " + stationId + ": '" + t.label()
+                        + "' is not playable right now (its file is missing or not ready) - skipping it");
+            }
+            known.remove(t.id);   // treated as new again if the file comes back (re-uploaded, disk remounted, ...)
+        }
+        return null;   // every candidate failed the check: nothing safe to play right now
+    }
+
+    /** The next song from a shuffled bag; every song plays once before any repeats. */
+    private RadioStore.Track pickNextRaw() {
         List<RadioStore.Track> all = content.tracks();
         if (all.isEmpty()) {
             return null;

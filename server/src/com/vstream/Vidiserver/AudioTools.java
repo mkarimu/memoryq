@@ -33,7 +33,15 @@ public final class AudioTools {
         public String artist = "";
         public String album = "";
         public long durationMs;
+        public int bitrateKbps;
     }
+
+    // ---- The inspection line: nothing with a bad file ever gets to the warehouse (addTrack) or the shelf (air) ----
+    // Short IDs/jingles/ad spots are real, intentional content, so the floor only screens out an empty or
+    // near-empty file - it is not a judgement about what counts as a "real song".
+    private static final long MIN_DURATION_MS = 2000;
+    private static final long MIN_BITRATE_BPS = 8_000;     // below this, it is not a usable audio bitrate
+    private static final long MAX_BITRATE_BPS = 1_000_000; // above this, the reading itself is almost certainly bad
 
     /** Where FFmpeg's messages go (thrown away): NUL on Windows, /dev/null elsewhere. */
     private static final File NULL_FILE = new File(System.getProperty("os.name", "").toLowerCase(Locale.ROOT)
@@ -224,13 +232,16 @@ public final class AudioTools {
         if (ffprobe == null) {
             throw new IOException("FFmpeg is not installed");
         }
-        String out = runOk(ffprobe, "-v", "error", "-show_entries", "format=duration:format_tags=title,artist,album",
+        String out = runOk(ffprobe, "-v", "error", "-show_entries",
+                "format=duration,bit_rate:format_tags=title,artist,album:stream=codec_type,bit_rate",
                 "-of", "default=noprint_wrappers=1", file.toAbsolutePath().toString());
         if (out.isEmpty()) {
             throw new IOException("this file is not a sound file FFmpeg can read");
         }
         Tags t = new Tags();
-        for (String line : out.split("\\r?\\n")) {
+        boolean hasAudio = false;
+        long bitRate = 0;
+        for (String line : out.split("\r?\n")) {
             String l = line.trim();
             String lower = l.toLowerCase(Locale.ROOT);
             if (lower.startsWith("tag:title=")) {
@@ -239,16 +250,68 @@ public final class AudioTools {
                 t.artist = l.substring(11).trim();
             } else if (lower.startsWith("tag:album=")) {
                 t.album = l.substring(10).trim();
+            } else if (lower.equals("codec_type=audio")) {
+                hasAudio = true;
+            } else if (lower.startsWith("bit_rate=") && !lower.contains("n/a")) {
+                try {
+                    bitRate = Math.max(bitRate, Long.parseLong(l.substring(9).trim()));
+                } catch (NumberFormatException e) { /* a stream or the format block left it blank */ }
             }
+        }
+        if (!hasAudio) {
+            throw new IOException("this file has no sound track FFmpeg can find");
         }
         Matcher m = DURATION.matcher(out);
         if (m.find()) {
             t.durationMs = Math.round(Double.parseDouble(m.group(1)) * 1000);
         }
-        if (t.durationMs < 1000) {
-            throw new IOException("this file has no playable sound");
+        if (t.durationMs < MIN_DURATION_MS) {
+            throw new IOException("this file is only " + String.format(Locale.ROOT, "%.1f", t.durationMs / 1000.0)
+                    + "s long - at least " + (MIN_DURATION_MS / 1000) + " seconds of sound is needed");
         }
+        if (bitRate <= 0) {
+            throw new IOException("this file's bitrate could not be read - it may be damaged");
+        }
+        if (bitRate < MIN_BITRATE_BPS || bitRate > MAX_BITRATE_BPS) {
+            throw new IOException("this file's bitrate (" + (bitRate / 1000)
+                    + " kbps) does not look like a real audio bitrate - it may be damaged");
+        }
+        t.bitrateKbps = (int) (bitRate / 1000);
+        // ffprobe only reads the header: actually decode a moment of it through the same path the radio uses on
+        // air, so a file that is truncated or scrambled past its header is caught here, not mid-broadcast.
+        verifyDecodes(file);
         return t;
+    }
+
+    /** Decodes the first moment of a file the same way the radio will, to catch damage ffprobe's header read misses. */
+    private void verifyDecodes(Path file) throws IOException {
+        Process p = decode(file);
+        long got = 0;
+        try {
+            InputStream in = p.getInputStream();
+            byte[] buf = new byte[65536];
+            long wantBytes = RATE * CHANNELS * 2L;   // about one second of 16-bit PCM
+            long deadline = System.currentTimeMillis() + 15_000;
+            int n;
+            while (got < wantBytes && System.currentTimeMillis() < deadline
+                    && (n = in.read(buf)) != -1) {
+                got += n;
+            }
+        } finally {
+            p.destroyForcibly();
+            // Wait for FFmpeg to actually let go of the file before this returns: on Windows especially, a killed
+            // process does not release its open handle on the file the instant destroyForcibly() is called, and
+            // the caller is about to move or store this same file - that would otherwise fail with "file is in
+            // use" right after a perfectly good upload.
+            try {
+                p.waitFor(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        if (got < 4096) {
+            throw new IOException("this file's header looks fine, but FFmpeg could not actually decode any sound from it - it may be truncated or corrupted");
+        }
     }
 
     // ---- Decoding and encoding ----

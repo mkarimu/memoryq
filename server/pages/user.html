@@ -1010,7 +1010,7 @@ async function show(cat, tab, how) {
 }
 
 // ---------- Spot What's Missing: the carers' area (players, their settings, progress, printable report) ----------
-const MG = { players: [], current: '' };
+const MG = { players: [], current: '', vistrId: '', vistrName: '', vistrEmail: '' };
 const MG_AV = { lion: '\ud83e\udd81', elephant: '\ud83d\udc18', giraffe: '\ud83e\udd92', turtle: '\ud83d\udc22', fish: '\ud83d\udc1f', butterfly: '\ud83e\udd8b', flower: '\ud83c\udf3b',
   star: '\u2b50', car: '\ud83d\ude97', rocket: '\ud83d\ude80', sun: '\u2600\ufe0f', heart: '\u2764\ufe0f' };
 const MG_LEVELS = ['1 - First steps: one big thing missing, very forgiving taps', '2 - Looking: one or two big things', '3 - Finding: two or three, like a nose or a paw',
@@ -1052,6 +1052,7 @@ async function loadMissingPlayers() {
   const r = await api('/api/missing/players');
   if (!r.ok) { root.appendChild(el('div', r.error, 'error')); return; }
   MG.players = r.data.players || [];
+  MG.vistrId = r.data.vistrId || ''; MG.vistrName = r.data.vistrName || ''; MG.vistrEmail = r.data.vistrEmail || '';
   if (r.data.gameId) { intro.appendChild(el('div', 'Your Spot What\'s Missing game ID: ' + r.data.gameId, 'muted small')); }
   const list = el('div', null, 'mg-cards');
   MG.players.forEach(p => {
@@ -1091,7 +1092,10 @@ function mgEdit(p) {
   const f = el('div', null, 'box');
   f.appendChild(el('b', p ? 'Settings for ' + p.nickname : 'A new player'));
   f.appendChild(el('div', 'Only a first name or nickname - no surnames, birthdays or photos.', 'muted small'));
-  const nick = el('input'); nick.maxLength = 24; nick.value = p ? p.nickname : ''; nick.placeholder = 'e.g. Zawadi';
+  if (!p && MG.vistrId) {
+    f.appendChild(el('div', 'Filled in from your Vistr player (ID ' + MG.vistrId + ') - change it if you\'d rather use a different name.', 'muted small'));
+  }
+  const nick = el('input'); nick.maxLength = 24; nick.value = p ? p.nickname : (MG.vistrId ? MG.vistrName : ''); nick.placeholder = 'e.g. Zawadi';
   const avs = el('div', null, 'mg-avs');
   let avatar = p ? p.avatar : 'star';
   Object.keys(MG_AV).forEach(k => {

@@ -3847,8 +3847,9 @@ function svgNode(text) {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const svg = doc.documentElement;
   if (svg.nodeName !== 'svg') { throw new Error('not an SVG picture'); }
-  svg.querySelectorAll('script, foreignObject, image, a, use, style, iframe').forEach(n => n.remove());
-  svg.querySelectorAll('*').forEach(n => Array.from(n.attributes).forEach(a => { if (/^on/i.test(a.name) || /href$/i.test(a.name)) { n.removeAttribute(a.name); } }));
+  svg.querySelectorAll('script, foreignObject, a, use, style, iframe').forEach(n => n.remove());
+  svg.querySelectorAll('image').forEach(n => { if (!/^data:image\/(webp|png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(n.getAttribute('href') || '')) { n.remove(); } });
+  svg.querySelectorAll('*').forEach(n => Array.from(n.attributes).forEach(a => { if (/^on/i.test(a.name) || /href$/i.test(a.name) && n.tagName.toLowerCase() !== 'image') { n.removeAttribute(a.name); } }));
   Array.from(svg.attributes).forEach(a => { if (/^on/i.test(a.name)) { svg.removeAttribute(a.name); } });
   return document.importNode(svg, true);
 }
@@ -3905,11 +3906,13 @@ async function editPicture(p) {
   const ages = ['child', 'teen', 'adult'].map(a => h('input', { type: 'checkbox', value: a, checked: !p || !p.ages || !p.ages.length || p.ages.indexOf(a) >= 0 }));
   const lic = h('input', { value: p ? (p.licence || '') : '', placeholder: 'who drew it / the licence (pictures must be yours or licensed)', style: 'width:100%' });
   const file = h('input', { type: 'file', accept: '.svg,image/svg+xml' });
-  const prev = h('div', { style: 'background:#fffdf7;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:240px;display:flex;align-items:center;justify-content:center' }, h('span', { class: 'muted' }, p ? 'Loading...' : 'Choose an SVG file'));
+  const photoFile = h('input', { type: 'file', accept: '.jpg,.jpeg,.png,image/jpeg,image/png' });
+  const photoNote = h('span', { class: 'muted small' }, '');
+  const prev = h('div', { style: 'background:#fffdf7;border:1px solid var(--line);border-radius:8px;padding:8px;min-height:240px;display:flex;align-items:center;justify-content:center' }, h('span', { class: 'muted' }, p ? 'Loading...' : 'Choose an SVG file, or upload a photo below'));
   const list = h('div', {});
-  const note = h('div', { class: 'muted small', style: 'margin:6px 0' }, 'Click a part in the picture to add it. Parts are the picture\'s top-level shapes or groups (draw each part as its own group in Inkscape or Illustrator). Twins (two eyes, two wheels) are never hidden together.');
+  const note = h('div', { class: 'muted small', style: 'margin:6px 0' }, 'Click a part in the picture to add it (hand-drawn SVG), or use "Draw a part" to drag boxes over a photo. Parts are the picture\'s top-level shapes or groups. Twins (two eyes, two wheels) are never hidden together.');
   const err = h('div', { class: 'error' });
-  let svgEl = null, hideTest = false;
+  let svgEl = null, hideTest = false, drawMode = false, drawing = null;
   const highlight = (id, on) => { const n = svgEl && svgEl.querySelector('[id="' + CSS.escape(id) + '"]'); if (n) { n.style.outline = on ? '3px solid #2f6fde' : ''; n.style.filter = on ? 'drop-shadow(0 0 4px #2f6fde)' : ''; } };
   const drawList = () => {
     list.textContent = '';
@@ -3932,22 +3935,66 @@ async function editPicture(p) {
     let k = 1;
     Array.from(svgEl.children).forEach(c => { if (!c.id && !/^(defs|title|desc)$/i.test(c.tagName)) { while (svgEl.querySelector('#part-' + k)) { k++; } c.id = 'part-' + k; } });
     svgEl.addEventListener('click', e => {
+      if (drawMode) { return; } // dragging a box, not picking an existing shape
       let n = e.target;
       while (n && n.parentNode !== svgEl && !(n.id && st.parts.some(x => x.id === n.id))) { n = n.parentNode; }
-      if (!n || n === svgEl || !n.id) { return; }
+      if (!n || n === svgEl || !n.id || n.tagName.toLowerCase() === 'image') { return; }
       if (!st.parts.some(x => x.id === n.id)) {
         const guess = n.getAttribute('data-name-en') || n.id.replace(/^(left|right|front|back)-|-\d+$/g, '').replace(/-/g, ' ');
         st.parts.push({ id: n.id, kind: n.getAttribute('data-part') || guess, size: n.getAttribute('data-size') || 'medium', twin: n.getAttribute('data-twin') || '', en: guess, sw: n.getAttribute('data-name-sw') || '' });
         drawList();
       }
     });
+    // Draw a part: drag a box over the picture (the only way to add parts to a photo, since it has no named shapes).
+    const toPt = e => { const pt = svgEl.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const m = svgEl.getScreenCTM(); return m ? pt.matrixTransform(m.inverse()) : pt; };
+    svgEl.addEventListener('pointerdown', e => {
+      if (!drawMode) { return; }
+      const p0 = toPt(e);
+      const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r.setAttribute('x', p0.x); r.setAttribute('y', p0.y); r.setAttribute('width', 0); r.setAttribute('height', 0);
+      const vb = svgEl.viewBox.baseVal, sw = Math.max(1, (vb && vb.width || 300) / 220);
+      r.setAttribute('fill', 'rgba(230,70,70,.5)'); r.setAttribute('stroke', '#3d2b1f'); r.setAttribute('stroke-width', sw);
+      svgEl.appendChild(r);
+      drawing = { r, x0: p0.x, y0: p0.y };
+      e.preventDefault();
+    });
+    svgEl.addEventListener('pointermove', e => {
+      if (!drawing) { return; }
+      const p1 = toPt(e);
+      drawing.r.setAttribute('x', Math.min(drawing.x0, p1.x)); drawing.r.setAttribute('y', Math.min(drawing.y0, p1.y));
+      drawing.r.setAttribute('width', Math.abs(p1.x - drawing.x0)); drawing.r.setAttribute('height', Math.abs(p1.y - drawing.y0));
+    });
+    const finishDrawing = () => {
+      if (!drawing) { return; }
+      const w = parseFloat(drawing.r.getAttribute('width')) || 0, hgt = parseFloat(drawing.r.getAttribute('height')) || 0;
+      if (w < 4 || hgt < 4) { drawing.r.remove(); drawing = null; return; } // too small to be a real box - ignore
+      let k = 1; while (svgEl.querySelector('#part-' + k)) { k++; }
+      drawing.r.id = 'part-' + k;
+      st.parts.push({ id: drawing.r.id, kind: '', size: 'medium', twin: '', en: '', sw: '' });
+      drawList();
+      drawing = null;
+    };
+    svgEl.addEventListener('pointerup', finishDrawing);
+    svgEl.addEventListener('pointerleave', finishDrawing);
     prev.appendChild(svgEl);
     st.svgText = new XMLSerializer().serializeToString(svgEl);
   };
   file.addEventListener('change', () => {
     const f = file.files[0]; if (!f) { return; }
-    if (f.size > 400000) { err.textContent = 'The picture is too big (400 KB at most).'; return; }
+    if (f.size > 2200000) { err.textContent = 'The picture is too big (2 MB at most).'; return; }
     const rd = new FileReader(); rd.onload = () => { err.textContent = ''; st.parts = []; show(String(rd.result)); drawList(); st.changedSvg = true; }; rd.readAsText(f);
+  });
+  photoFile.addEventListener('change', async () => {
+    const f = photoFile.files[0]; if (!f) { return; }
+    if (f.size > 12 * 1024 * 1024) { err.textContent = 'That photo is too big (12 MB at most).'; return; }
+    err.textContent = ''; photoNote.textContent = 'Converting the photo...';
+    try {
+      const r = await fetch('/api/admin/missing/photo', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': f.type || 'application/octet-stream' }, body: f });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) { throw new Error(data.error || ('could not convert that photo (' + r.status + ')')); }
+      photoNote.textContent = 'Converted (' + data.width + 'x' + data.height + '). Drag "Draw a part" boxes over it, then Save.';
+      st.parts = []; show(data.svg); drawList(); st.changedSvg = true;
+    } catch (e) { err.textContent = e.message; photoNote.textContent = ''; }
   });
   const save = h('button', { class: 'pri', on: { click: async () => {
     err.textContent = '';
@@ -3968,14 +4015,20 @@ async function editPicture(p) {
     st.parts.forEach(x => { const n = svgEl && svgEl.querySelector('[id="' + CSS.escape(x.id) + '"]'); if (n) { n.style.visibility = hideTest ? 'hidden' : ''; } });
     test.textContent = hideTest ? 'Show all parts again' : 'Preview: hide all the parts';
   } } }, 'Preview: hide all the parts');
+  const drawBtn = h('button', { on: { click: () => {
+    drawMode = !drawMode;
+    drawBtn.textContent = drawMode ? 'Done drawing' : 'Draw a part (drag a box)';
+    if (svgEl) { svgEl.style.cursor = drawMode ? 'crosshair' : 'pointer'; }
+  } } }, 'Draw a part (drag a box)');
   root.append(back, h('div', { class: 'box' }, h('b', { style: 'font-size:16px' }, p ? 'Change "' + p.title.en + '"' : 'Add a picture'),
     p && p.builtin ? h('div', { class: 'muted small' }, 'A built-in picture: your changes are kept as a copy, and "Put back the original" undoes them.') : null,
     h('div', { class: 'fgrid', style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 12px;margin-top:8px' },
       h('label', {}, 'Short name (id, letters and dashes)', fid), h('label', {}, 'Name in English', ten), h('label', {}, 'Name in Kiswahili', tsw), h('label', {}, 'Kind of picture', cat)),
     h('div', { class: 'small', style: 'margin:4px 0' }, 'For: ', ages.map(a => h('label', { style: 'margin-right:10px' }, a, ' ', a.value))),
     h('label', { class: 'small' }, 'Artwork and licence', lic),
-    h('div', { style: 'margin:8px 0' }, p ? 'Replace the drawing (optional): ' : 'The drawing (SVG): ', file)),
-    h('div', { style: 'display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:12px;align-items:start' }, h('div', {}, prev, test),
+    h('div', { style: 'margin:8px 0' }, p ? 'Replace the drawing (optional): ' : 'The drawing (SVG): ', file),
+    h('div', { style: 'margin:4px 0' }, p ? 'Or replace with a photo (JPG/PNG - converted automatically): ' : 'Or upload a photo (JPG/PNG - converted automatically): ', photoFile, ' ', photoNote)),
+    h('div', { style: 'display:grid;grid-template-columns:minmax(260px,1fr) minmax(320px,1.4fr);gap:12px;align-items:start' }, h('div', {}, prev, test, ' ', drawBtn),
       h('div', { class: 'box', style: 'margin:0' }, h('b', {}, 'Parts that can go missing'), note, list)), err, save);
   drawList();
   if (p) {

@@ -313,7 +313,8 @@ public class VideoServerMain {
         vistrImport.init();
         api.addModule(vistrImport::register);
         // Spot What's Missing (Vistr game 2): players, sessions, progress and pictures live here; the game is on vistr.memoryq.com/missing/
-        MissingGame missing = new MissingGame(Paths.get(System.getProperty("vstream.missingDir", "missing")), sessions, users, signIn, System::currentTimeMillis);
+        MissingGame missing = new MissingGame(Paths.get(System.getProperty("vstream.missingDir", "missing")), sessions, users, signIn,
+                System::currentTimeMillis, audioTools, profiles, emails);
         missing.init();
         api.addModule(missing::register);
         // Moderators: members the super-admin trusts with parts of the admin panel (Profiler -> Moderators), right by right

@@ -4,7 +4,9 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -22,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 
 import javax.xml.XMLConstants;
@@ -58,6 +61,8 @@ import org.w3c.dom.NodeList;
  *   GET  /api/missing/progress?player=             the carer's progress page and printable report
  *   GET  /api/admin/missing                        super-admin: pictures (with use counts) and numbers
  *   POST /api/admin/missing/picture   JSON         add or change a picture (SVG + parts); a built-in one is kept as a copy
+ *   POST /api/admin/missing/photo     (JPG/PNG bytes) converts a photo to WebP, wrapped in a small SVG <image> so the
+ *                                     admin can draw <rect> parts over it and Save through /picture as usual
  *   POST /api/admin/missing/enable    id, on       switch a picture on or off
  *   POST /api/admin/missing/delete    id           delete an added picture / put a built-in one back as it was
  *   GET  /api/admin/missing/svg?id=                a picture for the admin's preview (also when switched off)
@@ -139,6 +144,9 @@ public final class MissingGame {
     private final UserStore users;
     private final SignInApi signIn;
     private final LongSupplier clock;
+    private final AudioTools tools; // photo upload only: converts JPG/PNG to WebP (may be null in tests that don't need it)
+    private final ProfileStore profiles; // tester ID reuse only: the carer's own name, to suggest for a new player (may be null)
+    private final EmailService emails; // tester ID reuse only: the carer's own email (may be null)
     private final Map<String, Pic> pics = new LinkedHashMap<String, Pic>();
     private final Map<String, Player> players = new LinkedHashMap<String, Player>();
     private final Map<String, Sess> sess = new LinkedHashMap<String, Sess>();
@@ -150,11 +158,23 @@ public final class MissingGame {
     static volatile String extraOrigin = System.getProperty("vstream.missingOrigin"); // tests
 
     public MissingGame(Path dir, SessionStore sessions, UserStore users, SignInApi signIn, LongSupplier clock) {
+        this(dir, sessions, users, signIn, clock, null);
+    }
+
+    public MissingGame(Path dir, SessionStore sessions, UserStore users, SignInApi signIn, LongSupplier clock, AudioTools tools) {
+        this(dir, sessions, users, signIn, clock, tools, null, null);
+    }
+
+    public MissingGame(Path dir, SessionStore sessions, UserStore users, SignInApi signIn, LongSupplier clock, AudioTools tools, ProfileStore profiles,
+            EmailService emails) {
         this.dir = dir;
         this.sessions = sessions;
         this.users = users;
         this.signIn = signIn;
         this.clock = clock;
+        this.tools = tools;
+        this.profiles = profiles;
+        this.emails = emails;
     }
 
     // ================================================================ files
@@ -619,7 +639,10 @@ public final class MissingGame {
                         }
                     }
                     String gid = GameIds.current() == null ? "" : GameIds.current().idOf(owner, "missing");
-                    return sb.append("],\"carer\":").append(q(owner)).append(",\"gameId\":").append(q(gid)).append(",\"avatars\":").append(arr(AVATARS)).append('}').toString();
+                    String[] vistr = vistrIdentity(owner); // {id, name, email} - all "" if the carer has no Vistr player
+                    return sb.append("],\"carer\":").append(q(owner)).append(",\"gameId\":").append(q(gid)).append(",\"avatars\":").append(arr(AVATARS))
+                            .append(",\"vistrId\":").append(q(vistr[0])).append(",\"vistrName\":").append(q(vistr[1])).append(",\"vistrEmail\":")
+                            .append(q(vistr[2])).append('}').toString();
                 }
                 case "players/save":
                     if (!mq) {
@@ -658,6 +681,36 @@ public final class MissingGame {
                     throw new Bad(404, "not found");
             }
         }
+    }
+
+    /**
+     * Tester ID reuse: if this carer already has a Vistr player, their name and email can be reused for a new Spot
+     * What's Missing player instead of typing a new identity from scratch. Nothing is made up: a carer with no Vistr
+     * player gets {"","",""}, same as the rest of this file never invents a game ID that was not actually given.
+     */
+    private String[] vistrIdentity(String owner) {
+        String id = GameIds.current() == null ? "" : GameIds.current().idOf(owner, "vistr");
+        if (id == null || id.isEmpty()) {
+            return new String[] {"", "", ""};
+        }
+        String name = "";
+        if (profiles != null) {
+            ProfileStore.Profile pr = profiles.get(owner);
+            if (pr != null) {
+                name = !pr.stageName.isEmpty() ? pr.stageName : (pr.firstName + " " + pr.lastName).trim();
+            }
+        }
+        if (name.isEmpty()) {
+            name = owner;
+        }
+        String email = "";
+        if (emails != null) {
+            EmailService.Entry e = emails.get(owner);
+            if (e != null && e.email != null) {
+                email = e.email;
+            }
+        }
+        return new String[] {id, name, email};
     }
 
     private static String arr(String[] a) {
@@ -1103,6 +1156,14 @@ public final class MissingGame {
             }
             String op = ex.getRequestURI().getPath().substring("/api/admin/missing".length()).replaceFirst("^/", "");
             boolean post = "POST".equalsIgnoreCase(ex.getRequestMethod());
+            if (op.equals("photo")) { // raw JPG/PNG bytes - must not be read as text (readBody would corrupt it)
+                if (!post) {
+                    throw new Bad(405, "use POST");
+                }
+                out = convertPhoto(ex);
+                send(ex, status, "application/json; charset=utf-8", out.getBytes(StandardCharsets.UTF_8));
+                return;
+            }
             String body = post ? SuperAgent.readBody(ex, 600000) : "";
             if (op.equals("svg")) { // the super-admin's preview, also of pictures that are switched off
                 Pic pc;
@@ -1182,6 +1243,97 @@ public final class MissingGame {
         send(ex, status, "application/json; charset=utf-8", out.getBytes(StandardCharsets.UTF_8));
     }
 
+    private static final long MAX_PHOTO_BYTES = 12_000_000;
+    private static final long MAX_WEBP_BYTES = 1_300_000;
+
+    /** A JPG/PNG the admin uploaded, converted to WebP and wrapped in a small SVG (just one <image>, viewBox = the
+     * picture's own pixel size) so it can go through the same /picture save as a hand-drawn SVG: the admin draws
+     * <rect> "parts" over it in the browser and Saves as usual. Nothing is written to disk here. */
+    private String convertPhoto(HttpExchange ex) throws Bad, IOException {
+        if (tools == null || !tools.ready()) {
+            throw new Bad(409, "FFmpeg is not installed on the server - photo uploads need it to convert the picture");
+        }
+        InputStream in = ex.getRequestBody();
+        ByteArrayOutputStream buf = new ByteArrayOutputStream();
+        byte[] b = new byte[65536];
+        long total = 0;
+        int n;
+        while ((n = in.read(b)) != -1) {
+            total += n;
+            if (total > MAX_PHOTO_BYTES) {
+                throw new Bad(413, "that photo is too big (12 MB at most)");
+            }
+            buf.write(b, 0, n);
+        }
+        byte[] data = buf.toByteArray();
+        if (data.length < 100) {
+            throw new Bad(400, "the file is empty");
+        }
+        Path tmpDir = dir.resolve("tmp");
+        Files.createDirectories(tmpDir);
+        Path src = Files.createTempFile(tmpDir, "missing-photo-", ".img");
+        Path out = Files.createTempFile(tmpDir, "missing-photo-", ".webp");
+        try {
+            Files.write(src, data);
+            Process p = new ProcessBuilder(tools.ffmpegPath(), "-y", "-v", "error", "-i", src.toString(), "-vf",
+                    "scale='min(1400,iw)':'min(1400,ih)':force_original_aspect_ratio=decrease", "-quality", "82", out.toString())
+                    .redirectErrorStream(true).start();
+            readAllQuiet(p.getInputStream()); // drain fully before waitFor, or a full pipe can stall the process
+            try {
+                if (!p.waitFor(20, TimeUnit.SECONDS)) {
+                    p.destroyForcibly();
+                    p.waitFor(3, TimeUnit.SECONDS); // Windows: let the handle free before the finally block deletes the files
+                    throw new Bad(400, "that photo took too long to convert");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new Bad(500, "the conversion was interrupted");
+            }
+            if (p.exitValue() != 0 || !Files.isRegularFile(out) || Files.size(out) < 20) { // a flat/simple image can be a tiny valid WebP
+                throw new Bad(400, "that did not look like a picture we could convert (choose a JPG or PNG)");
+            }
+            if (Files.size(out) > MAX_WEBP_BYTES) {
+                throw new Bad(413, "the converted picture is still too big - use a smaller or simpler photo");
+            }
+            int[] wh = probeSize(out);
+            byte[] webp = Files.readAllBytes(out);
+            String b64 = Base64.getEncoder().encodeToString(webp);
+            String svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 " + wh[0] + " " + wh[1] + "\">"
+                    + "<image id=\"photo-bg\" href=\"data:image/webp;base64," + b64 + "\" x=\"0\" y=\"0\" width=\"" + wh[0] + "\" height=\"" + wh[1]
+                    + "\"/></svg>";
+            return "{\"svg\":" + q(svg) + ",\"width\":" + wh[0] + ",\"height\":" + wh[1] + "}";
+        } finally {
+            Files.deleteIfExists(src);
+            Files.deleteIfExists(out);
+        }
+    }
+
+    /** The converted picture's pixel size, via ffprobe; a sane fallback if its output ever changes shape. */
+    private int[] probeSize(Path file) {
+        try {
+            Process p = new ProcessBuilder(tools.ffprobePath(), "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                    "-of", "csv=p=0", file.toString()).start();
+            byte[] o = readAllQuiet(p.getInputStream());
+            p.waitFor(10, TimeUnit.SECONDS);
+            String[] parts = new String(o, StandardCharsets.UTF_8).trim().split("[,x]");
+            int w = (int) l(parts[0]);
+            int h2 = parts.length > 1 ? (int) l(parts[1]) : w;
+            return new int[] {Math.max(1, w), Math.max(1, h2)};
+        } catch (Exception e) {
+            return new int[] {1200, 900};
+        }
+    }
+
+    private static byte[] readAllQuiet(InputStream in) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) {
+            b.write(buf, 0, n);
+        }
+        return b.toByteArray();
+    }
+
     private String adminJson() {
         Map<String, Integer> uses = new HashMap<String, Integer>();
         long week = clock.getAsLong() - 7 * SessionStore.DAY_MS;
@@ -1218,7 +1370,7 @@ public final class MissingGame {
     // ---- adding or changing a picture ----
 
     private static final Set<String> ELEMENTS = new HashSet<String>(Arrays.asList("svg", "g", "path", "circle", "ellipse", "rect", "line", "polyline",
-            "polygon", "text", "tspan", "defs", "linearGradient", "radialGradient", "stop", "title", "desc"));
+            "polygon", "text", "tspan", "defs", "linearGradient", "radialGradient", "stop", "title", "desc", "image"));
     private static final Set<String> ATTRS = new HashSet<String>(Arrays.asList("id", "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "y1", "x2", "y2", "dx",
             "dy", "width", "height", "points", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-dasharray", "stroke-miterlimit",
             "opacity", "fill-opacity", "stroke-opacity", "fill-rule", "clip-rule", "transform", "viewBox", "font-family", "font-size", "font-weight",
@@ -1282,6 +1434,26 @@ public final class MissingGame {
         return true;
     }
 
+    /** An <image>'s href: only a self-contained WebP/PNG/JPEG data URI (no outside files) of a sane size - this is the
+     * one place a photo picture's bytes are allowed to carry a "data:" value. */
+    private static boolean safeHref(String v) {
+        if (v == null) {
+            return false;
+        }
+        String mime = null;
+        for (String m : new String[] {"webp", "png", "jpeg"}) {
+            if (v.startsWith("data:image/" + m + ";base64,")) {
+                mime = m;
+                break;
+            }
+        }
+        if (mime == null) {
+            return false;
+        }
+        String b64 = v.substring(v.indexOf(',') + 1);
+        return !b64.isEmpty() && b64.length() <= 2_200_000 && b64.matches("[A-Za-z0-9+/=]+");
+    }
+
     private static void clean(Element el) {
         NamedNodeMap at = el.getAttributes();
         List<Attr> drop = new ArrayList<Attr>();
@@ -1290,8 +1462,13 @@ public final class MissingGame {
             String name = a.getName();
             boolean data = name.matches("data-[a-z0-9-]{1,30}");
             boolean ns = name.startsWith("xmlns");
+            boolean imageHref = name.equals("href") && "image".equals(el.getLocalName());
             if (ns && !name.equals("xmlns")) {
                 drop.add(a);
+            } else if (imageHref) {
+                if (!safeHref(a.getValue())) {
+                    drop.add(a);
+                }
             } else if (!(ATTRS.contains(name) || data) || !safeValue(a.getValue()) || name.equals("xmlns") && !a.getValue().equals("http://www.w3.org/2000/svg")) {
                 drop.add(a);
             }
@@ -1309,6 +1486,9 @@ public final class MissingGame {
                     remove.add(k);
                 } else {
                     clean((Element) k);
+                    if ("image".equals(n) && !((Element) k).hasAttribute("href")) {
+                        remove.add(k); // an unsafe href was just dropped above - an <image> with nothing safe to show is not kept
+                    }
                 }
             } else if (k.getNodeType() == Node.TEXT_NODE) {
                 String n = el.getLocalName();
@@ -1358,8 +1538,8 @@ public final class MissingGame {
             throw new Bad(400, "the picture's name (id): 2 to 40 letters, numbers or dashes, e.g. red-bus");
         }
         String svg = MiniJson.str(o, "svg");
-        if (svg.length() > 400000) {
-            throw new Bad(413, "the picture is too big (400 KB at most)");
+        if (svg.length() > 2_200_000) { // a hand-drawn SVG is tiny; a converted photo's base64 <image> needs more room
+            throw new Bad(413, "the picture is too big (2 MB at most)");
         }
         Pic old = pics.get(id);
         if (svg.isEmpty()) {
